@@ -21,10 +21,11 @@ export default function Login() {
     const err = await signIn(email, password);
     setLoading(false);
     if (err) {
-      if (err.includes('Invalid login credentials') || err.includes('invalid_credentials')) {
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
-      } else if (err.includes('Email not confirmed')) {
-        setError('يرجى تأكيد البريد الإلكتروني أولاً');
+      const lower = err.toLowerCase();
+      if (lower.includes('invalid login credentials') || lower.includes('invalid_credentials') || lower.includes('grant') || lower.includes('bad request')) {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة، أو لم يتم تأكيد الحساب بعد');
+      } else if (lower.includes('email not confirmed')) {
+        setError('يرجى تأكيد البريد الإلكتروني في حسابك على Supabase أو تعطيل إجبار التأكيد');
       } else {
         setError(err);
       }

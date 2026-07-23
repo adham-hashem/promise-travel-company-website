@@ -99,7 +99,11 @@ export default function WebsiteFooter({ onNavigate }: Props) {
 
         <div className="border-t border-white/10 mt-12 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-white/40 text-xs">© 2026 Promise Travel. جميع الحقوق محفوظة.</p>
-          <p className="text-white/40 text-xs">تصميم وتطوير فريق Promise</p>
+          <div className="flex items-center gap-4 text-xs text-white/40">
+            <a href="/#/admin" className="hover:text-gold-300 transition-colors">لوحة التحكم (دخول الموظفين)</a>
+            <span>•</span>
+            <span>تصميم وتطوير فريق Promise</span>
+          </div>
         </div>
       </div>
     </footer>

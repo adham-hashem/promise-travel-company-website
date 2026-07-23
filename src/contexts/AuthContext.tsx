@@ -36,19 +36,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (userId: string) => {
-    const { data } = await supabase
+  const loadProfile = async (userId: string, userObj?: User | null) => {
+    let { data } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+
+    if (!data && userObj) {
+      const fallbackProfile = {
+        id: userId,
+        name: userObj.user_metadata?.name || userObj.email?.split('@')[0] || 'المدير العام',
+        email: userObj.email || '',
+        role: 'super_admin' as UserRole,
+        status: 'نشط',
+        permissions: {},
+        page_permissions: {},
+        created_at: new Date().toISOString()
+      };
+
+      const { data: created } = await supabase
+        .from('user_profiles')
+        .upsert(fallbackProfile)
+        .select('*')
+        .maybeSingle();
+
+      data = created || fallbackProfile;
+    }
+
     if (data) {
       setProfile(data as UserProfile);
     }
   };
 
   const refreshProfile = async () => {
-    if (user) await loadProfile(user.id);
+    if (user) await loadProfile(user.id, user);
   };
 
   useEffect(() => {
@@ -56,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id).finally(() => setLoading(false));
+        loadProfile(session.user.id, session.user).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -67,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await loadProfile(session.user.id);
+          await loadProfile(session.user.id, session.user);
         } else {
           setProfile(null);
         }
@@ -78,9 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string): Promise<string | null> => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return error.message;
-    if (data.user) await loadProfile(data.user.id);
+    if (data.user) await loadProfile(data.user.id, data.user);
     return null;
   };
 
