@@ -1,0 +1,9 @@
+# Promise Travel - Robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+
+# Host and Sitemap Locations
+Host: https://promise-travel.com
+Sitemap: https://promise-travel.com/sitemap.xml
