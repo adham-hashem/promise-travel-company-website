@@ -1,0 +1,57 @@
+name: Automatic Supabase Database Sync & CI Checks
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  typecheck-and-build:
+    name: Verify Code & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test Production Build
+        run: npm run build
+
+  deploy-supabase:
+    name: Auto Sync Supabase Migrations
+    needs: typecheck-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link & Push Database Migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "Pushing migrations automatically to Supabase..."
+            supabase link --project-ref $SUPABASE_PROJECT_ID --password "$SUPABASE_DB_PASSWORD"
+            supabase db push
+          else
+            echo "Supabase secrets not set in GitHub repository settings. Skipping CLI push."
+          fi
