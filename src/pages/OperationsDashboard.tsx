@@ -833,6 +833,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
             </div>
           </div>
         </div>
+      )}
+
       {/* Transfer to Flight Modal */}
       {showFlightTransferModal && selected && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>

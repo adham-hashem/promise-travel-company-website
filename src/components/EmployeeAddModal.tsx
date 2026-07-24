@@ -432,4 +432,3 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
     </div>
   );
 }
-}
