@@ -702,20 +702,47 @@ function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOp
   }, []);
 
   const handleTransfer = async () => {
+    if (!file?.id) {
+      alert('خطأ: لم يتم العثور على الملف. حاول مجدداً.');
+      return;
+    }
     setTransferring(true);
     const updatedNotes = notes
       ? `${file.notes ? file.notes + ' | ' : ''}ملاحظات اعتماد قسم الحسابات: ${notes}`
       : file.notes;
 
-    const payload = {
-      workflow_stage: 'operations',
-      file_status: 'قيد التجهيز',
-      financially_approved: true,
-      assigned_to: targetEmpId || null,
-      notes: updatedNotes,
-    };
+    // Try update with financially_approved first, fallback without it
+    let updateError: any = null;
+    const { error: err1 } = await supabase
+      .from('operation_files')
+      .update({
+        workflow_stage: 'operations',
+        file_status: 'قيد التجهيز',
+        financially_approved: true,
+        assigned_to: targetEmpId || null,
+        notes: updatedNotes,
+      })
+      .eq('id', file.id);
 
-    await supabase.from('operation_files').update(payload).eq('id', file.id);
+    if (err1) {
+      // Retry without financially_approved in case column doesn't exist
+      const { error: err2 } = await supabase
+        .from('operation_files')
+        .update({
+          workflow_stage: 'operations',
+          file_status: 'قيد التجهيز',
+          assigned_to: targetEmpId || null,
+          notes: updatedNotes,
+        })
+        .eq('id', file.id);
+      updateError = err2;
+    }
+
+    if (updateError) {
+      alert(`فشل التحويل للتشغيل: ${updateError.message}`);
+      setTransferring(false);
+      return;
+    }
 
     if (file.customer_id) {
       await supabase.from('workflow_timeline').insert({

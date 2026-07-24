@@ -123,13 +123,15 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         *,
         customer:customers(*),
         booking:bookings(*),
-        hotel:hotels(*),
-        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
+        hotel:hotels(*)
       `)
       .single();
 
     if (data) {
-      const updated = data as unknown as OpFile;
+      const emp = targetFlightEmpId
+        ? employees.find((e) => e.id === targetFlightEmpId) || null
+        : selected.assigned_employee;
+      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
       setSelected(updated);
       setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
     }
@@ -162,17 +164,31 @@ export default function OperationsDashboard({ onNavigate }: Props) {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    // Use simple select without named FK hint — avoids failure if FK constraint name differs in remote DB
+    const { data, error } = await supabase
       .from('operation_files')
       .select(`
         *,
         customer:customers(*),
         booking:bookings(*),
-        hotel:hotels(*),
-        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
+        hotel:hotels(*)
       `)
       .order('created_at', { ascending: false });
-    const rows = (data as unknown as OpFile[]) || [];
+
+    if (error) {
+      console.error('[OperationsDashboard] load error:', error.message);
+    }
+
+    // Load employees separately to enrich assigned_to
+    const { data: empData } = await supabase.from('employees').select('id, name').eq('is_active', true);
+    const empMap: Record<string, { id: string; name: string }> = {};
+    (empData || []).forEach((e: any) => { empMap[e.id] = e; });
+
+    const rows = ((data as unknown as OpFile[]) || []).map((r: any) => ({
+      ...r,
+      assigned_employee: r.assigned_to ? (empMap[r.assigned_to] || null) : null,
+    }));
+
     setFiles(rows);
     setStats({
       total: rows.length,
@@ -253,12 +269,15 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         *,
         customer:customers(*),
         booking:bookings(*),
-        hotel:hotels(*),
-        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
+        hotel:hotels(*)
       `)
       .single();
     if (data) {
-      const updated = data as unknown as OpFile;
+      // Attach assigned_employee from employees list
+      const emp = updates.assigned_to
+        ? employees.find((e) => e.id === updates.assigned_to) || null
+        : selected.assigned_employee;
+      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
       setSelected(updated);
       setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
       setStats((s) => ({
