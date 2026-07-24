@@ -45,18 +45,23 @@ export default function Payments() {
   const [rejectionReason, setRejectionReason] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [transferredFiles, setTransferredFiles] = useState<any[]>([]);
+  const [opsTransferFile, setOpsTransferFile] = useState<any | null>(null);
+
   useEffect(() => {
     load();
   }, []);
 
   const load = async () => {
     setLoading(true);
-    const [{ data: payData }, { data: bkData }] = await Promise.all([
+    const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
+      supabase.from('operation_files').select('*, customer:customers(*), booking:bookings(*)').eq('workflow_stage', 'accounts').order('created_at', { ascending: false }),
     ]);
     setPayments((payData as PayRow[]) || []);
     setBookings((bkData as Booking[]) || []);
+    setTransferredFiles(opsData || []);
     setLoading(false);
   };
 
@@ -294,6 +299,73 @@ export default function Payments() {
           <button onClick={openAdd} className="btn-gold"><Plus size={16} /> إضافة دفعة</button>
         </div>
       </div>
+
+      {/* Transferred Files to Accounts (Stage 2 -> Stage 3) */}
+      {transferredFiles.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-gold-50/50 to-white rounded-2xl border border-gold-300 p-5 space-y-3.5 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
+                2➜3
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-sm flex items-center gap-2">
+                  📥 عملاء محوّلون لقسم الحسابات ({transferredFiles.length})
+                </h3>
+                <p className="text-xs text-gray-500">عملاء محولون من قسم الاستعلامات والـ CRM بانتظار معالجة الدفعات والفواتير والتحويل للتشغيل</p>
+              </div>
+            </div>
+            <span className="text-xs text-amber-800 bg-amber-100 px-3 py-1 rounded-full font-bold border border-amber-200">
+              بانتظار المعالجة الماليّة
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {transferredFiles.map((file) => (
+              <div key={file.id} className="bg-white rounded-xl p-4 shadow-sm border border-gold-200 space-y-2.5 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-navy-900 text-sm">{file.customer?.name || 'عميل'}</span>
+                    {file.customer?.client_code && (
+                      <span className="text-[11px] font-mono text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-200">
+                        {file.customer.client_code}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    {file.customer?.phone && <p>📱 الهاتف: <span dir="ltr" className="font-semibold text-navy-800">{file.customer.phone}</span></p>}
+                    {file.customer?.service_type && <p>✈️ الخدمة: <span className="font-semibold text-navy-800">{file.customer.service_type}</span></p>}
+                    {file.notes && (
+                      <div className="mt-1 bg-amber-50/80 p-2 rounded-lg border border-amber-200 text-[11px] text-navy-900">
+                        <span className="font-bold text-amber-800 block">📝 ملاحظات التحويل:</span>
+                        <p className="line-clamp-3 leading-relaxed">{file.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-gray-100 mt-2">
+                  <button
+                    onClick={() => {
+                      setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '' });
+                      setShowModal(true);
+                    }}
+                    className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
+                  >
+                    <Plus size={12} /> إضافة دفعة
+                  </button>
+                  <button
+                    onClick={() => setOpsTransferFile(file)}
+                    className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
+                  >
+                    🚀 تحويل للتشغيل
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
@@ -534,6 +606,140 @@ export default function Payments() {
           </div>
         </div>
       )}
+
+      {/* Transfer file to Operations modal */}
+      {opsTransferFile && (
+        <TransferFileToOpsModal
+          file={opsTransferFile}
+          onClose={() => setOpsTransferFile(null)}
+          onTransferred={() => {
+            setOpsTransferFile(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface TransferFileOpsProps {
+  file: any;
+  onClose: () => void;
+  onTransferred: () => void;
+}
+
+function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOpsProps) {
+  const [opsEmployees, setOpsEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [targetEmpId, setTargetEmpId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [transferring, setTransferring] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
+      const list = (data || []).map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` }));
+      setOpsEmployees(list);
+    })();
+  }, []);
+
+  const handleTransfer = async () => {
+    setTransferring(true);
+    const updatedNotes = notes
+      ? `${file.notes ? file.notes + ' | ' : ''}ملاحظات اعتماد قسم الحسابات: ${notes}`
+      : file.notes;
+
+    const payload = {
+      workflow_stage: 'operations',
+      file_status: 'قيد التجهيز',
+      financially_approved: true,
+      assigned_to: targetEmpId || null,
+      notes: updatedNotes,
+    };
+
+    await supabase.from('operation_files').update(payload).eq('id', file.id);
+
+    if (file.customer_id) {
+      await supabase.from('workflow_timeline').insert({
+        customer_id: file.customer_id,
+        booking_id: file.booking_id || null,
+        stage: 'operations',
+        stage_label: 'قسم التشغيل',
+        department: 'الحسابات',
+        employee_id: targetEmpId || null,
+        status: 'مكتمل',
+        notes: notes || 'تم اعتماد ملف العميل مالياً وتحويله من قسم الحسابات إلى التشغيل',
+      });
+    }
+
+    if (targetEmpId) {
+      await supabase.from('notifications').insert({
+        employee_id: targetEmpId,
+        type: 'task_assigned',
+        title: 'ملف تشغيل جديد محول من قسم الحسابات',
+        body: `العميل: ${file.customer?.name || '—'} - ملاحظات الحسابات: ${notes}`,
+      });
+    }
+
+    setTransferring(false);
+    onTransferred();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
+          <div className="w-12 h-12 rounded-2xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
+            3➜4
+          </div>
+          <div>
+            <h3 className="font-bold text-navy-900 text-base">تحويل العميل من الحسابات إلى التشغيل</h3>
+            <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{file.customer?.name || '—'}</span></p>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-right">
+          <div>
+            <label className="form-label font-bold text-navy-900 text-xs">اختر موظف قسم التشغيل المسؤول:</label>
+            <select
+              value={targetEmpId}
+              onChange={(e) => setTargetEmpId(e.target.value)}
+              className="form-input text-xs"
+            >
+              <option value="">— جميع فريق قسم التشغيل —</option>
+              {opsEmployees.map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للتشغيل:</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="form-input text-xs resize-none"
+              rows={3}
+              placeholder="اكتب ملاحظات الاعتماد المالي والدفعات وقسم الفنادق..."
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={handleTransfer}
+            disabled={transferring}
+            className="btn-gold flex-1 justify-center text-xs py-2.5"
+          >
+            {transferring ? 'جارٍ التحويل...' : 'تأكيد الاعتماد المالي والتحويل للتشغيل'}
+          </button>
+          <button
+            onClick={onClose}
+            className="btn-outline flex-1 justify-center text-xs py-2.5"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
