@@ -109,15 +109,14 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       ? `${selected.notes ? selected.notes + ' | ' : ''}ملاحظات قسم التشغيل للطيران: ${flightTransferNotes}`
       : selected.notes;
 
-    const updates = {
-      workflow_stage: 'flight',
-      assigned_to: targetFlightEmpId || selected.assigned_to,
-      notes: updatedNotes,
-    };
-
-    const { data } = await supabase
+    const { data, error: updateErr } = await supabase
       .from('operation_files')
-      .update(updates)
+      .update({
+        workflow_stage: 'flight',
+        file_status: 'جاهز للسفر',
+        assigned_to: targetFlightEmpId || selected.assigned_to || null,
+        notes: updatedNotes,
+      })
       .eq('id', selected.id)
       .select(`
         *,
@@ -126,6 +125,12 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         hotel:hotels(*)
       `)
       .single();
+
+    if (updateErr) {
+      alert(`فشل التحويل لقسم الطيران: ${updateErr.message}`);
+      setFlightTransferring(false);
+      return;
+    }
 
     if (data) {
       const emp = targetFlightEmpId
@@ -160,6 +165,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setFlightTransferring(false);
     setShowFlightTransferModal(false);
     setFlightTransferNotes('');
+    setTargetFlightEmpId('');
   };
 
   const load = async () => {
