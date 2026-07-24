@@ -180,7 +180,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
 
     try {
       if (!createdAuthId) {
-        const { data: signUpData } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: form.email,
           password: form.password,
           options: {
@@ -190,6 +190,11 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
             },
           },
         });
+        if (signUpError) {
+          setError('خطأ في إنشاء حساب Auth: ' + signUpError.message);
+          setSaving(false);
+          return;
+        }
         if (signUpData?.user?.id) {
           createdAuthId = signUpData.user.id;
         }
