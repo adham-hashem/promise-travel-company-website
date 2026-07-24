@@ -151,12 +151,18 @@ function InquiryModal({ inquiry, employees, onClose, onSave }: InquiryModalProps
 
 interface ConvertModalProps {
   inquiry: Inquiry;
+  employees: Employee[];
   onClose: () => void;
   onConverted: () => void;
 }
 
-function ConvertModal({ inquiry, onClose, onConverted }: ConvertModalProps) {
+function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModalProps) {
   const [converting, setConverting] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<'crm' | 'accounts'>('accounts');
+  const [targetEmployeeId, setTargetEmployeeId] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+
+  const accountsEmployees = employees.filter((e) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
 
   const handleConvert = async () => {
     setConverting(true);
@@ -167,7 +173,8 @@ function ConvertModal({ inquiry, onClose, onConverted }: ConvertModalProps) {
       service_type: inquiry.service_type === 'حج' ? 'حج' : inquiry.service_type === 'عمرة' ? 'عمرة' : undefined,
       source: inquiry.source,
       status: 'جديد',
-      notes: inquiry.notes,
+      notes: transferNotes ? `${inquiry.notes ? inquiry.notes + ' | ' : ''}ملاحظات التحويل: ${transferNotes}` : inquiry.notes,
+      assigned_employee_id: targetEmployeeId || undefined,
       visa_requirement: inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة' ? 'Requires Visa' : 'No Visa Required',
     }]).select().maybeSingle();
 
@@ -178,6 +185,28 @@ function ConvertModal({ inquiry, onClose, onConverted }: ConvertModalProps) {
         converted_customer_id: newCustomer.id,
         updated_at: new Date().toISOString(),
       }).eq('id', inquiry.id);
+
+      // If transferring to Accounts, create an operation file record with stage 'accounts'
+      if (transferTarget === 'accounts') {
+        await supabase.from('operation_files').insert({
+          customer_id: newCustomer.id,
+          file_status: 'جديد',
+          workflow_stage: 'accounts',
+          notes: transferNotes || 'تم التحويل من قسم إضافة العملاء والاستعلامات إلى قسم الحسابات',
+          assigned_to: targetEmployeeId || null,
+          financially_approved: false,
+        });
+
+        // Notify selected employee or accounts team
+        if (targetEmployeeId) {
+          await supabase.from('notifications').insert({
+            employee_id: targetEmployeeId,
+            type: 'new_customer',
+            title: 'عميل جديد محول إلى قسم الحسابات',
+            body: `تم تحويل العميل ${newCustomer.name} إليك من قسم إضافة العملاء: ${transferNotes}`,
+          });
+        }
+      }
 
       // Auto-create a visa file if the service requires a visa
       if (inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة') {
@@ -194,41 +223,98 @@ function ConvertModal({ inquiry, onClose, onConverted }: ConvertModalProps) {
         // Auto-create travel checklist
         await supabase.from('travel_checklist').upsert({ customer_id: newCustomer.id }, { onConflict: 'customer_id' });
       }
+
+      // Log workflow timeline
+      await supabase.from('workflow_timeline').insert({
+        customer_id: newCustomer.id,
+        stage: transferTarget === 'accounts' ? 'accounts' : 'crm',
+        stage_label: transferTarget === 'accounts' ? 'قسم الحسابات' : 'العملاء CRM',
+        department: transferTarget === 'accounts' ? 'الحسابات' : 'المبيعات',
+        employee_id: targetEmployeeId || null,
+        status: 'مكتمل',
+        notes: transferNotes || 'تم تحويل العميل من مسار الاستعلامات وإضافة العملاء',
+      });
     }
     setConverting(false);
     onConverted();
   };
 
-  const targetSection =
-    inquiry.service_type === 'عمرة' || inquiry.service_type === 'حج' ? 'المبيعات (العملاء)' :
-    inquiry.service_type === 'رحلة داخلية' ? 'السياحة الداخلية' :
-    inquiry.service_type === 'فندق' ? 'إدارة الفنادق' : 'المبيعات';
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="p-6 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto">
-            <ArrowRightLeft size={28} className="text-emerald-600" />
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto text-emerald-600">
+            <ArrowRightLeft size={28} />
           </div>
-          <h3 className="text-lg font-bold text-navy-900">تحويل الاستعلام</h3>
-          <p className="text-gray-600 text-sm">
-            سيتم تحويل استعلام <strong>{inquiry.customer_name}</strong> إلى قسم <strong>{targetSection}</strong> وإنشاء عميل جديد تلقائياً.
-          </p>
-          <div className="bg-gray-50 rounded-xl p-3 text-right space-y-1">
-            <p className="text-xs text-gray-500">سيتم تنفيذ التالي تلقائياً:</p>
-            <p className="text-sm text-gray-700 flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-500" /> إنشاء عميل جديد في CRM</p>
-            <p className="text-sm text-gray-700 flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-500" /> تغيير حالة الاستعلام إلى "تم التحويل"</p>
-            <p className="text-sm text-gray-700 flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-500" /> نقل البيانات للقسم المختص</p>
-            {(inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة') && (
-              <p className="text-sm text-gray-700 flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-500" /> إنشاء ملف تأشيرة (Visa Management)</p>
-            )}
+          <div>
+            <h3 className="text-lg font-bold text-navy-900">تحويل العميل من مسار "إضافة العملاء"</h3>
+            <p className="text-gray-500 text-xs mt-1">
+              اختر قسم الوجهة لتحويل بيانات <strong>{inquiry.customer_name}</strong>
+            </p>
           </div>
-          <div className="flex gap-3">
-            <button onClick={handleConvert} disabled={converting} className="btn-gold flex-1 justify-center">
-              {converting ? 'جارٍ التحويل...' : 'تأكيد التحويل'}
+
+          {/* Transfer Target selection */}
+          <div className="grid grid-cols-2 gap-3 text-right">
+            <button
+              type="button"
+              onClick={() => setTransferTarget('accounts')}
+              className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all ${
+                transferTarget === 'accounts'
+                  ? 'border-gold-500 bg-gold-50 text-navy-900 font-bold shadow-sm'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
+              }`}
+            >
+              <span className="text-xs font-bold text-gold-700">1. تحويل لـ قسم الحسابات</span>
+              <span className="text-[10px] text-gray-500">إرسال للمحاسب لمعالجة الدفعات والفواتير</span>
             </button>
-            <button onClick={onClose} className="btn-secondary flex-1 justify-center">إلغاء</button>
+            <button
+              type="button"
+              onClick={() => setTransferTarget('crm')}
+              className={`p-3 rounded-xl border flex flex-col items-start gap-1 transition-all ${
+                transferTarget === 'crm'
+                  ? 'border-gold-500 bg-gold-50 text-navy-900 font-bold shadow-sm'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
+              }`}
+            >
+              <span className="text-xs font-bold text-navy-700">2. تحويل لـ العملاء CRM</span>
+              <span className="text-[10px] text-gray-500">إضافة لقاعدة بيانات العملاء والمتابعة</span>
+            </button>
+          </div>
+
+          {/* Employee selection if accounts */}
+          {transferTarget === 'accounts' && (
+            <div className="text-right space-y-2">
+              <label className="text-xs font-bold text-navy-900 block">اختر موظف الحسابات المسؤول:</label>
+              <select
+                value={targetEmployeeId}
+                onChange={(e) => setTargetEmployeeId(e.target.value)}
+                className="form-input text-xs"
+              >
+                <option value="">— جميع موظفي قسم الحسابات —</option>
+                {accountsEmployees.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name} ({e.role})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Transfer notes */}
+          <div className="text-right space-y-1">
+            <label className="text-xs font-bold text-navy-900 block">ملاحظات التحويل والتعليمات:</label>
+            <textarea
+              value={transferNotes}
+              onChange={(e) => setTransferNotes(e.target.value)}
+              className="form-input text-xs resize-none"
+              rows={3}
+              placeholder="اكتب ملاحظات لموظف الحسابات أو الفريق..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button onClick={handleConvert} disabled={converting} className="btn-gold flex-1 justify-center text-xs py-2.5">
+              {converting ? 'جارٍ التحويل...' : 'تأكيد وإرسال التحويل'}
+            </button>
+            <button onClick={onClose} className="btn-outline flex-1 justify-center text-xs py-2.5">إلغاء</button>
           </div>
         </div>
       </div>
@@ -541,6 +627,7 @@ export default function Inquiries() {
       {convertInquiry && (
         <ConvertModal
           inquiry={convertInquiry}
+          employees={employees}
           onClose={() => setConvertInquiry(null)}
           onConverted={() => { setConvertInquiry(null); load(); }}
         />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Plus, Users, CalendarCheck, ListChecks, Target, Shuffle, ChevronLeft,
-  Pencil, Eye, CheckCircle2, Clock, AlertCircle, LayoutDashboard,
+  Pencil, Eye, CheckCircle2, Clock, AlertCircle, LayoutDashboard, Trash2,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -54,6 +54,24 @@ export default function Employees({ onNavigate }: Props) {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [defaultTaskEmployee, setDefaultTaskEmployee] = useState<string | undefined>(undefined);
   const [statDrillDown, setStatDrillDown] = useState<StatType | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDeleteEmployee = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await supabase.from('tasks').delete().eq('employee_id', deleteTarget.id);
+      await supabase.from('employees').delete().eq('id', deleteTarget.id);
+      await supabase.from('user_profiles').delete().eq('id', deleteTarget.id);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      console.error('Error deleting employee:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -311,11 +329,18 @@ export default function Employees({ onNavigate }: Props) {
                       <button onClick={() => setShowEmployeeModal(emp)} className="w-full text-xs font-semibold text-white bg-navy-700 hover:bg-navy-800 py-2 rounded-xl transition-colors flex items-center justify-center gap-1 mb-2">
                         <Eye size={12} />عرض التفاصيل
                       </button>
-                      {can('employees_edit') && (
-                        <button onClick={() => openEdit(emp)} className="w-full text-xs font-semibold text-navy-700 bg-navy-50 hover:bg-navy-100 py-2 rounded-xl transition-colors flex items-center justify-center gap-1">
-                          <Pencil size={12} />تعديل البيانات
-                        </button>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {can('employees_edit') && (
+                          <button onClick={() => openEdit(emp)} className="flex-1 text-xs font-semibold text-navy-700 bg-navy-50 hover:bg-navy-100 py-2 rounded-xl transition-colors flex items-center justify-center gap-1">
+                            <Pencil size={12} />تعديل
+                          </button>
+                        )}
+                        {can('employees_delete') && (
+                          <button onClick={() => setDeleteTarget(emp)} className="text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 p-2 rounded-xl transition-colors flex items-center justify-center gap-1" title="حذف الموظف">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -493,6 +518,39 @@ export default function Employees({ onNavigate }: Props) {
         type={statDrillDown}
         onClose={() => setStatDrillDown(null)}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-gray-100 animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 mb-4 mx-auto">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-navy-900 text-center mb-2">تأكيد حذف الموظف</h3>
+            <p className="text-sm text-gray-600 text-center mb-6 leading-relaxed">
+              هل أنت تأكد من رغبتك في حذف الموظف <span className="font-bold text-navy-900">{deleteTarget.name}</span>؟
+              <br />
+              <span className="text-xs text-red-500 font-semibold mt-1 block">ملاحظة: سيتم حذف بيانات الموظف والمهام المرتبطة به نهائياً.</span>
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                disabled={deleting}
+                onClick={confirmDeleteEmployee}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all shadow-md hover:shadow-red-600/30 text-sm disabled:opacity-50"
+              >
+                {deleting ? 'جارٍ الحذف...' : 'نعم، احذف الموظف'}
+              </button>
+              <button
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-navy-800 font-bold py-3 rounded-xl transition-all text-sm"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

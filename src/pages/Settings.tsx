@@ -17,15 +17,17 @@ const tabs = [
   { id: 'system', label: 'إعدادات النظام', icon: SettingsIcon },
 ];
 
-const roles: UserRole[] = ['مالك النظام', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل'];
+const roles: UserRole[] = ['مالك النظام', 'إضافة عملاء', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
 
 const roleColors: Record<string, string> = {
   'مالك النظام': 'bg-gold-100 text-gold-700 border-gold-200',
   'مدير النظام': 'bg-navy-100 text-navy-700 border-navy-200',
+  'إضافة عملاء': 'bg-teal-100 text-teal-700 border-teal-200',
   'مدير المبيعات': 'bg-purple-100 text-purple-700 border-purple-200',
   'مندوب مبيعات': 'bg-blue-100 text-blue-700 border-blue-200',
   'محاسب': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'موظف التشغيل': 'bg-orange-100 text-orange-700 border-orange-200',
+  'مسؤول طيران': 'bg-cyan-100 text-cyan-700 border-cyan-200',
 };
 
 // Section-based permission matrix definition

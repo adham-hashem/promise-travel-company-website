@@ -91,12 +91,74 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const [newDocType, setNewDocType] = useState(opDocTypes[0]);
   const [newNotes, setNewNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showFlightTransferModal, setShowFlightTransferModal] = useState(false);
+  const [targetFlightEmpId, setTargetFlightEmpId] = useState('');
+  const [flightTransferNotes, setFlightTransferNotes] = useState('');
+  const [flightTransferring, setFlightTransferring] = useState(false);
   const docFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     load();
     loadEmployees();
   }, []);
+
+  const handleSendToFlight = async () => {
+    if (!selected) return;
+    setFlightTransferring(true);
+    const updatedNotes = flightTransferNotes
+      ? `${selected.notes ? selected.notes + ' | ' : ''}ملاحظات قسم التشغيل للطيران: ${flightTransferNotes}`
+      : selected.notes;
+
+    const updates = {
+      workflow_stage: 'flight',
+      assigned_to: targetFlightEmpId || selected.assigned_to,
+      notes: updatedNotes,
+    };
+
+    const { data } = await supabase
+      .from('operation_files')
+      .update(updates)
+      .eq('id', selected.id)
+      .select(`
+        *,
+        customer:customers(*),
+        booking:bookings(*),
+        hotel:hotels(*),
+        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
+      `)
+      .single();
+
+    if (data) {
+      const updated = data as unknown as OpFile;
+      setSelected(updated);
+      setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
+    }
+
+    if (selected.customer?.id) {
+      await supabase.from('workflow_timeline').insert({
+        customer_id: selected.customer.id,
+        stage: 'flight',
+        stage_label: 'قسم الطيران',
+        department: 'التشغيل',
+        employee_id: targetFlightEmpId || null,
+        status: 'مكتمل',
+        notes: flightTransferNotes || 'تم تحويل الملف من قسم التشغيل إلى مسؤول الطيران',
+      });
+    }
+
+    if (targetFlightEmpId) {
+      await supabase.from('notifications').insert({
+        employee_id: targetFlightEmpId,
+        type: 'task_assigned',
+        title: 'ملف جديد محول من قسم التشغيل لإصدار التذاكر',
+        body: `العميل: ${selected.customer?.name || '—'} - ملاحظات التشغيل: ${flightTransferNotes}`,
+      });
+    }
+
+    setFlightTransferring(false);
+    setShowFlightTransferModal(false);
+    setFlightTransferNotes('');
+  };
 
   const load = async () => {
     setLoading(true);
@@ -456,6 +518,27 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     );
                   })}
                 </div>
+                {/* Send to Aviation Banner */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-50/80 p-3.5 rounded-xl border border-cyan-200 mt-3 gap-2">
+                  <div>
+                    <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
+                      <Plane size={15} className="text-cyan-600" />
+                      تحويل الملف إلى مسؤول قسم الطيران (Aviation Transfer)
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      كتابة ملاحظات موظف التشغيل وإرسال الملف مباشرة لمسؤول الطيران لإصدار التذاكر
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFlightTransferNotes(selected.notes || '');
+                      setShowFlightTransferModal(true);
+                    }}
+                    className="btn-gold text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  >
+                    <Plane size={14} /> تحويل للطيران + ملاحظات
+                  </button>
+                </div>
               </div>
 
               {/* Customer + Booking info */}
@@ -747,6 +830,66 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                   عرض ملف العميل الكامل <ChevronRight size={12} />
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      {/* Transfer to Flight Modal */}
+      {showFlightTransferModal && selected && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-cyan-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-cyan-600 border-b border-gray-100 pb-3">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-100 flex items-center justify-center">
+                <Plane size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">تحويل الملف إلى قسم الطيران</h3>
+                <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{selected.customer?.name || '—'}</span></p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">اختر مسؤول الطيران المستلم:</label>
+                <select
+                  value={targetFlightEmpId}
+                  onChange={(e) => setTargetFlightEmpId(e.target.value)}
+                  className="form-input text-xs"
+                >
+                  <option value="">— جميع موظفي ومسؤولي قسم الطيران —</option>
+                  {employees.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">
+                  ملاحظات وتوجيهات موظف التشغيل إلى مسؤول الطيران <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={flightTransferNotes}
+                  onChange={(e) => setFlightTransferNotes(e.target.value)}
+                  className="form-input text-xs resize-none"
+                  rows={4}
+                  placeholder="اكتب ملاحظات التشغيل (مثال: درجات السفر المطلوب إصدارها، تفاصيل أرقام الجوازات والمواعيد، طلبات الوجبات أو المقاعد...)"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleSendToFlight}
+                disabled={flightTransferring}
+                className="btn-gold flex-1 justify-center text-xs py-2.5"
+              >
+                {flightTransferring ? 'جارٍ الإرسال...' : 'تأكيد وإرسال إلى قسم الطيران'}
+              </button>
+              <button
+                onClick={() => setShowFlightTransferModal(false)}
+                className="btn-outline flex-1 justify-center text-xs py-2.5"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>

@@ -76,6 +76,7 @@ export default function FlightTickets({ onNavigate }: Props) {
       visa_id: '',
       hotel_name: o.booking?.hotel?.name || o.booking?.package?.hotel?.name || '—',
       package_name: o.booking?.package?.name || '—',
+      notes: o.notes || '',
     }));
     setReadyCustomers(opsData);
     setLoading(false);
@@ -228,6 +229,12 @@ export default function FlightTickets({ onNavigate }: Props) {
                     <div className="flex justify-between"><span className="text-gray-400">تاريخ السفر</span><span className="font-semibold text-navy-700">{r.travel_date !== '—' ? fmtDate(r.travel_date) : '—'}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400">المسافرين</span><span className="font-semibold text-navy-700">{r.pax_count}</span></div>
                   </div>
+                  {r.notes && (
+                    <div className="mt-2.5 bg-cyan-50/80 p-2.5 rounded-xl border border-cyan-100 text-[11px] text-navy-800">
+                      <span className="font-bold text-cyan-800 block mb-0.5">📝 ملاحظات قسم التشغيل:</span>
+                      <p className="leading-relaxed whitespace-pre-wrap">{r.notes}</p>
+                    </div>
+                  )}
                   {r.workflow_stage === 'flight' && (
                     <button
                       onClick={() => {

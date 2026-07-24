@@ -464,6 +464,7 @@ export default function SuperAdminPanel() {
                         <option value="super_admin">Super Admin</option>
                         <option value="مالك النظام">مالك النظام</option>
                         <option value="مدير النظام">مدير النظام</option>
+                        <option value="إضافة عملاء">إضافة عملاء</option>
                         <option value="مدير المبيعات">مدير المبيعات</option>
                         <option value="محاسب">محاسب</option>
                         <option value="موظف التشغيل">موظف التشغيل</option>

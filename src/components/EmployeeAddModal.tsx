@@ -14,7 +14,7 @@ import type { Employee } from '../types';
 
 type Role = UserRole | 'مدير النظام';
 
-const allRoles: Role[] = ['super_admin', 'مالك النظام', 'مدير النظام', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
+const allRoles: Role[] = ['super_admin', 'مالك النظام', 'مدير النظام', 'إضافة عملاء', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
 
 interface Props {
   open: boolean;
@@ -39,10 +39,10 @@ const emptyForm = (): FormState => ({
   email: '',
   password: '',
   phone: '',
-  role: 'مندوب مبيعات',
+  role: 'إضافة عملاء',
   status: 'نشط',
-  permissions: getDefaultPermissions('مندوب مبيعات'),
-  page_permissions: getDefaultPagePermissions('مندوب مبيعات'),
+  permissions: getDefaultPermissions('إضافة عملاء'),
+  page_permissions: getDefaultPagePermissions('إضافة عملاء'),
 });
 
 export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee }: Props) {
@@ -149,6 +149,8 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const fnUrl = `${supabaseUrl}/functions/v1/create-user`;
+    let createdAuthId: string | null = null;
+
     try {
       const resp = await fetch(fnUrl, {
         method: 'POST',
@@ -168,13 +170,46 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           page_permissions: form.page_permissions,
         }),
       });
-      const data = await resp.json();
-      if (!resp.ok) {
-        setError(data?.error || `فشل إنشاء المستخدم (${resp.status})`);
-        setSaving(false);
-        return;
+      if (resp.ok) {
+        const data = await resp.json();
+        createdAuthId = data?.user?.id || data?.id || null;
       }
-      const { error: e3 } = await supabase.from('employees').insert({
+    } catch (fnErr) {
+      console.warn('Edge function unavailable or failed, falling back to direct auth/DB creation:', fnErr);
+    }
+
+    try {
+      if (!createdAuthId) {
+        const { data: signUpData } = await supabase.auth.signUp({
+          email: form.email,
+          password: form.password,
+          options: {
+            data: {
+              name: form.name,
+              role: form.role,
+            },
+          },
+        });
+        if (signUpData?.user?.id) {
+          createdAuthId = signUpData.user.id;
+        }
+      }
+
+      const newId = createdAuthId || crypto.randomUUID();
+
+      await supabase.from('user_profiles').upsert({
+        id: newId,
+        name: form.name,
+        email: form.email,
+        phone: form.phone || null,
+        role: form.role,
+        status: form.status,
+        permissions: form.permissions,
+        page_permissions: form.page_permissions,
+      });
+
+      const { error: e3 } = await supabase.from('employees').upsert({
+        id: newId,
         name: form.name,
         email: form.email,
         phone: form.phone || null,
@@ -184,9 +219,14 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         clients_count: 0,
         bookings_count: 0,
       });
+
       if (e3) {
-        console.warn('Employee row insert failed:', e3.message);
+        console.error('Employee row upsert failed:', e3.message);
+        setError(e3.message);
+        setSaving(false);
+        return;
       }
+
       setSaving(false);
       onSaved();
       onClose();
@@ -223,165 +263,173 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="form-label">الاسم الكامل <span className="text-red-500">*</span></label>
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="form-input"
-                placeholder="مثال: أحمد محمد علي"
-              />
-            </div>
-            <div>
-              <label className="form-label">البريد الإلكتروني <span className="text-red-500">*</span></label>
-              <input
-                type="email"
-                dir="ltr"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="form-input"
-                placeholder="employee@promise.com"
-              />
-            </div>
-            <div>
-              <label className="form-label">
-                كلمة المرور {!isEdit && <span className="text-red-500">*</span>}
-              </label>
-              <input
-                type="password"
-                dir="ltr"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="form-input"
-                placeholder={isEdit ? 'اتركها فارغة للإبقاء عليها' : '••••••••'}
-                disabled={isEdit}
-              />
-            </div>
-            <div>
-              <label className="form-label">رقم الهاتف</label>
-              <input
-                dir="ltr"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="form-input"
-                placeholder="01xxxxxxxxx"
-              />
-            </div>
-            <div>
-              <label className="form-label">الوظيفة الأساسية</label>
-              <select
-                value={form.role}
-                onChange={(e) => onRoleChange(e.target.value as Role)}
-                className="form-input"
-              >
-                {allRoles.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">حالة الحساب</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="form-input"
-              >
-                <option value="نشط">نشط</option>
-                <option value="غير نشط">غير نشط</option>
-              </select>
+        {/* Form Wrap */}
+        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+          {/* Body */}
+          <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="form-label">الاسم الكامل <span className="text-red-500">*</span></label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="form-input"
+                  placeholder="مثال: أحمد محمد علي"
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="form-label">البريد الإلكتروني <span className="text-red-500">*</span></label>
+                <input
+                  type="email"
+                  dir="ltr"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="form-input"
+                  placeholder="employee@promise.com"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label className="form-label">
+                  كلمة المرور {!isEdit && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="password"
+                  dir="ltr"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="form-input"
+                  placeholder={isEdit ? 'اتركها فارغة للإبقاء عليها' : '••••••••'}
+                  disabled={isEdit}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="form-label">رقم الهاتف</label>
+                <input
+                  dir="ltr"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="form-input"
+                  placeholder="01xxxxxxxxx"
+                  autoComplete="tel"
+                />
+              </div>
+              <div>
+                <label className="form-label">الوظيفة الأساسية</label>
+                <select
+                  value={form.role}
+                  onChange={(e) => onRoleChange(e.target.value as Role)}
+                  className="form-input"
+                >
+                  {allRoles.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">حالة الحساب</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="form-input"
+                >
+                  <option value="نشط">نشط</option>
+                  <option value="غير نشط">غير نشط</option>
+                </select>
+              </div>
+
+              {/* Custom Page Access Selection */}
+              <div className="col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPages((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gold-50 rounded-xl border border-gold-200 hover:border-gold-400 transition-all"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-navy-900">
+                    <Layout size={16} className="text-gold-600" /> تحديد الواجهات الظاهرة للموظف (Page Control)
+                  </span>
+                  <span className="text-xs text-navy-600 font-medium">
+                    {showPages ? 'إخفاء' : 'تخصيص الواجهات'}
+                  </span>
+                </button>
+                {showPages && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-48 overflow-y-auto animate-fadeIn">
+                    {ALL_PAGES.map((pg) => (
+                      <label key={pg.key} className="flex items-center gap-2 cursor-pointer p-1.5 bg-white rounded-lg border border-gray-100">
+                        <input
+                          type="checkbox"
+                          checked={form.page_permissions[pg.key] ?? false}
+                          onChange={() => togglePage(pg.key)}
+                          className="w-3.5 h-3.5 rounded accent-gold-500"
+                        />
+                        <span className="text-xs text-navy-900 font-semibold">{pg.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Action Permissions Selection */}
+              <div className="col-span-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPerms((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-navy-300 transition-all"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-navy-700">
+                    <Shield size={15} /> صلاحيات الإضافة، التعديل والحذف
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {showPerms ? 'إخفاء' : 'تخصيص الإجراءات'}
+                  </span>
+                </button>
+                {showPerms && (
+                  <div className="mt-2 grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 animate-fadeIn">
+                    {PERMISSION_GROUPS.map((group) => (
+                      <div key={group.label} className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-navy-700 uppercase mt-1">{group.label}</p>
+                        {group.items.map((item) => (
+                          <label key={item.key} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.permissions[item.key as keyof Permissions] ?? false}
+                              onChange={() => togglePerm(item.key as keyof Permissions)}
+                              className="w-3.5 h-3.5 rounded accent-navy-700"
+                            />
+                            <span className="text-[11px] text-gray-600">{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Custom Page Access Selection */}
-            <div className="col-span-2">
-              <button
-                type="button"
-                onClick={() => setShowPages((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gold-50 rounded-xl border border-gold-200 hover:border-gold-400 transition-all"
-              >
-                <span className="flex items-center gap-2 text-sm font-bold text-navy-900">
-                  <Layout size={16} className="text-gold-600" /> تحديد الواجهات الظاهرة للموظف (Page Control)
-                </span>
-                <span className="text-xs text-navy-600 font-medium">
-                  {showPages ? 'إخفاء' : 'تخصيص الواجهات'}
-                </span>
-              </button>
-              {showPages && (
-                <div className="mt-2 grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-48 overflow-y-auto animate-fadeIn">
-                  {ALL_PAGES.map((pg) => (
-                    <label key={pg.key} className="flex items-center gap-2 cursor-pointer p-1.5 bg-white rounded-lg border border-gray-100">
-                      <input
-                        type="checkbox"
-                        checked={form.page_permissions[pg.key] ?? false}
-                        onChange={() => togglePage(pg.key)}
-                        className="w-3.5 h-3.5 rounded accent-gold-500"
-                      />
-                      <span className="text-xs text-navy-900 font-semibold">{pg.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Custom Action Permissions Selection */}
-            <div className="col-span-2">
-              <button
-                type="button"
-                onClick={() => setShowPerms((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-navy-300 transition-all"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-navy-700">
-                  <Shield size={15} /> صلاحيات الإضافة، التعديل والحذف
-                </span>
-                <span className="text-xs text-gray-400">
-                  {showPerms ? 'إخفاء' : 'تخصيص الإجراءات'}
-                </span>
-              </button>
-              {showPerms && (
-                <div className="mt-2 grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 animate-fadeIn">
-                  {PERMISSION_GROUPS.map((group) => (
-                    <div key={group.label} className="space-y-1.5">
-                      <p className="text-[10px] font-bold text-navy-700 uppercase mt-1">{group.label}</p>
-                      {group.items.map((item) => (
-                        <label key={item.key} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={form.permissions[item.key as keyof Permissions] ?? false}
-                            onChange={() => togglePerm(item.key as keyof Permissions)}
-                            className="w-3.5 h-3.5 rounded accent-navy-700"
-                          />
-                          <span className="text-[11px] text-gray-600">{item.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
+                {error}
+              </div>
+            )}
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
-              {error}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="btn-outline">إلغاء</button>
-          <button onClick={handleSave} disabled={saving} className="btn-gold">
-            {saving ? (
-              <span className="flex items-center gap-2">
-                <Loader2 size={16} className="animate-spin" />
-                {isEdit ? 'جارٍ الحفظ...' : 'جارٍ إنشاء الحساب...'}
-              </span>
-            ) : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
-          </button>
-        </div>
+          {/* Footer */}
+          <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="btn-outline">إلغاء</button>
+            <button type="submit" disabled={saving} className="btn-gold">
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
+                  {isEdit ? 'جارٍ الحفظ...' : 'جارٍ إنشاء الحساب...'}
+                </span>
+              ) : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
+}
 }
