@@ -71,6 +71,21 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         permissions: getDefaultPermissions(role),
         page_permissions: getDefaultPagePermissions(role),
       });
+
+      supabase
+        .from('user_profiles')
+        .select('permissions, page_permissions')
+        .eq('id', editEmployee.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setForm(prev => ({
+              ...prev,
+              permissions: data.permissions || prev.permissions,
+              page_permissions: data.page_permissions || prev.page_permissions,
+            }));
+          }
+        });
     } else {
       setIsEdit(false);
       setForm(emptyForm());
@@ -139,7 +154,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           permissions: form.permissions,
           page_permissions: form.page_permissions,
         })
-        .eq('email', editEmployee.email);
+        .eq('id', editEmployee.id);
 
       if (e2) console.warn('Profile update skipped:', e2.message);
       setSaving(false);
@@ -302,9 +317,10 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
                   dir="ltr"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="form-input"
+                  className="form-input disabled:opacity-60 disabled:bg-gray-50 disabled:cursor-not-allowed"
                   placeholder="employee@promise.com"
                   autoComplete="email"
+                  disabled={isEdit}
                 />
               </div>
               <div>
