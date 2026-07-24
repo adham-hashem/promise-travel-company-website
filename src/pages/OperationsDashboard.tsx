@@ -500,7 +500,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       </div>
 
       {/* Detail Modal */}
-      {selected && (
+      {selected && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelected(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
@@ -857,11 +857,12 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Transfer to Flight Modal */}
-      {showFlightTransferModal && selected && (
+      {showFlightTransferModal && selected && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4 border border-cyan-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 text-cyan-600 border-b border-gray-100 pb-3">
@@ -919,7 +920,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

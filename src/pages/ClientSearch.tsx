@@ -61,7 +61,13 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     setLoading(true);
     setNotFound(false);
     setCandidates([]);
-    const { data } = await supabase.rpc('get_customer_full_data', { p_client_code: clientCode });
+    const { data, error } = await supabase.rpc('get_customer_full_data', { p_client_code: clientCode });
+    if (error) {
+      console.error('[ClientSearch] RPC error:', error);
+      alert('خطأ أثناء جلب بيانات العميل: ' + error.message);
+      setLoading(false);
+      return;
+    }
     const full = data as FullData;
     if (!full || !full.found) {
       setNotFound(true);
