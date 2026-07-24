@@ -58,9 +58,16 @@ export default function FlightTickets({ onNavigate }: Props) {
       supabase.from('operation_files').select(`
         *,
         customer:customers(*),
-        booking:bookings(*, package:packages(*), hotel:hotels(*))
+        booking:bookings(*, package:packages(*)),
+        hotel:hotels(*)
       `).in('workflow_stage', ['flight', 'ready', 'completed']).order('created_at', { ascending: false }),
     ]);
+
+    if (opsRes.error) {
+      console.error('[FlightTickets] Error fetching ops data:', opsRes.error);
+      alert(`خطأ في جلب بيانات التشغيل: ${opsRes.error.message}`);
+    }
+
     setTickets((ticketRes.data as FlightTicket[]) || []);
     const opsData = (opsRes.data || []).map((o: any) => ({
       customer_id: o.customer_id,
