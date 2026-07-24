@@ -11,6 +11,8 @@ DECLARE
   v_inquiries json;
   v_internal json;
   v_visas json;
+  v_timeline json;
+  v_op_docs json;
 BEGIN
   SELECT row_to_json(c) INTO v_customer
   FROM (SELECT * FROM customers WHERE client_code = p_client_code LIMIT 1) c;
@@ -73,7 +75,6 @@ BEGIN
     ORDER BY created_at DESC
   ) q;
 
-  -- Fixed internal trip bookings table schema references
   SELECT COALESCE(json_agg(row_to_json(it)), '[]'::json) INTO v_internal
   FROM (
     SELECT itb.*, it.name AS trip_name
@@ -90,6 +91,25 @@ BEGIN
     ORDER BY created_at DESC
   ) v;
 
+  SELECT COALESCE(json_agg(row_to_json(tl)), '[]'::json) INTO v_timeline
+  FROM (
+    SELECT wt.*, up.name AS employee_real_name
+    FROM workflow_timeline wt
+    LEFT JOIN user_profiles up ON up.id = wt.employee_id
+    WHERE wt.customer_id = (SELECT id FROM customers WHERE client_code = p_client_code LIMIT 1)
+    ORDER BY wt.created_at ASC
+  ) tl;
+
+  -- Fetch operational documents
+  SELECT COALESCE(json_agg(row_to_json(od)), '[]'::json) INTO v_op_docs
+  FROM (
+    SELECT od.*, op.op_number
+    FROM operation_file_documents od
+    JOIN operation_files op ON op.id = od.operation_file_id
+    WHERE op.customer_id = (SELECT id FROM customers WHERE client_code = p_client_code LIMIT 1)
+    ORDER BY od.created_at DESC
+  ) od;
+
   RETURN json_build_object(
     'found', true,
     'customer', v_customer,
@@ -101,7 +121,9 @@ BEGIN
     'tasks', v_tasks,
     'inquiries', v_inquiries,
     'internal_bookings', v_internal,
-    'visas', v_visas
+    'visas', v_visas,
+    'timeline', v_timeline,
+    'op_documents', v_op_docs
   );
 END;
 $$;

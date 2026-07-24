@@ -72,23 +72,44 @@ const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
 
 function AppInner() {
   const { session, profile, loading, signOut, can, canAccessPage } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const h = window.location.hash.replace(/^#/, '').toLowerCase();
+    if (h.startsWith('/admin/')) {
+      return h.substring(7) as Page;
+    }
+    return 'dashboard';
+  });
+  
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
   const [search, setSearch] = useState('');
+  
   const [adminRoute, setAdminRoute] = useState(() => {
     if (typeof window === 'undefined') return false;
     const h = window.location.hash.replace(/^#/, '').toLowerCase();
-    return h === '/admin' || h === '/dashboard';
+    return h === '/admin' || h === '/dashboard' || h.startsWith('/admin/');
   });
 
   useEffect(() => {
     const onHash = () => {
       const h = window.location.hash.replace(/^#/, '').toLowerCase();
-      setAdminRoute(h === '/admin' || h === '/dashboard');
+      const isAdmin = h === '/admin' || h === '/dashboard' || h.startsWith('/admin/');
+      setAdminRoute(isAdmin);
+      if (isAdmin && h.startsWith('/admin/')) {
+        const page = h.substring(7) as Page;
+        setCurrentPage(page);
+      }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  useEffect(() => {
+    if (adminRoute && session && profile) {
+      window.location.hash = `/admin/${currentPage}`;
+    }
+  }, [currentPage, adminRoute, session, profile]);
 
   useEffect(() => {
     if (!profile) return;

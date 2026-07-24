@@ -4,6 +4,7 @@ import {
   CalendarCheck, CreditCard, Building2, MessageSquare,
   ChevronRight, AlertCircle, Loader2, Wallet, FileCheck,
   ListChecks, Plane, Hotel as HotelIcon, ClipboardList,
+  Download, Eye, Clock, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Booking, Invoice, Inquiry, Page, Task } from '../types';
@@ -14,12 +15,32 @@ interface FullData {
   bookings?: Array<Booking & { package_name?: string; package_type?: string; employee_name?: string }>;
   invoices?: Array<Invoice & { hotel_name?: string }>;
   payments?: Array<{ id: string; amount: number; payment_date: string; payment_method: string; status: string; transaction_number?: string }>;
-  documents?: Array<{ id: string; doc_type: string; status: string; created_at: string; doc_number?: string }>;
+  documents?: Array<{ id: string; doc_type: string; status: string; created_at: string; doc_number?: string; file_path?: string; file_name?: string }>;
   operation_files?: Array<{ id: string; op_number: string; file_status: string; financially_approved: boolean; travel_date: string | null; return_date: string | null; visa_status?: string }>;
   visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null }>;
   tasks?: Task[];
   inquiries?: Inquiry[];
   internal_bookings?: Array<{ id: string; trip_name?: string; booking_status: string; total_amount: number; created_at: string }>;
+  timeline?: Array<{
+    id: string;
+    stage: string;
+    stage_label: string;
+    department?: string;
+    employee_real_name?: string;
+    employee_name?: string;
+    status: string;
+    notes?: string;
+    created_at: string;
+  }>;
+  op_documents?: Array<{
+    id: string;
+    operation_file_id: string;
+    op_number: string;
+    doc_type: string;
+    file_path: string;
+    file_name: string;
+    created_at: string;
+  }>;
 }
 
 const statusColors: Record<string, string> = {
@@ -162,6 +183,22 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
 
   const customer = result?.customer;
   const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
+
+  const handleViewDoc = async (filePath: string) => {
+    const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600);
+    if (data) window.open(data.signedUrl);
+  };
+
+  const handleDownloadDoc = async (filePath: string, fileName: string) => {
+    const { data } = await supabase.storage.from('documents').download(filePath);
+    if (data) {
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+    }
+  };
 
   const SectionCard = ({
     title, icon: Icon, count, children, accent = 'text-navy-600',
@@ -375,6 +412,51 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
             </div>
           </SectionCard>
 
+          {/* Customer Journey Timeline */}
+          <SectionCard title="مسار العميل الزمني بالترتيب" icon={Clock} count={result.timeline?.length ?? 0} accent="text-gold-600">
+            <div className="p-6">
+              {result.timeline?.length === 0 ? (
+                <EmptyRow />
+              ) : (
+                <div className="relative border-r-2 border-gray-100 mr-4 pr-6 space-y-6">
+                  {result.timeline?.map((step) => {
+                    return (
+                      <div key={step.id} className="relative">
+                        {/* Dot indicator */}
+                        <div className="absolute -right-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white bg-gold-500 shadow-sm" />
+                        
+                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-navy-900 text-sm">{step.stage_label}</span>
+                              {step.department && (
+                                <span className="badge text-[10px] bg-navy-50 text-navy-700">قسم: {step.department}</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-400 font-mono">
+                              {new Date(step.created_at).toLocaleString('ar-EG')}
+                            </span>
+                          </div>
+                          
+                          {step.notes && (
+                            <p className="text-xs text-gray-600 bg-white p-2.5 rounded-lg border border-gray-100/50 leading-relaxed">
+                              {step.notes}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+                            <span>المسؤول: {step.employee_real_name || step.employee_name || '—'}</span>
+                            <span className="text-emerald-600 font-semibold">{step.status}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
           {/* Sub-codes grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Bookings */}
@@ -448,17 +530,47 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
             </SectionCard>
 
             {/* Documents */}
-            <SectionCard title="المستندات" icon={ClipboardList} count={result.documents?.length ?? 0} accent="text-amber-600">
-              <div className="p-4 space-y-2">
-                {result.documents?.length === 0 ? <EmptyRow /> : result.documents?.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div>
-                      {doc.doc_number && <p className="text-xs font-mono font-bold text-gold-700 mb-0.5">{doc.doc_number}</p>}
-                      <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
+            <SectionCard title="المستندات والملفات" icon={ClipboardList} count={(result.documents?.length ?? 0) + (result.op_documents?.length ?? 0)} accent="text-amber-600">
+              <div className="p-4 space-y-4">
+                {/* Basic Documents */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 mb-2">مستندات العميل الأساسية</h4>
+                  {result.documents?.length === 0 ? <EmptyRow /> : result.documents?.map(doc => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-2">
+                      <div>
+                        {doc.doc_number && <p className="text-xs font-mono font-bold text-gold-700 mb-0.5">{doc.doc_number}</p>}
+                        <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="badge text-xs bg-gray-100 text-gray-600">{doc.status}</span>
+                        {doc.file_path && (
+                          <div className="flex gap-1">
+                            <button onClick={() => handleViewDoc(doc.file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Eye size={14} /></button>
+                            <button onClick={() => handleDownloadDoc(doc.file_path!, doc.file_name || 'doc')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Download size={14} /></button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <span className="badge text-xs bg-gray-100 text-gray-600">{doc.status}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
+                {/* Operational Documents */}
+                <div className="pt-2 border-t border-gray-100">
+                  <h4 className="text-xs font-bold text-gray-400 mb-2">مستندات ملفات التشغيل (الطيران، الفنادق، التأشيرات)</h4>
+                  {result.op_documents?.length === 0 ? <EmptyRow /> : result.op_documents?.map(doc => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-2">
+                      <div>
+                        <p className="text-xs font-mono font-bold text-cyan-600 mb-0.5">{doc.op_number}</p>
+                        <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{doc.file_name}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleViewDoc(doc.file_path)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Eye size={14} /></button>
+                        <button onClick={() => handleDownloadDoc(doc.file_path, doc.file_name)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Download size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </SectionCard>
 
