@@ -20,6 +20,7 @@ const emptyForm = {
   e_ticket_number: '',
 };
 
+
 const stageLabels: Record<string, { label: string; color: string }> = {
   new: { label: 'جديد', color: 'bg-gray-100 text-gray-600' },
   accounts: { label: 'الحسابات', color: 'bg-amber-100 text-amber-700' },
