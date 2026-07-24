@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CustomerStatus, Page } from '../types';
 
@@ -21,12 +21,11 @@ interface Props {
   searchValue: string;
 }
 
-
-
 export default function Customers({ onNavigate, searchValue }: Props) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'الكل'>('الكل');
+  const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -154,17 +153,19 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                     <td>
                       <div className="flex items-center gap-1.5">
                         <button
+                          onClick={() => setTransferCustomer(c)}
+                          className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
+                          title="تحويل ملف العميل إلى قسم الحسابات"
+                        >
+                          <ArrowRightLeft size={13} />
+                          تحويل للحسابات
+                        </button>
+                        <button
                           onClick={() => onNavigate('customer-details', c.id)}
                           className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600 transition-colors"
                           title="عرض التفاصيل"
                         >
                           <Eye size={15} />
-                        </button>
-                        <button
-                          className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600 transition-colors"
-                          title="تعديل"
-                        >
-                          <Pencil size={15} />
                         </button>
                       </div>
                     </td>
@@ -180,6 +181,135 @@ export default function Customers({ onNavigate, searchValue }: Props) {
             )}
           </div>
         )}
+      </div>
+
+      {/* Transfer to Accounts Modal */}
+      {transferCustomer && (
+        <TransferAccountsModal
+          customer={transferCustomer}
+          onClose={() => setTransferCustomer(null)}
+          onTransferred={() => setTransferCustomer(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface TransferAccountsProps {
+  customer: Customer;
+  onClose: () => void;
+  onTransferred: () => void;
+}
+
+function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAccountsProps) {
+  const [accountsEmployees, setAccountsEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [targetEmpId, setTargetEmpId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [transferring, setTransferring] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
+      const accList = (data || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
+      setAccountsEmployees(accList.map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` })));
+    })();
+  }, []);
+
+  const handleTransfer = async () => {
+    setTransferring(true);
+    const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
+    const payload = {
+      customer_id: customer.id,
+      workflow_stage: 'accounts',
+      file_status: 'جديد',
+      assigned_to: targetEmpId || null,
+      notes: notes ? `تم التحويل من قائمة العملاء CRM: ${notes}` : 'تم التحويل من العملاء CRM إلى قسم الحسابات',
+    };
+
+    if (existingOp) {
+      await supabase.from('operation_files').update(payload).eq('id', existingOp.id);
+    } else {
+      await supabase.from('operation_files').insert(payload);
+    }
+
+    await supabase.from('workflow_timeline').insert({
+      customer_id: customer.id,
+      stage: 'accounts',
+      stage_label: 'قسم الحسابات',
+      department: 'CRM / العملاء',
+      employee_id: targetEmpId || null,
+      status: 'مكتمل',
+      notes: notes || 'تم تحويل العميل من قائمة العملاء CRM إلى قسم الحسابات',
+    });
+
+    if (targetEmpId) {
+      await supabase.from('notifications').insert({
+        employee_id: targetEmpId,
+        type: 'new_customer',
+        title: 'عميل جديد محول من قائمة العملاء CRM إلى الحسابات',
+        body: `العميل: ${customer.name} - ملاحظات: ${notes}`,
+      });
+    }
+
+    setTransferring(false);
+    onTransferred();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
+          <div className="w-12 h-12 rounded-2xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
+            2➜3
+          </div>
+          <div>
+            <h3 className="font-bold text-navy-900 text-base">تحويل العميل إلى قسم الحسابات</h3>
+            <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{customer.name}</span></p>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-right">
+          <div>
+            <label className="form-label font-bold text-navy-900 text-xs">اختر موظف قسم الحسابات المستلم:</label>
+            <select
+              value={targetEmpId}
+              onChange={(e) => setTargetEmpId(e.target.value)}
+              className="form-input text-xs"
+            >
+              <option value="">— جميع فريق الحسابات —</option>
+              {accountsEmployees.map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للحسابات:</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="form-input text-xs resize-none"
+              rows={3}
+              placeholder="اكتب تفاصيل الفواتير، الدفعات، طريقة السداد المطلوبة..."
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={handleTransfer}
+            disabled={transferring}
+            className="btn-gold flex-1 justify-center text-xs py-2.5"
+          >
+            {transferring ? 'جارٍ التحويل...' : 'تأكيد وإرسال لقسم الحسابات'}
+          </button>
+          <button
+            onClick={onClose}
+            className="btn-outline flex-1 justify-center text-xs py-2.5"
+          >
+            إلغاء
+          </button>
+        </div>
       </div>
     </div>
   );
