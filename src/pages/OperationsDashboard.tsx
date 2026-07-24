@@ -862,8 +862,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
 
       {/* Transfer to Flight Modal */}
       {showFlightTransferModal && selected && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-cyan-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4 border border-cyan-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 text-cyan-600 border-b border-gray-100 pb-3">
               <div className="w-12 h-12 rounded-2xl bg-cyan-100 flex items-center justify-center">
                 <Plane size={24} />
