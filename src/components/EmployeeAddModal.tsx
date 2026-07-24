@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, UserPlus, Loader2, Shield, Layout } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -180,7 +181,18 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
 
     try {
       if (!createdAuthId) {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        const tempSupabase = createClient(
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_ANON_KEY,
+          {
+            auth: {
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false,
+            },
+          }
+        );
+        const { data: signUpData, error: signUpError } = await tempSupabase.auth.signUp({
           email: form.email,
           password: form.password,
           options: {
