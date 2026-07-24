@@ -35,13 +35,13 @@ export default function Dashboard() {
         supabase.from('internal_trips').select('status'),
         supabase.from('internal_trip_bookings').select('booking_status, total_amount'),
         supabase.from('expenses').select('amount, expense_date, category'),
-        supabase.from('payments').select('amount, status'),
+        supabase.from('payments').select('amount, status, payment_date'),
       ]);
 
       const customers = (custRes.data as Array<{ status: string; created_at: string; source: string | null; service_type: string | null }>) || [];
       const bookings = (bookRes.data as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; package: { name: string; cost_price: number | null } | null }>) || [];
       const expenses = (expRes.data as Array<{ amount: number; expense_date: string; category: string }>) || [];
-      const payments = (payRes.data as Array<{ amount: number; status: string }>) || [];
+      const payments = (payRes.data as Array<{ amount: number; status: string; payment_date: string }>) || [];
 
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -96,11 +96,13 @@ export default function Dashboard() {
 
       // Monthly data
       const monthMap = new Map<number, { sales: number; expenses: number }>();
-      bookings.forEach((b) => {
-        const m = new Date(b.booking_date).getMonth();
-        const row = monthMap.get(m) || { sales: 0, expenses: 0 };
-        row.sales += Number(b.total_amount || 0);
-        monthMap.set(m, row);
+      payments.forEach((p) => {
+        if ((p.status === 'مكتمل' || p.status === 'معتمد') && p.payment_date) {
+          const m = new Date(p.payment_date).getMonth();
+          const row = monthMap.get(m) || { sales: 0, expenses: 0 };
+          row.sales += Number(p.amount || 0);
+          monthMap.set(m, row);
+        }
       });
       expenses.forEach((e) => {
         const m = new Date(e.expense_date).getMonth();
