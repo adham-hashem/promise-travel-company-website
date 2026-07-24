@@ -57,15 +57,23 @@ export default function Payments() {
     const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
-      // Show all files that have EVER been in the accounts stage or beyond (accounts, operations, visa, flight, ready, completed)
+      // Show all files that have EVER been in the accounts stage or beyond
       supabase.from('operation_files')
-        .select('*, customer:customers(*), booking:bookings(*), payments:payments(id, amount, payment_method, payment_date, status, approval_status)')
+        .select('*, customer:customers(*), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
     ]);
-    setPayments((payData as PayRow[]) || []);
-    setBookings((bkData as Booking[]) || []);
-    setTransferredFiles(opsData || []);
+    const allPayments = (payData as PayRow[]) || [];
+    const allBookings = (bkData as Booking[]) || [];
+    const rawFiles = (opsData || []) as any[];
+    // Attach payments to each operation file via customer_id
+    const filesWithPayments = rawFiles.map((f: any) => ({
+      ...f,
+      payments: allPayments.filter((p) => p.customer_id === f.customer_id),
+    }));
+    setPayments(allPayments);
+    setBookings(allBookings);
+    setTransferredFiles(filesWithPayments);
     setLoading(false);
   };
 
