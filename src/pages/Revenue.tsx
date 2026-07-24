@@ -23,10 +23,16 @@ export default function Revenue() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('bookings')
         .select('*, customers(*), packages(*)')
         .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[Revenue] Error:', error);
+        alert(`خطأ في جلب بيانات الإيرادات: ${error.message}`);
+      }
+
       setRows((data as RevenueRow[]) || []);
       setLoading(false);
     })();

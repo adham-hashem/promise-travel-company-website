@@ -136,13 +136,15 @@ export default function Payments() {
       payment_type: form.payment_type,
     };
     if (editId) {
-      const { data } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      if (error) { alert(`خطأ في تحديث الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments(payments.map(p => p.id === editId ? (data as PayRow) : p));
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
       }
     } else {
-      const { data } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      if (error) { alert(`خطأ في إضافة الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments([data as PayRow, ...payments]);
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);

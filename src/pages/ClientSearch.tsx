@@ -38,6 +38,7 @@ const statusColors: Record<string, string> = {
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
+  customerId?: string | null;
 }
 
 interface CandidateCustomer {
@@ -48,7 +49,7 @@ interface CandidateCustomer {
   status: string;
 }
 
-export default function ClientSearch({ onNavigate }: Props) {
+export default function ClientSearch({ onNavigate, customerId }: Props) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FullData | null>(null);
@@ -57,8 +58,27 @@ export default function ClientSearch({ onNavigate }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (customerId) {
+      loadFullById(customerId);
+    } else {
+      inputRef.current?.focus();
+    }
+  }, [customerId]);
+
+  const loadFullById = async (id: string) => {
+    setLoading(true);
+    setNotFound(false);
+    setCandidates([]);
+    // First get the customer's client_code
+    const { data: cust } = await supabase.from('customers').select('client_code').eq('id', id).maybeSingle();
+    if (cust?.client_code) {
+      setQuery(cust.client_code);
+      await loadFullByCode(cust.client_code);
+    } else {
+      setNotFound(true);
+      setLoading(false);
+    }
+  };
 
   const loadFullByCode = async (clientCode: string) => {
     setLoading(true);

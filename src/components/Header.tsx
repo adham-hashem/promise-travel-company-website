@@ -154,7 +154,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   };
 
   const onSuperSelect = (r: { id: string; type: string }) => {
-    if (r.type === 'customer') onNavigate?.('customer-details', r.id);
+    if (r.type === 'customer') onNavigate?.('client-search', r.id);
     else if (r.type === 'invoice') onNavigate?.('invoices');
     else if (r.type === 'operation') onNavigate?.('operations');
     else if (r.type === 'visa') onNavigate?.('visa');
