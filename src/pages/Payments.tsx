@@ -57,7 +57,11 @@ export default function Payments() {
     const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
-      supabase.from('operation_files').select('*, customer:customers(*), booking:bookings(*)').eq('workflow_stage', 'accounts').order('created_at', { ascending: false }),
+      // Show all files that have EVER been in the accounts stage or beyond (accounts, operations, visa, flight, ready, completed)
+      supabase.from('operation_files')
+        .select('*, customer:customers(*), booking:bookings(*), payments:payments(id, amount, payment_method, payment_date, status, approval_status)')
+        .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
+        .order('created_at', { ascending: false }),
     ]);
     setPayments((payData as PayRow[]) || []);
     setBookings((bkData as Booking[]) || []);
@@ -136,7 +140,10 @@ export default function Payments() {
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
       }
     }
-    setSaving(false); setShowModal(false);
+    setSaving(false);
+    setShowModal(false);
+    // Reload to refresh transferred files' payment counts
+    load();
   };
 
   const handleDelete = async (p: PayRow) => {
@@ -300,69 +307,113 @@ export default function Payments() {
         </div>
       </div>
 
-      {/* Transferred Files to Accounts (Stage 2 -> Stage 3) */}
+      {/* Transferred Files to Accounts (all files at accounts stage or beyond) */}
       {transferredFiles.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50 via-gold-50/50 to-white rounded-2xl border border-gold-300 p-5 space-y-3.5 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
-                2➜3
+                2➜
               </div>
               <div>
                 <h3 className="font-bold text-navy-900 text-sm flex items-center gap-2">
-                  📥 عملاء محوّلون لقسم الحسابات ({transferredFiles.length})
+                  📥 ملفات قسم الحسابات والمراحل اللاحقة ({transferredFiles.length})
                 </h3>
-                <p className="text-xs text-gray-500">عملاء محولون من قسم الاستعلامات والـ CRM بانتظار معالجة الدفعات والفواتير والتحويل للتشغيل</p>
+                <p className="text-xs text-gray-500">جميع الملفات المحوّلة للحسابات — يبقى العميل مرئياً في جميع المراحل</p>
               </div>
             </div>
-            <span className="text-xs text-amber-800 bg-amber-100 px-3 py-1 rounded-full font-bold border border-amber-200">
-              بانتظار المعالجة الماليّة
-            </span>
+            <button onClick={load} className="text-xs text-navy-700 bg-navy-50 px-3 py-1 rounded-full font-medium border border-navy-200 hover:bg-navy-100 transition-colors">
+              🔄 تحديث
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {transferredFiles.map((file) => (
-              <div key={file.id} className="bg-white rounded-xl p-4 shadow-sm border border-gold-200 space-y-2.5 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-navy-900 text-sm">{file.customer?.name || 'عميل'}</span>
-                    {file.customer?.client_code && (
-                      <span className="text-[11px] font-mono text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-200">
-                        {file.customer.client_code}
+            {transferredFiles.map((file) => {
+              const stageLabels: Record<string, { label: string; color: string; bg: string }> = {
+                accounts: { label: '💰 الحسابات', color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300' },
+                operations: { label: '⚙️ التشغيل', color: 'text-blue-700', bg: 'bg-blue-100 border-blue-300' },
+                visa: { label: '🛂 التأشيرة', color: 'text-purple-700', bg: 'bg-purple-100 border-purple-300' },
+                flight: { label: '✈️ الطيران', color: 'text-cyan-700', bg: 'bg-cyan-100 border-cyan-300' },
+                ready: { label: '✅ جاهز للسفر', color: 'text-emerald-700', bg: 'bg-emerald-100 border-emerald-300' },
+                completed: { label: '🏁 مكتمل', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-300' },
+              };
+              const stageMeta = stageLabels[file.workflow_stage] || stageLabels.accounts;
+              // Compute payment totals from linked payments
+              const filePayments: any[] = file.payments || [];
+              const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+              const bookingTotal = Number(file.booking?.total_amount || 0);
+              const paidPct = bookingTotal > 0 ? Math.min(100, Math.round((totalPaid / bookingTotal) * 100)) : 0;
+
+              return (
+                <div key={file.id} className="bg-white rounded-xl p-4 shadow-sm border border-gold-200 space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-navy-900 text-sm">{file.customer?.name || 'عميل'}</span>
+                      {file.customer?.client_code && (
+                        <span className="text-[11px] font-mono text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-200">
+                          {file.customer.client_code}
+                        </span>
+                      )}
+                    </div>
+                    {/* Stage badge */}
+                    <div className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stageMeta.bg} ${stageMeta.color}`}>
+                      {stageMeta.label}
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      {file.customer?.phone && <p>📱 الهاتف: <span dir="ltr" className="font-semibold text-navy-800">{file.customer.phone}</span></p>}
+                      {file.customer?.service_type && <p>✈️ الخدمة: <span className="font-semibold text-navy-800">{file.customer.service_type}</span></p>}
+                      {/* Payment summary */}
+                      {(totalPaid > 0 || bookingTotal > 0) && (
+                        <div className="bg-navy-50 rounded-lg p-2 mt-1">
+                          <p className="text-navy-700 font-semibold text-[11px]">
+                            💳 مدفوع: {totalPaid.toLocaleString('ar-EG')} ج.م
+                            {bookingTotal > 0 && <span className="text-gray-500"> / {bookingTotal.toLocaleString('ar-EG')} ج.م ({paidPct}%)</span>}
+                          </p>
+                          {bookingTotal > 0 && (
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                              <div className="bg-gold-500 h-1.5 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
+                            </div>
+                          )}
+                          <p className="text-[10px] text-gray-500 mt-0.5">{filePayments.length} دفعة مسجّلة</p>
+                        </div>
+                      )}
+                      {file.notes && (
+                        <div className="mt-1 bg-amber-50/80 p-2 rounded-lg border border-amber-200 text-[11px] text-navy-900">
+                          <span className="font-bold text-amber-800 block">📝 ملاحظات:</span>
+                          <p className="line-clamp-2 leading-relaxed">{file.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-100 mt-2">
+                    <button
+                      onClick={() => {
+                        setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '' });
+                        setShowModal(true);
+                      }}
+                      className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
+                    >
+                      <Plus size={12} /> إضافة دفعة
+                    </button>
+                    {/* Only show transfer to ops if still in accounts stage */}
+                    {file.workflow_stage === 'accounts' && (
+                      <button
+                        onClick={() => setOpsTransferFile(file)}
+                        className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
+                      >
+                        🚀 تحويل للتشغيل
+                      </button>
+                    )}
+                    {file.workflow_stage !== 'accounts' && (
+                      <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center">
+                        محوّل ✔
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    {file.customer?.phone && <p>📱 الهاتف: <span dir="ltr" className="font-semibold text-navy-800">{file.customer.phone}</span></p>}
-                    {file.customer?.service_type && <p>✈️ الخدمة: <span className="font-semibold text-navy-800">{file.customer.service_type}</span></p>}
-                    {file.notes && (
-                      <div className="mt-1 bg-amber-50/80 p-2 rounded-lg border border-amber-200 text-[11px] text-navy-900">
-                        <span className="font-bold text-amber-800 block">📝 ملاحظات التحويل:</span>
-                        <p className="line-clamp-3 leading-relaxed">{file.notes}</p>
-                      </div>
-                    )}
-                  </div>
                 </div>
-
-                <div className="flex gap-2 pt-2 border-t border-gray-100 mt-2">
-                  <button
-                    onClick={() => {
-                      setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '' });
-                      setShowModal(true);
-                    }}
-                    className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
-                  >
-                    <Plus size={12} /> إضافة دفعة
-                  </button>
-                  <button
-                    onClick={() => setOpsTransferFile(file)}
-                    className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
-                  >
-                    🚀 تحويل للتشغيل
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
