@@ -1,5 +1,5 @@
 CREATE OR REPLACE FUNCTION notify_accounts_on_payment()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_cust_name text;
   v_booking_id text;
@@ -47,4 +47,4 @@ BEGIN
 
   RETURN NEW;
 END;
-$$$;
+$$;
