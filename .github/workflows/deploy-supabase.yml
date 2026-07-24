@@ -42,7 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          version: latest
+          version: 1.192.0
 
       - name: Link & Push Database Migrations
         env:
