@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileCheck, Search, Loader2, Hash, User, Plane, Hotel as HotelIcon,
   Calendar, CheckCircle2, AlertCircle, FileText, CreditCard, Wallet,
