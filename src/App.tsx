@@ -25,6 +25,7 @@ import Hotels from './pages/Hotels';
 import Invoices from './pages/Invoices';
 import Inquiries from './pages/Inquiries';
 import ClientSearch from './pages/ClientSearch';
+import ErrorBoundary from './ErrorBoundary';
 import Tasks from './pages/Tasks';
 import CalendarPage from './pages/CalendarPage';
 import ProfitAnalysis from './pages/ProfitAnalysis';
@@ -152,7 +153,7 @@ function AppInner() {
   }
 
   return (
-    <Layout
+    <ErrorBoundary><Layout
       currentPage={currentPage}
       onNavigate={navigate}
       onLogout={logout}
@@ -190,7 +191,7 @@ function AppInner() {
       {currentPage === 'suppliers' && canAccessPage('suppliers') && <Suppliers />}
       {currentPage === 'visa' && canAccessPage('visa') && <VisaManagement onNavigate={navigate} />}
       {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
-    </Layout>
+    </Layout></ErrorBoundary>
   );
 }
 
