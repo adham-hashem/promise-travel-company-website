@@ -55,7 +55,7 @@ export default function Payments() {
   const load = async () => {
     setLoading(true);
     const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
-      supabase.from('payments').select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').order('payment_date', { ascending: false }),
+      supabase.from('payments').select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
       // Show all files that have EVER been in the accounts stage or beyond
       supabase.from('operation_files')
@@ -136,14 +136,14 @@ export default function Payments() {
       payment_type: form.payment_type,
     };
     if (editId) {
-      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
       if (error) { alert(`خطأ في تحديث الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments(payments.map(p => p.id === editId ? (data as PayRow) : p));
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
       }
     } else {
-      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
       if (error) { alert(`خطأ في إضافة الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments([data as PayRow, ...payments]);
@@ -197,7 +197,7 @@ export default function Payments() {
         status: 'مدفوع بالكامل',
       })
       .eq('id', p.id)
-      .select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)')
+      .select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)')
       .single();
     if (data) {
       setPayments(payments.map(x => x.id === p.id ? (data as PayRow) : x));
@@ -214,7 +214,7 @@ export default function Payments() {
         rejection_reason: rejectionReason,
       })
       .eq('id', p.id)
-      .select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)')
+      .select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)')
       .single();
     if (data) {
       setPayments(payments.map(x => x.id === p.id ? (data as PayRow) : x));
