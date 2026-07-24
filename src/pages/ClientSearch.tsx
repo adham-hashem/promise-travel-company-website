@@ -4,7 +4,7 @@ import {
   CalendarCheck, CreditCard, Building2, MessageSquare,
   ChevronRight, AlertCircle, Loader2, Wallet, FileCheck,
   ListChecks, Plane, Hotel as HotelIcon, ClipboardList,
-  Download, Eye, Clock, CheckCircle2,
+  Download, Eye, Clock, CheckCircle2, Briefcase, ShieldAlert as ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Booking, Invoice, Inquiry, Page, Task } from '../types';
@@ -17,7 +17,8 @@ interface FullData {
   payments?: Array<{ id: string; amount: number; payment_date: string; payment_method: string; status: string; transaction_number?: string }>;
   documents?: Array<{ id: string; doc_type: string; status: string; created_at: string; doc_number?: string; file_path?: string; file_name?: string }>;
   operation_files?: Array<{ id: string; op_number: string; file_status: string; financially_approved: boolean; travel_date: string | null; return_date: string | null; visa_status?: string }>;
-  visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null }>;
+  visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null; visa_file_path?: string; visa_file_name?: string }>;
+  tickets?: Array<{ id: string; pnr: string; airline?: string; flight_number?: string; departure_airport?: string; arrival_airport?: string; departure_datetime?: string; return_datetime?: string; e_ticket_number?: string; ticket_file_path?: string; ticket_file_name?: string; status?: string }>;
   tasks?: Task[];
   inquiries?: Inquiry[];
   internal_bookings?: Array<{ id: string; trip_name?: string; booking_status: string; total_amount: number; created_at: string }>;
@@ -621,6 +622,56 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
                         <p className="text-xs text-gray-500">{inq.service_type} · {inq.source}</p>
                       </div>
                       <span className="badge text-xs bg-blue-100 text-blue-700">{inq.status}</span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Visas */}
+            {(result.visas?.length ?? 0) > 0 && (
+              <SectionCard title="التأشيرات" icon={Briefcase} count={result.visas?.length ?? 0} accent="text-purple-600">
+                <div className="p-4 space-y-2">
+                  {result.visas?.map(v => (
+                    <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div>
+                        <p className="text-sm font-semibold text-navy-900">{v.visa_type} — {v.country}</p>
+                        <p className="text-xs text-gray-500">تاريخ التقديم: {v.application_date ? new Date(v.application_date).toLocaleDateString('ar-EG') : '—'}</p>
+                      </div>
+                      <div className="text-left flex items-center gap-2">
+                        <span className={`badge text-xs ${statusColors[v.visa_status] ?? 'bg-purple-100 text-purple-700'}`}>{v.visa_status}</span>
+                        {v.visa_file_path && (
+                          <div className="flex gap-1">
+                            <button onClick={() => handleViewDoc(v.visa_file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="عرض"><Eye size={14} /></button>
+                            <button onClick={() => handleDownloadDoc(v.visa_file_path!, v.visa_file_name || 'visa')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="تحميل"><Download size={14} /></button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Flight Tickets */}
+            {(result.tickets?.length ?? 0) > 0 && (
+              <SectionCard title="تذاكر الطيران" icon={Plane} count={result.tickets?.length ?? 0} accent="text-cyan-600">
+                <div className="p-4 space-y-2">
+                  {result.tickets?.map(t => (
+                    <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div>
+                        <p className="text-sm font-semibold text-navy-900">{t.airline || 'طيران'} {t.flight_number || ''}</p>
+                        <p className="text-xs text-gray-500">PNR: <span className="font-mono font-bold text-cyan-600">{t.pnr || '—'}</span> · {t.departure_airport || ''} ➔ {t.arrival_airport || ''}</p>
+                      </div>
+                      <div className="text-left flex items-center gap-2">
+                        <span className="badge text-xs bg-cyan-100 text-cyan-700">{t.status || 'صادر'}</span>
+                        {t.ticket_file_path && (
+                          <div className="flex gap-1">
+                            <button onClick={() => handleViewDoc(t.ticket_file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="عرض"><Eye size={14} /></button>
+                            <button onClick={() => handleDownloadDoc(t.ticket_file_path!, t.ticket_file_name || 'ticket')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="تحميل"><Download size={14} /></button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

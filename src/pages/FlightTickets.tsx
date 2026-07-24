@@ -46,6 +46,7 @@ export default function FlightTickets({ onNavigate }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<FlightTicket | null>(null);
+  const [ticketFile, setTicketFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -107,31 +108,50 @@ export default function FlightTickets({ onNavigate }: Props) {
   });
 
   const issueTicket = async () => {
-    if (!form.customer_id || !form.pnr.trim()) return;
+    if (!form.customer_id || !ticketFile) {
+      alert('يرجى اختيار العميل ورفع ملف التذكرة');
+      return;
+    }
+    const ext = ticketFile.name.split('.').pop()?.toLowerCase();
+    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext || '')) {
+      alert('الملفات المدعومة: PDF, JPG, PNG فقط');
+      return;
+    }
     setSaving(true);
-    const { data } = await supabase
+
+    const tempTicketId = crypto.randomUUID();
+    const filePath = `ticket-files/${tempTicketId}/${Date.now()}-${ticketFile.name}`;
+    
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, ticketFile);
+    if (upErr) {
+      alert('فشل رفع ملف التذكرة: ' + upErr.message);
+      setSaving(false);
+      return;
+    }
+
+    const { data, error } = await supabase
       .from('flight_tickets')
       .insert({
+        id: tempTicketId,
         customer_id: form.customer_id,
         booking_id: form.booking_id || null,
-        pnr: form.pnr,
-        airline: form.airline || null,
-        flight_number: form.flight_number || null,
-        departure_airport: form.departure_airport || null,
-        arrival_airport: form.arrival_airport || null,
-        departure_datetime: form.departure_datetime ? new Date(form.departure_datetime).toISOString() : null,
-        return_datetime: form.return_datetime ? new Date(form.return_datetime).toISOString() : null,
-        e_ticket_number: form.e_ticket_number || null,
+        pnr: form.pnr || 'صادرة',
+        ticket_file_path: filePath,
+        ticket_file_name: ticketFile.name,
         issued_by: profile?.id || null,
         status: 'صادر',
       })
       .select('*, customers(*), bookings(*), user_profiles(*)')
       .single();
-    if (data) {
+
+    if (error) {
+      alert('خطأ في حفظ التذكرة: ' + error.message);
+    } else if (data) {
       setTickets([data as FlightTicket, ...tickets]);
       setReadyCustomers(readyCustomers.map(r => r.customer_id === form.customer_id ? { ...r, workflow_stage: 'ready' } : r));
     }
     setForm(emptyForm);
+    setTicketFile(null);
     setShowForm(false);
     setSaving(false);
   };
@@ -311,20 +331,73 @@ export default function FlightTickets({ onNavigate }: Props) {
               <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="form-label">PNR <span className="text-red-500">*</span></label><input value={form.pnr} onChange={(e) => setForm({ ...form, pnr: e.target.value })} className="form-input" placeholder="ABC123" /></div>
-                <div><label className="form-label">شركة الطيران</label><input value={form.airline} onChange={(e) => setForm({ ...form, airline: e.target.value })} className="form-input" placeholder="الخطوط السعودية" /></div>
-                <div><label className="form-label">رقم الرحلة</label><input value={form.flight_number} onChange={(e) => setForm({ ...form, flight_number: e.target.value })} className="form-input" placeholder="SV100" /></div>
-                <div><label className="form-label">رقم التذكرة الإلكترونية</label><input value={form.e_ticket_number} onChange={(e) => setForm({ ...form, e_ticket_number: e.target.value })} className="form-input" placeholder="ET-123456" /></div>
-                <div><label className="form-label">مطار المغادرة</label><input value={form.departure_airport} onChange={(e) => setForm({ ...form, departure_airport: e.target.value })} className="form-input" placeholder="CAI" /></div>
-                <div><label className="form-label">مطار الوصول</label><input value={form.arrival_airport} onChange={(e) => setForm({ ...form, arrival_airport: e.target.value })} className="form-input" placeholder="JED" /></div>
-                <div><label className="form-label">تاريخ ووقت المغادرة</label><input type="datetime-local" value={form.departure_datetime} onChange={(e) => setForm({ ...form, departure_datetime: e.target.value })} className="form-input" dir="ltr" /></div>
-                <div><label className="form-label">تاريخ ووقت العودة</label><input type="datetime-local" value={form.return_datetime} onChange={(e) => setForm({ ...form, return_datetime: e.target.value })} className="form-input" dir="ltr" /></div>
+              {/* Select Customer if empty */}
+              {!form.customer_id ? (
+                <div>
+                  <label className="form-label">العميل المرتبط <span className="text-red-500">*</span></label>
+                  <select
+                    value={form.customer_id}
+                    onChange={(e) => {
+                      const sel = readyCustomers.find(r => r.customer_id === e.target.value);
+                      setForm({ ...form, customer_id: e.target.value, booking_id: sel?.booking_id || '' });
+                    }}
+                    className="form-input"
+                  >
+                    <option value="">اختر العميل</option>
+                    {readyCustomers.filter(r => r.workflow_stage === 'flight').map(r => (
+                      <option key={r.customer_id} value={r.customer_id}>{r.customer_name} ({r.client_code})</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">العميل المحدد</p>
+                    <p className="font-bold text-navy-950 text-sm">
+                      {readyCustomers.find(r => r.customer_id === form.customer_id)?.customer_name || 'عميل'}
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs text-gold-600 bg-gold-50 px-2 py-1 rounded">
+                    {readyCustomers.find(r => r.customer_id === form.customer_id)?.client_code || ''}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="form-label">PNR (رمز الحجز)</label>
+                <input value={form.pnr} onChange={(e) => setForm({ ...form, pnr: e.target.value })} className="form-input" placeholder="مثال: ABC123" />
+              </div>
+
+              {/* Upload Flight Ticket File (Required) */}
+              <div>
+                <label className="form-label">ملف التذكرة (صورة أو PDF) <span className="text-red-500">*</span></label>
+                {ticketFile ? (
+                  <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText size={16} className="text-emerald-600 flex-shrink-0" />
+                      <p className="text-xs font-semibold text-emerald-800 truncate">{ticketFile.name}</p>
+                    </div>
+                    <button type="button" onClick={() => setTicketFile(null)} className="p-1 rounded text-red-500 hover:bg-red-50"><X size={14} /></button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,image/*"
+                      onChange={(e) => setTicketFile(e.target.files?.[0] || null)}
+                      className="form-input text-xs"
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
               <button onClick={() => setShowForm(false)} className="btn-outline">إلغاء</button>
-              <button onClick={issueTicket} disabled={!form.pnr || saving} className="btn-gold">{saving ? 'جارٍ الإصدار...' : 'إصدار التذكرة'}</button>
+              <button onClick={issueTicket} disabled={saving || !ticketFile} className="btn-gold">
+                {saving ? (
+                  <span className="flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> جارٍ الرفع والإصدار...</span>
+                ) : 'إصدار التذكرة'}
+              </button>
             </div>
           </div>
         </div>

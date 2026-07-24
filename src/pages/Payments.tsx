@@ -56,7 +56,7 @@ export default function Payments() {
     setLoading(true);
     const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
-      supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
+      supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
       // Show all files that have EVER been in the accounts stage or beyond
       supabase.from('operation_files')
         .select('*, customer:customers(*), booking:bookings(*)')
@@ -498,7 +498,7 @@ export default function Payments() {
                 <label className="form-label">الحجز المرتبط</label>
                 <select value={form.booking_id} onChange={(e) => onBookingChange(e.target.value)} className="form-input">
                   <option value="">— بدون حجز —</option>
-                  {bookings.map(b => <option key={b.id} value={b.id}>{b.customers?.name || 'حجز'} — {fmt(Number(b.total_amount || 0))} ج.م</option>)}
+                  {bookings.map(b => <option key={b.id} value={b.id}>{b.customers?.name || 'حجز'} — {(b as any).package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م</option>)}
                 </select>
               </div>
               <div>
