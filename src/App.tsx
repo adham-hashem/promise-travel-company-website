@@ -36,7 +36,7 @@ import SuperAdminPanel from './pages/SuperAdminPanel';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
-import type { Permissions } from './lib/permissions';
+import { ALL_PAGES, type Permissions } from './lib/permissions';
 
 const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   customers: 'customers_view',
@@ -114,8 +114,10 @@ function AppInner() {
   useEffect(() => {
     if (!profile) return;
     if (!canAccessPage(currentPage)) {
-      const requiredPerm = PAGE_PERMISSIONS[currentPage];
-      if (requiredPerm && !can(requiredPerm)) {
+      const allowed = ALL_PAGES.find(p => canAccessPage(p.key));
+      if (allowed) {
+        setCurrentPage(allowed.key);
+      } else {
         setCurrentPage('dashboard');
       }
     }
@@ -123,10 +125,7 @@ function AppInner() {
 
   const navigate = (page: Page, id?: string) => {
     if (!canAccessPage(page)) {
-      const requiredPerm = PAGE_PERMISSIONS[page];
-      if (requiredPerm && !can(requiredPerm)) {
-        return;
-      }
+      return;
     }
     setCurrentPage(page);
     if (id) setSelectedCustomerId(id);
@@ -181,7 +180,7 @@ function AppInner() {
       searchValue={search}
       onSearchChange={setSearch}
     >
-      {currentPage === 'dashboard' && <Dashboard />}
+      {currentPage === 'dashboard' && canAccessPage('dashboard') && <Dashboard />}
       {currentPage === 'customers' && canAccessPage('customers') && <Customers onNavigate={navigate} searchValue={search} />}
       {currentPage === 'customer-add' && canAccessPage('customer-add') && <AddCustomer onNavigate={navigate} />}
       {currentPage === 'customer-details' && canAccessPage('customer-details') && <CustomerDetails customerId={selectedCustomerId} onNavigate={navigate} />}
@@ -205,7 +204,7 @@ function AppInner() {
       {currentPage === 'hotels' && canAccessPage('hotels') && <Hotels />}
       {currentPage === 'invoices' && canAccessPage('invoices') && <Invoices />}
       {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries />}
-      {currentPage === 'client-search' && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
+      {currentPage === 'client-search' && canAccessPage('client-search') && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
       {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} />}
       {currentPage === 'calendar' && canAccessPage('calendar') && <CalendarPage />}
       {currentPage === 'profit' && canAccessPage('profit') && <ProfitAnalysis />}

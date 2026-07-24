@@ -142,15 +142,14 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
   };
 
   const isItemVisible = (item: NavItem): boolean => {
-    if (item.alwaysVisible) return true;
     if (isSuper) return true;
     if (!canAccessPage(item.id)) return false;
+    if (item.alwaysVisible) return true;
     if (!item.permissionKey) return true;
     return can(item.permissionKey);
   };
 
   const isSectionVisible = (section: NavSection): boolean => {
-    if (section.alwaysVisible) return true;
     if (isSuper) return true;
     return section.items.some(item => isItemVisible(item));
   };
