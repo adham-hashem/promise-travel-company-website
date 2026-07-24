@@ -62,6 +62,63 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
   const [newLog, setNewLog] = useState({ type: 'مكالمة' as CommType, result: '', notes: '', agreed_on: '', next_follow_up: '' });
   const [saving, setSaving] = useState(false);
 
+  const [showTransferAccountsModal, setShowTransferAccountsModal] = useState(false);
+  const [targetAccountsEmpId, setTargetAccountsEmpId] = useState('');
+  const [accountsTransferNotes, setAccountsTransferNotes] = useState('');
+  const [transferringAccounts, setTransferringAccounts] = useState(false);
+  const [accountsEmployees, setAccountsEmployees] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
+      const accList = (data || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
+      setAccountsEmployees(accList.map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` })));
+    })();
+  }, []);
+
+  const handleTransferToAccounts = async () => {
+    if (!customer) return;
+    setTransferringAccounts(true);
+    
+    const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
+    const payload = {
+      customer_id: customer.id,
+      workflow_stage: 'accounts',
+      file_status: 'جديد',
+      assigned_to: targetAccountsEmpId || null,
+      notes: accountsTransferNotes ? `تم التحويل من قسم CRM: ${accountsTransferNotes}` : 'تم التحويل من CRM إلى قسم الحسابات',
+    };
+
+    if (existingOp) {
+      await supabase.from('operation_files').update(payload).eq('id', existingOp.id);
+    } else {
+      await supabase.from('operation_files').insert(payload);
+    }
+
+    await supabase.from('workflow_timeline').insert({
+      customer_id: customer.id,
+      stage: 'accounts',
+      stage_label: 'قسم الحسابات',
+      department: 'CRM / المبيعات',
+      employee_id: targetAccountsEmpId || null,
+      status: 'مكتمل',
+      notes: accountsTransferNotes || 'تم تحويل العميل من قسم CRM إلى قسم الحسابات',
+    });
+
+    if (targetAccountsEmpId) {
+      await supabase.from('notifications').insert({
+        employee_id: targetAccountsEmpId,
+        type: 'new_customer',
+        title: 'عميل جديد محول إلى قسم الحسابات من CRM',
+        body: `العميل: ${customer.name} - ملاحظات التحويل: ${accountsTransferNotes}`,
+      });
+    }
+
+    setTransferringAccounts(false);
+    setShowTransferAccountsModal(false);
+    setAccountsTransferNotes('');
+  };
+
   useEffect(() => {
     async function load() {
       if (!customerId) { setLoading(false); return; }
@@ -252,8 +309,8 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           )}
 
           {/* Status Change */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h4 className="text-sm font-bold text-navy-800 mb-4">تغيير حالة العميل</h4>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+            <h4 className="text-sm font-bold text-navy-800">تغيير حالة العميل</h4>
             <div className="grid grid-cols-2 gap-2">
               {allStatuses.map((s) => (
                 <button
@@ -264,6 +321,16 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                   {s}
                 </button>
               ))}
+            </div>
+
+            {/* Stage 2 -> Stage 3 Transfer Button */}
+            <div className="pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setShowTransferAccountsModal(true)}
+                className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
+              </button>
             </div>
           </div>
         </div>
@@ -607,6 +674,66 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           <DocumentsSection customerId={customer.id} customerName={customer.name} />
         </div>
       </div>
+
+      {/* Transfer to Accounts Modal */}
+      {showTransferAccountsModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowTransferAccountsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
+              <div className="w-12 h-12 rounded-2xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
+                2➜3
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">تحويل ملف العميل إلى قسم الحسابات</h3>
+                <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{customer.name}</span></p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-right">
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">اختر موظف الحسابات المسؤول:</label>
+                <select
+                  value={targetAccountsEmpId}
+                  onChange={(e) => setTargetAccountsEmpId(e.target.value)}
+                  className="form-input text-xs"
+                >
+                  <option value="">— جميع فريق قسم الحسابات —</option>
+                  {accountsEmployees.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للحسابات:</label>
+                <textarea
+                  value={accountsTransferNotes}
+                  onChange={(e) => setAccountsTransferNotes(e.target.value)}
+                  className="form-input text-xs resize-none"
+                  rows={3}
+                  placeholder="اكتب ملاحظات للمحاسب (تفاصيل المبالغ، الفواتير، طرق الدفع...)"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleTransferToAccounts}
+                disabled={transferringAccounts}
+                className="btn-gold flex-1 justify-center text-xs py-2.5"
+              >
+                {transferringAccounts ? 'جارٍ التحويل...' : 'تأكيد التحويل لقسم الحسابات'}
+              </button>
+              <button
+                onClick={() => setShowTransferAccountsModal(false)}
+                className="btn-outline flex-1 justify-center text-xs py-2.5"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
