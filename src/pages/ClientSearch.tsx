@@ -57,29 +57,6 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
   const [notFound, setNotFound] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (customerId) {
-      loadFullById(customerId);
-    } else {
-      inputRef.current?.focus();
-    }
-  }, [customerId]);
-
-  const loadFullById = async (id: string) => {
-    setLoading(true);
-    setNotFound(false);
-    setCandidates([]);
-    // First get the customer's client_code
-    const { data: cust } = await supabase.from('customers').select('client_code').eq('id', id).maybeSingle();
-    if (cust?.client_code) {
-      setQuery(cust.client_code);
-      await loadFullByCode(cust.client_code);
-    } else {
-      setNotFound(true);
-      setLoading(false);
-    }
-  };
-
   const loadFullByCode = async (clientCode: string) => {
     setLoading(true);
     setNotFound(false);
@@ -93,6 +70,28 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     }
     setLoading(false);
   };
+
+  const loadFullById = async (id: string) => {
+    setLoading(true);
+    setNotFound(false);
+    setCandidates([]);
+    const { data: cust } = await supabase.from('customers').select('client_code').eq('id', id).maybeSingle();
+    if (cust?.client_code) {
+      setQuery(cust.client_code);
+      await loadFullByCode(cust.client_code);
+    } else {
+      setNotFound(true);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (customerId) {
+      loadFullById(customerId);
+    } else {
+      inputRef.current?.focus();
+    }
+  }, [customerId]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -28,23 +28,25 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [custRes, bookRes, empRes, itRes, itbRes, expRes, pkgRes] = await Promise.all([
+      const [custRes, bookRes, empRes, itRes, itbRes, expRes, payRes] = await Promise.all([
         supabase.from('customers').select('status, created_at, source, service_type'),
         supabase.from('bookings').select('status, total_amount, booking_date, package_id, payment_status, package:packages(name, cost_price)'),
         supabase.from('employees').select('name, target_percentage, bookings_count').order('target_percentage', { ascending: false }).limit(5),
         supabase.from('internal_trips').select('status'),
         supabase.from('internal_trip_bookings').select('booking_status, total_amount'),
         supabase.from('expenses').select('amount, expense_date, category'),
-        supabase.from('packages').select('id, name'),
+        supabase.from('payments').select('amount, status'),
       ]);
 
       const customers = (custRes.data as Array<{ status: string; created_at: string; source: string | null; service_type: string | null }>) || [];
       const bookings = (bookRes.data as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; package: { name: string; cost_price: number | null } | null }>) || [];
       const expenses = (expRes.data as Array<{ amount: number; expense_date: string; category: string }>) || [];
+      const payments = (payRes.data as Array<{ amount: number; status: string }>) || [];
 
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const totalRevenue = bookings.filter((b) => b.status === 'مؤكد').reduce((s, b) => s + Number(b.total_amount || 0), 0);
+      
+      const totalRevenue = payments.filter((p) => p.status === 'مكتمل' || p.status === 'معتمد').reduce((s, p) => s + Number(p.amount || 0), 0);
       const totalCost = bookings.filter((b) => b.status === 'مؤكد').reduce((s, b) => s + Number(b.package?.cost_price || 0), 0);
       const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
