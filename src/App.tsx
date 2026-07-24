@@ -184,7 +184,7 @@ function AppInner() {
       {currentPage === 'hotels' && canAccessPage('hotels') && <Hotels />}
       {currentPage === 'invoices' && canAccessPage('invoices') && <Invoices />}
       {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries />}
-      {currentPage === 'client-search' && <ClientSearch onNavigate={navigate} customerId={selectedId} />}
+      {currentPage === 'client-search' && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
       {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} />}
       {currentPage === 'calendar' && canAccessPage('calendar') && <CalendarPage />}
       {currentPage === 'profit' && canAccessPage('profit') && <ProfitAnalysis />}
