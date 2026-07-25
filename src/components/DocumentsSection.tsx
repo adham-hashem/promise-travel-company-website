@@ -45,7 +45,7 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
 
   useEffect(() => {
     (async () => {
-      let query = supabase.from('documents').select('*, customers(*), bookings(*), user_profiles(*)');
+      let query = supabase.from('documents').select('*, customers(*), bookings(*), uploader:user_profiles!documents_uploaded_by_fkey(id, name), reviewer:user_profiles!documents_reviewed_by_fkey(id, name)');
       if (customerId) query = query.eq('customer_id', customerId);
       else if (bookingId) query = query.eq('booking_id', bookingId);
       const { data } = await query.order('created_at', { ascending: false });
@@ -91,7 +91,7 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
       file_size: file.size,
       status: 'مرفوع',
       doc_number: docNumber,
-    }).select('*, customers(*), bookings(*), user_profiles(*)').single();
+    }).select('*, customers(*), bookings(*)').single();
 
     if (insertErr) { alert('فشل حفظ المستند: ' + insertErr.message); setUploading(false); return; }
     if (data) {
@@ -129,7 +129,7 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
       review_notes: notes || null,
       reviewed_by: profile?.id || null,
       reviewed_at: new Date().toISOString(),
-    }).eq('id', doc.id).select('*, customers(*), bookings(*), user_profiles(*)').single();
+    }).eq('id', doc.id).select('*, customers(*), bookings(*)').single();
     if (data) setDocs(docs.map(d => d.id === doc.id ? (data as DocumentRecord) : d));
     setReviewingId(null);
     setReviewNotes('');
