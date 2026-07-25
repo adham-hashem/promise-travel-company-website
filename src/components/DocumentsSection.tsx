@@ -57,8 +57,17 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    const ext = file.name.split('.').pop();
-    const filePath = `${customerId || bookingId}/${Date.now()}_${uploadType}.${ext}`;
+    const ext = (file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+    // Sanitize doc type to ASCII-safe key
+    const docTypeKey: Record<string, string> = {
+      'جواز سفر': 'passport',
+      'بطاقة رقم قومي': 'national_id',
+      'صورة شخصية': 'personal_photo',
+      'تأشيرة': 'visa',
+      'مستند إضافي': 'extra_doc',
+    };
+    const safeDocType = docTypeKey[uploadType] || 'document';
+    const filePath = `${customerId || bookingId}/${Date.now()}_${safeDocType}.${ext}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
 

@@ -38,7 +38,8 @@ interface Props {
 export default function FlightTickets({ onNavigate }: Props) {
   const { profile } = useAuth();
   const [tickets, setTickets] = useState<FlightTicket[]>([]);
-  const [readyCustomers, setReadyCustomers] = useState<Array<{ customer_id: string; customer_name: string; client_code: string; booking_id: string; workflow_stage: string; destination: string; travel_date: string; return_date: string; pax_count: number; passport_name: string; visa_id: string; hotel_name: string; package_name: string }>>([]);
+  const [readyCustomers, setReadyCustomers] = useState<Array<{ customer_id: string; customer_name: string; client_code: string; booking_id: string; workflow_stage: string; destination: string; travel_date: string; return_date: string; pax_count: number; passport_name: string; visa_id: string; hotel_name: string; package_name: string; notes?: string }>>([]);
+  const [allCustomers, setAllCustomers] = useState<Array<{ id: string; name: string; client_code: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -55,7 +56,7 @@ export default function FlightTickets({ onNavigate }: Props) {
 
   const load = async () => {
     setLoading(true);
-    const [ticketRes, opsRes] = await Promise.all([
+    const [ticketRes, opsRes, custRes] = await Promise.all([
       supabase.from('flight_tickets').select('*, customers(*), bookings(*), user_profiles(*)').order('created_at', { ascending: false }),
       supabase.from('operation_files').select(`
         *,
@@ -63,14 +64,15 @@ export default function FlightTickets({ onNavigate }: Props) {
         booking:bookings(*, package:packages(*)),
         hotel:hotels(*)
       `).in('workflow_stage', ['flight', 'ready', 'completed']).order('created_at', { ascending: false }),
+      supabase.from('customers').select('id, name, client_code').order('name', { ascending: true }),
     ]);
 
     if (opsRes.error) {
       console.error('[FlightTickets] Error fetching ops data:', opsRes.error);
-      alert(`خطأ في جلب بيانات التشغيل: ${opsRes.error.message}`);
     }
 
     setTickets((ticketRes.data as FlightTicket[]) || []);
+    setAllCustomers((custRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '—', client_code: c.client_code || '' })));
     const opsData = (opsRes.data || []).map((o: any) => ({
       customer_id: o.customer_id,
       customer_name: o.customer?.name || '—',
@@ -344,9 +346,20 @@ export default function FlightTickets({ onNavigate }: Props) {
                     className="form-input"
                   >
                     <option value="">اختر العميل</option>
-                    {readyCustomers.filter(r => r.workflow_stage === 'flight').map(r => (
-                      <option key={r.customer_id} value={r.customer_id}>{r.customer_name} ({r.client_code})</option>
-                    ))}
+                    {/* First: customers in flight workflow stage */}
+                    {readyCustomers.filter(r => r.workflow_stage === 'flight').length > 0 && (
+                      <optgroup label="▸ جاهزون للطيران (من التشغيل)">
+                        {readyCustomers.filter(r => r.workflow_stage === 'flight').map(r => (
+                          <option key={r.customer_id} value={r.customer_id}>{r.customer_name} ({r.client_code})</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {/* All customers fallback */}
+                    <optgroup label="▸ جميع العملاء">
+                      {allCustomers.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}{c.client_code ? ` (${c.client_code})` : ''}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               ) : (
@@ -354,12 +367,17 @@ export default function FlightTickets({ onNavigate }: Props) {
                   <div>
                     <p className="text-xs text-gray-500">العميل المحدد</p>
                     <p className="font-bold text-navy-950 text-sm">
-                      {readyCustomers.find(r => r.customer_id === form.customer_id)?.customer_name || 'عميل'}
+                      {readyCustomers.find(r => r.customer_id === form.customer_id)?.customer_name ||
+                        allCustomers.find(c => c.id === form.customer_id)?.name || 'عميل'}
                     </p>
                   </div>
-                  <span className="font-mono text-xs text-gold-600 bg-gold-50 px-2 py-1 rounded">
-                    {readyCustomers.find(r => r.customer_id === form.customer_id)?.client_code || ''}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-gold-600 bg-gold-50 px-2 py-1 rounded">
+                      {readyCustomers.find(r => r.customer_id === form.customer_id)?.client_code ||
+                        allCustomers.find(c => c.id === form.customer_id)?.client_code || ''}
+                    </span>
+                    <button type="button" onClick={() => setForm({ ...form, customer_id: '', booking_id: '' })} className="text-xs text-red-500 hover:text-red-700 underline">تغيير</button>
+                  </div>
                 </div>
               )}
 

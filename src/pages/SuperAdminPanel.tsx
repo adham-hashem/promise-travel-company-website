@@ -3,6 +3,7 @@ import {
   ShieldCheck, Shield, RefreshCw, Key, AlertCircle, Trash2,
   Database, AlertTriangle, CheckCircle, Calendar, Filter, Eye,
   Lock, Bell, MessageSquare, Clock, CheckSquare, Plane, FileText,
+  Users, Search, Phone, Mail, UserX, Pencil, X, Save,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +18,17 @@ interface ProfileItem {
   status: string;
   permissions: Permissions;
   page_permissions?: Record<string, boolean>;
+  created_at: string;
+  employee_id?: string; // linked employees.id if exists
+}
+
+interface CustomerItem {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  status?: string;
+  client_code?: string;
   created_at: string;
 }
 
@@ -109,12 +121,26 @@ type CutoffPeriod = '1_month' | '3_months' | '6_months' | '1_year' | '2_years' |
 
 export default function SuperAdminPanel() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'permissions' | 'cleanup'>('permissions');
+  const [activeTab, setActiveTab] = useState<'permissions' | 'cleanup' | 'customers'>('permissions');
   const [profiles, setProfiles] = useState<ProfileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAdmin, setSelectedAdmin] = useState<ProfileItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Delete employee confirmation
+  const [deleteTarget, setDeleteTarget] = useState<ProfileItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Customers management
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [editCustomer, setEditCustomer] = useState<CustomerItem | null>(null);
+  const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '', status: '' });
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<CustomerItem | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
 
   // Page access checkboxes
   const [pagePerms, setPagePerms] = useState<Record<string, boolean>>({});
@@ -148,14 +174,37 @@ export default function SuperAdminPanel() {
 
   const fetchProfiles = async () => {
     setLoading(true);
-    const { data } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
-    if (data) setProfiles(data as ProfileItem[]);
+    const [{ data: profileData }, { data: empData }] = await Promise.all([
+      supabase.from('user_profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('employees').select('id, name, role, phone, is_active').order('name', { ascending: true }),
+    ]);
+    if (profileData) {
+      const empMap: Record<string, any> = {};
+      (empData || []).forEach((e: any) => { empMap[e.id] = e; });
+      // Merge employee phone/status if not in user_profiles
+      setProfiles((profileData as ProfileItem[]).map(p => ({
+        ...p,
+        phone: p.phone || empMap[p.id]?.phone,
+        status: p.status || (empMap[p.id]?.is_active ? 'نشط' : 'غير نشط'),
+      })));
+    }
     setLoading(false);
+  };
+
+  const fetchCustomers = async () => {
+    setCustomersLoading(true);
+    const { data } = await supabase.from('customers').select('id, name, phone, email, status, client_code, created_at').order('created_at', { ascending: false });
+    setCustomers((data as CustomerItem[]) || []);
+    setCustomersLoading(false);
   };
 
   useEffect(() => {
     fetchProfiles();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'customers') fetchCustomers();
+  }, [activeTab]);
 
   const handleSelectUser = (p: ProfileItem) => {
     setSelectedAdmin(p);
@@ -223,6 +272,65 @@ export default function SuperAdminPanel() {
       fetchProfiles();
     }
   };
+
+  const handleDeleteProfile = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      // Delete tasks linked to the employee
+      await supabase.from('tasks').delete().eq('employee_id', deleteTarget.id);
+      // Delete from employees table
+      await supabase.from('employees').delete().eq('id', deleteTarget.id);
+      // Delete from user_profiles
+      await supabase.from('user_profiles').delete().eq('id', deleteTarget.id);
+      setDeleteTarget(null);
+      if (selectedAdmin?.id === deleteTarget.id) setSelectedAdmin(null);
+      await fetchProfiles();
+    } catch (err: any) {
+      alert('فشل الحذف: ' + (err?.message || 'خطأ غير معروف'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!editCustomer) return;
+    setSavingCustomer(true);
+    const { error } = await supabase.from('customers').update({
+      name: editCustomerForm.name,
+      phone: editCustomerForm.phone,
+      email: editCustomerForm.email,
+      status: editCustomerForm.status,
+    }).eq('id', editCustomer.id);
+    if (!error) {
+      setCustomers(customers.map(c => c.id === editCustomer.id ? { ...c, ...editCustomerForm } : c));
+      setEditCustomer(null);
+    } else {
+      alert('فشل الحفظ: ' + error.message);
+    }
+    setSavingCustomer(false);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!deleteCustomerTarget) return;
+    setDeletingCustomer(true);
+    const { error } = await supabase.from('customers').delete().eq('id', deleteCustomerTarget.id);
+    if (!error) {
+      setCustomers(customers.filter(c => c.id !== deleteCustomerTarget.id));
+      setDeleteCustomerTarget(null);
+    } else {
+      alert('فشل الحذف: ' + error.message);
+    }
+    setDeletingCustomer(false);
+  };
+
+  const filteredCustomers = customers.filter(c => {
+    if (!customerSearch) return true;
+    const q = customerSearch.toLowerCase();
+    return (c.name || '').toLowerCase().includes(q) ||
+      (c.client_code || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(q);
+  });
 
   // Helper date calculation
   const getCutoffDateISO = (): string => {
@@ -381,6 +489,15 @@ export default function SuperAdminPanel() {
             <Database size={15} />
             الحذف والتنظيف المتقدم
           </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'customers' ? 'bg-gold-500 text-navy-950 shadow' : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Users size={15} />
+            إدارة العملاء
+          </button>
         </div>
       </div>
 
@@ -434,6 +551,16 @@ export default function SuperAdminPanel() {
                           }`}
                         >
                           {p.status}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(p);
+                          }}
+                          className="text-[10px] px-2 py-1 rounded-lg font-bold bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1"
+                          title="حذف الموظف"
+                        >
+                          <Trash2 size={10} /> حذف
                         </button>
                       </div>
                     </div>
@@ -838,7 +965,197 @@ export default function SuperAdminPanel() {
           </div>
         </div>
       )}
+
+      {/* TAB 3: CUSTOMERS MANAGEMENT */}
+      {activeTab === 'customers' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900 flex items-center gap-2">
+                <Users size={20} className="text-gold-500" />
+                إدارة العملاء ({customers.length})
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">عرض وتعديل وحذف بيانات العملاء المسجلين في النظام</p>
+            </div>
+            <button onClick={fetchCustomers} className="btn-outline text-xs flex items-center gap-1.5">
+              <RefreshCw size={13} className={customersLoading ? 'animate-spin' : ''} />
+              تحديث
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search size={15} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+            <input
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              placeholder="بحث بالاسم، الكود، أو الهاتف..."
+              className="form-input pr-9"
+            />
+          </div>
+
+          {customersLoading ? (
+            <div className="text-center py-16 text-gray-400"><RefreshCw size={24} className="animate-spin mx-auto mb-2" />جارٍ التحميل...</div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full data-table">
+                <thead>
+                  <tr>
+                    <th>الكود</th>
+                    <th>الاسم</th>
+                    <th>الهاتف</th>
+                    <th>البريد</th>
+                    <th>الحالة</th>
+                    <th>تاريخ الإضافة</th>
+                    <th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCustomers.length === 0 ? (
+                    <tr><td colSpan={7} className="text-center py-10 text-gray-400">لا يوجد عملاء</td></tr>
+                  ) : filteredCustomers.map(c => (
+                    <tr key={c.id} className="hover:bg-gray-50/50">
+                      <td className="font-mono text-xs font-bold text-gold-600">{c.client_code || '—'}</td>
+                      <td className="font-semibold text-navy-900">{c.name}</td>
+                      <td className="text-gray-600 text-xs" dir="ltr">{c.phone || '—'}</td>
+                      <td className="text-gray-500 text-xs">{c.email || '—'}</td>
+                      <td>
+                        <span className={`badge text-xs ${c.status === 'مكتمل' ? 'bg-emerald-100 text-emerald-700' : c.status === 'ملغي' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {c.status || 'جديد'}
+                        </span>
+                      </td>
+                      <td className="text-xs text-gray-400">{c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—'}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setEditCustomer(c); setEditCustomerForm({ name: c.name, phone: c.phone || '', email: c.email || '', status: c.status || '' }); }}
+                            className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600"
+                            title="تعديل"
+                          ><Pencil size={13} /></button>
+                          <button
+                            onClick={() => setDeleteCustomerTarget(c)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                            title="حذف"
+                          ><Trash2 size={13} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DELETE EMPLOYEE CONFIRMATION MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 border border-red-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
+                <UserX size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">حذف الموظف نهائياً</h3>
+                <p className="text-xs text-red-600">هذا الإجراء لا يمكن التراجع عنه!</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              هل أنت متأكد من حذف الموظف <span className="font-bold text-navy-900">{deleteTarget.name}</span>؟
+              <br /><span className="text-xs text-red-500 mt-1 block">سيتم حذف حسابه ومهامه المرتبطة.</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteProfile}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                {deleting ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'جارٍ الحذف...' : 'حذف نهائي'}
+              </button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT CUSTOMER MODAL */}
+      {editCustomer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-navy-900 text-base flex items-center gap-2">
+                <Pencil size={16} className="text-gold-500" /> تعديل بيانات العميل
+              </h3>
+              <button onClick={() => setEditCustomer(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="form-label">الاسم</label>
+                <input value={editCustomerForm.name} onChange={e => setEditCustomerForm({ ...editCustomerForm, name: e.target.value })} className="form-input" />
+              </div>
+              <div>
+                <label className="form-label">الهاتف</label>
+                <input value={editCustomerForm.phone} onChange={e => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })} className="form-input" dir="ltr" />
+              </div>
+              <div>
+                <label className="form-label">البريد الإلكتروني</label>
+                <input value={editCustomerForm.email} onChange={e => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })} className="form-input" dir="ltr" />
+              </div>
+              <div>
+                <label className="form-label">الحالة</label>
+                <select value={editCustomerForm.status} onChange={e => setEditCustomerForm({ ...editCustomerForm, status: e.target.value })} className="form-input">
+                  {['جديد', 'مهتم', 'متابعة', 'حجز', 'تم الحجز', 'مكتمل', 'مغلق', 'ملغي'].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={handleSaveCustomer} disabled={savingCustomer} className="flex-1 btn-gold text-xs py-2.5 flex items-center justify-center gap-2">
+                {savingCustomer ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                {savingCustomer ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}
+              </button>
+              <button onClick={() => setEditCustomer(null)} className="flex-1 btn-outline text-xs py-2.5">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CUSTOMER CONFIRMATION MODAL */}
+      {deleteCustomerTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 border border-red-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">حذف العميل نهائياً</h3>
+                <p className="text-xs text-red-600">هذا الإجراء لا يمكن التراجع عنه!</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              هل أنت متأكد من حذف العميل <span className="font-bold text-navy-900">{deleteCustomerTarget.name}</span>؟
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteCustomer}
+                disabled={deletingCustomer}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                {deletingCustomer ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deletingCustomer ? 'جارٍ الحذف...' : 'حذف نهائي'}
+              </button>
+              <button onClick={() => setDeleteCustomerTarget(null)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50">
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-
