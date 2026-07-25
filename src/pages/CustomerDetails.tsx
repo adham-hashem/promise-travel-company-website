@@ -283,6 +283,62 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
             </div>
           </div>
 
+          {/* Documents Inventory Summary */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h4 className="text-sm font-bold text-navy-800 mb-4 flex items-center gap-2">
+              <FileCheck size={16} className="text-gold-500" /> حصر المستندات
+              <span className="mr-auto text-xs font-normal text-gray-400">{docs.length} مرفوع</span>
+            </h4>
+            {docs.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-3">لم يتم رفع أي مستند بعد</p>
+            ) : (
+              <div className="space-y-2">
+                {docs.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-navy-800">{doc.doc_type}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                        doc.status === 'مقبول' ? 'bg-emerald-100 text-emerald-700' :
+                        doc.status === 'مرفوض' ? 'bg-red-100 text-red-600' :
+                        doc.status === 'قيد المراجعة' ? 'bg-amber-100 text-amber-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>{doc.status}</span>
+                      <span className="text-[10px] text-gray-400">{new Date(doc.created_at).toLocaleDateString('ar-EG')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Missing required docs */}
+            {(() => {
+              const required = ['جواز سفر', 'بطاقة رقم قومي', 'صورة شخصية'];
+              const uploaded = docs.map(d => d.doc_type);
+              const missing = required.filter(r => !uploaded.includes(r));
+              return missing.length > 0 ? (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-[10px] text-amber-600 font-semibold mb-1.5 flex items-center gap-1">
+                    <AlertCircle size={11} /> مستندات مطلوبة لم تُرفع بعد:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {missing.map(m => (
+                      <span key={m} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1.5 text-emerald-600">
+                  <CheckCircle2 size={13} />
+                  <span className="text-xs font-semibold">جميع المستندات الأساسية مرفوعة</span>
+                </div>
+              );
+            })()}
+          </div>
+
           {/* Travel Data */}
           {(customer.passport_number || customer.nationality || customer.birth_date || customer.gender) && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">

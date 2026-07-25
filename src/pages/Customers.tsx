@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CustomerStatus, Page } from '../types';
 
@@ -26,6 +26,8 @@ export default function Customers({ onNavigate, searchValue }: Props) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'الكل'>('الكل');
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -44,6 +46,15 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     const matchStatus = statusFilter === 'الكل' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await supabase.from('customers').delete().eq('id', deleteTarget.id);
+    setCustomers(customers.filter(c => c.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    setDeleting(false);
+  };
 
   return (
     <div className="space-y-5">
@@ -167,6 +178,13 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                         >
                           <Eye size={15} />
                         </button>
+                        <button
+                          onClick={() => setDeleteTarget(c)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                          title="حذف العميل"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -190,6 +208,43 @@ export default function Customers({ onNavigate, searchValue }: Props) {
           onClose={() => setTransferCustomer(null)}
           onTransferred={() => setTransferCustomer(null)}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 border border-red-100">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">حذف العميل نهائياً</h3>
+                <p className="text-xs text-red-600">هذا الإجراء لا يمكن التراجع عنه!</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700">
+              هل أنت متأكد من حذف العميل <span className="font-bold text-navy-900">{deleteTarget.name}</span>?
+              <br /><span className="text-xs text-red-500 block mt-1">سيتم حذف جميع بياناته وسجلاته ومستنداته بشكل نهائي.</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'جارٍ الحذف...' : 'حذف نهائي'}
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
