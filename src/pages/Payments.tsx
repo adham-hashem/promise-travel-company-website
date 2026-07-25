@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, Loader2, X, Wallet, Upload, Eye,
-  Download, CheckCircle2, XCircle, FileText, Clock, Search,
+  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,8 @@ export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [packages, setPackages] = useState<Array<{ id: string; name: string; price?: number; destination?: string }>>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -54,30 +56,35 @@ export default function Payments() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
+    const [{ data: payData }, { data: bkData }, { data: opsData }, { data: pkgData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
-      // Show all files that have EVER been in the accounts stage or beyond
       supabase.from('operation_files')
         .select('*, customer:customers(*), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
+      supabase.from('packages').select('id, name, price, destination').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
     const rawFiles = (opsData || []) as any[];
-    // Attach payments to each operation file via customer_id
     const filesWithPayments = rawFiles.map((f: any) => ({
       ...f,
       payments: allPayments.filter((p) => p.customer_id === f.customer_id),
     }));
     setPayments(allPayments);
     setBookings(allBookings);
+    setPackages((pkgData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, destination: p.destination })));
     setTransferredFiles(filesWithPayments);
     setLoading(false);
   };
 
-  const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
+  const openAdd = () => {
+    setForm(emptyForm);
+    setEditId(null);
+    setSelectedPackageId('');
+    setShowModal(true);
+  };
   const openEdit = (p: PayRow) => {
     setForm({
       booking_id: p.booking_id || '',
@@ -494,12 +501,67 @@ export default function Payments() {
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="form-label">الحجز المرتبط</label>
-                <select value={form.booking_id} onChange={(e) => onBookingChange(e.target.value)} className="form-input">
-                  <option value="">— بدون حجز —</option>
-                  {bookings.map(b => <option key={b.id} value={b.id}>{b.customers?.name || 'حجز'} — {(b as any).package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م</option>)}
+              <div className="space-y-3">
+                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> الباقة المرتبطة</label>
+                <select
+                  value={selectedPackageId}
+                  onChange={(e) => {
+                    setSelectedPackageId(e.target.value);
+                    // Reset booking selection when package changes
+                    setForm(prev => ({ ...prev, booking_id: '', customer_id: '' }));
+                  }}
+                  className="form-input"
+                >
+                  <option value="">— اختر باقة —</option>
+                  {packages.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.destination ? ` — ${p.destination}` : ''}{p.price ? ` — ${fmt(p.price)} ج.م` : ''}
+                    </option>
+                  ))}
                 </select>
+
+                {selectedPackageId && (
+                  <div>
+                    <label className="form-label">الحجز المرتبط (من هذه الباقة)</label>
+                    <select
+                      value={form.booking_id}
+                      onChange={(e) => onBookingChange(e.target.value)}
+                      className="form-input"
+                    >
+                      <option value="">— اختر حجز العميل —</option>
+                      {bookings
+                        .filter(b => (b as any).package?.id === selectedPackageId)
+                        .map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.customers?.name || 'عميل'} — {fmt(Number(b.total_amount || 0))} ج.م
+                          </option>
+                        ))}
+                    </select>
+                    {bookings.filter(b => (b as any).package?.id === selectedPackageId).length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        ⚠️ لا يوجد حجوزات مرتبطة بهذه الباقة. يمكنك إضافة الدفعة بدون حجز محدد.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {!selectedPackageId && (
+                  <div>
+                    <label className="form-label">أو: حجز محدد مباشرة (اختياري)</label>
+                    <select
+                      value={form.booking_id}
+                      onChange={(e) => onBookingChange(e.target.value)}
+                      className="form-input"
+                    >
+                      <option value="">— بدون حجز —</option>
+                      {bookings.map(b => (
+                        <option key={b.id} value={b.id}>
+                          {b.customers?.name || 'حجز'} — {(b as any).package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label">نوع العملية المالية</label>
