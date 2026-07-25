@@ -599,32 +599,57 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                 const ready = checklist?.passport_done && visaApproved && visaUploaded && checklist?.ticket_done && checklist?.hotel_done && checklist?.invoice_done && checklist?.payment_done;
                 return (
                   <span className={`badge text-xs ${ready ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {ready ? 'Ready to Travel' : 'غير جاهز'}
+                    {ready ? '✅ جاهز للسفر' : '⏳ غير جاهز'}
                   </span>
                 );
               })()}
             </div>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { key: 'passport_done', label: 'جواز السفر' },
-                { key: 'visa_approved', label: 'Visa Approved', derived: true, done: visaRecord?.visa_status === 'تمت الموافقة' || checklist?.visa_done },
-                { key: 'visa_uploaded', label: 'Visa Uploaded', derived: true, done: visaRecord?.visa_upload_status === 'Uploaded' || checklist?.visa_uploaded },
-                { key: 'ticket_done', label: 'التذكرة' },
-                { key: 'hotel_done', label: 'الفندق' },
-                { key: 'invoice_done', label: 'الفاتورة' },
-                { key: 'payment_done', label: 'الدفع مكتمل' },
+                { key: 'passport_done', label: 'جواز السفر', editable: true },
+                { key: 'visa_approved', label: 'Visa Approved', editable: false, done: visaRecord?.visa_status === 'تمت الموافقة' || checklist?.visa_done },
+                { key: 'visa_uploaded', label: 'Visa Uploaded', editable: false, done: visaRecord?.visa_upload_status === 'Uploaded' || checklist?.visa_uploaded },
+                { key: 'ticket_done', label: 'التذكرة', editable: true },
+                { key: 'hotel_done', label: 'الفندق', editable: true },
+                { key: 'invoice_done', label: 'الفاتورة', editable: true },
+                { key: 'payment_done', label: 'الدفع مكتمل', editable: true },
               ].map((item) => {
-                const done = item.derived ? item.done : checklist?.[item.key as keyof ChecklistType] as boolean;
+                const done = item.editable
+                  ? !!(checklist?.[item.key as keyof ChecklistType] as boolean)
+                  : !!item.done;
                 return (
-                  <div
+                  <button
                     key={item.key}
-                    className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-right ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}
+                    disabled={!item.editable}
+                    onClick={async () => {
+                      if (!item.editable || !customerId) return;
+                      const newVal = !done;
+                      const patch = { [item.key]: newVal };
+                      if (checklist) {
+                        setChecklist({ ...checklist, ...patch } as ChecklistType);
+                        await supabase.from('travel_checklist').update(patch).eq('customer_id', customerId);
+                      } else {
+                        const newRow = { customer_id: customerId, passport_done: false, visa_done: false, visa_uploaded: false, ticket_done: false, hotel_done: false, invoice_done: false, payment_done: false, ...patch };
+                        const { data } = await supabase.from('travel_checklist').insert(newRow).select().single();
+                        if (data) setChecklist(data as ChecklistType);
+                      }
+                    }}
+                    className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-right w-full ${
+                      done ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
+                    } ${item.editable ? 'cursor-pointer hover:shadow-sm active:scale-95' : 'cursor-default opacity-80'}`}
+                    title={item.editable ? (done ? 'اضغط لإلغاء التأكيد' : 'اضغط للتأكيد') : 'يتم تحديثه تلقائياً'}
                   >
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${done ? 'bg-emerald-500 text-white' : 'bg-white border-2 border-gray-300'}`}>
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                      done ? 'bg-emerald-500 text-white' : 'bg-white border-2 border-gray-300'
+                    }`}>
                       {done && <CheckCircle2 size={14} />}
                     </div>
-                    <span className={`text-sm font-medium ${done ? 'text-emerald-700' : 'text-gray-600'}`}>{item.label}</span>
-                  </div>
+                    <div className="flex-1 text-right">
+                      <span className={`text-sm font-medium ${done ? 'text-emerald-700' : 'text-gray-600'}`}>{item.label}</span>
+                      {!item.editable && <p className="text-[10px] text-gray-400 mt-0.5">تلقائي</p>}
+                    </div>
+                  </button>
                 );
               })}
             </div>
@@ -651,6 +676,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
               </div>
             )}
           </div>
+
 
 
           {/* Workflow Timeline */}
