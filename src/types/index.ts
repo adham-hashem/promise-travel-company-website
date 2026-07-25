@@ -330,6 +330,7 @@ export type Page =
   | 'visa'
   | 'flight-tickets'
   | 'super-admin'
+  | 'sales-portal'
   | 'website';
 
 // ===== Accounting types =====

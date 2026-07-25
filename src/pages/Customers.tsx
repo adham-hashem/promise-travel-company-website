@@ -34,6 +34,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
       const { data } = await supabase
         .from('customers')
         .select('*, packages(*), employees(*)')
+        .not('sales_agent_submitted', 'eq', false)
         .order('created_at', { ascending: false });
       setCustomers((data as Customer[]) || []);
       setLoading(false);

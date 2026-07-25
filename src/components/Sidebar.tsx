@@ -49,6 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
     alwaysVisible: true,
     items: [
       { id: 'inquiries', label: '1. الاستعلامات', icon: MessageSquare, permissionKey: 'inquiries_view' },
+      { id: 'sales-portal', label: 'بوابة المندوب', icon: Users },
       { id: 'customers', label: '2. العملاء CRM', icon: Users, permissionKey: 'customers_view' },
       { id: 'revenue', label: '3. الحسابات الإيرادات', icon: TrendingUp, permissionKey: 'accounting_revenue' },
       { id: 'payments', label: '3. الحسابات المدفوعات', icon: Wallet, permissionKey: 'accounting_payments' },
@@ -111,7 +112,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   home: ['dashboard', 'client-search', 'tasks', 'calendar'],
-  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'revenue', 'payments', 'operations', 'flight-tickets'],
+  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
   accounting_more: ['installments', 'expenses', 'commissions', 'invoices', 'profit'],
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
   internal: ['internal-trips', 'internal-bookings', 'internal-customers', 'internal-reports'],

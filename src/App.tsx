@@ -33,6 +33,7 @@ import Suppliers from './pages/Suppliers';
 import VisaManagement from './pages/VisaManagement';
 import FlightTickets from './pages/FlightTickets';
 import SuperAdminPanel from './pages/SuperAdminPanel';
+import SalesAgentPortal from './pages/SalesAgentPortal';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
@@ -211,6 +212,7 @@ function AppInner() {
       {currentPage === 'suppliers' && canAccessPage('suppliers') && <Suppliers />}
       {currentPage === 'visa' && canAccessPage('visa') && <VisaManagement onNavigate={navigate} />}
       {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
+      {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
     </Layout></ErrorBoundary>
   );
 }

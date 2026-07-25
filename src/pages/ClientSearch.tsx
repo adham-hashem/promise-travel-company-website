@@ -159,6 +159,7 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     const { data: matches } = await supabase
       .from('customers')
       .select('id, name, client_code, phone, status')
+      .not('sales_agent_submitted', 'eq', false)
       .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
       .limit(10);
 

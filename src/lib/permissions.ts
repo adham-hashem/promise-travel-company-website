@@ -94,7 +94,8 @@ export type PageKey =
   | 'reports'
   | 'employees'
   | 'settings'
-  | 'super-admin';
+  | 'super-admin'
+  | 'sales-portal';
 
 export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'dashboard', label: 'لوحة التحكم', group: 'الرئيسية' },
@@ -119,6 +120,7 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
+  { key: 'sales-portal', label: 'بوابة مندوب المبيعات', group: 'إدارة المبيعات والأعمال' },
 ];
 
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
@@ -193,7 +195,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
   },
   'مندوب مبيعات': {
-    customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
+    customers_view: false, customers_add: true, customers_edit: true, customers_delete: false,
     bookings_view: true, bookings_add: false, bookings_edit: false, bookings_delete: false,
     packages_view: true, packages_add: false, packages_edit: false, packages_delete: false,
     offers_view: true, offers_add: false, offers_edit: false, offers_delete: false,
@@ -204,7 +206,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     documents_upload: true, documents_review: false, documents_view: true, operations_access: false, operations_edit: false, operations_delete: false,
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
-    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
+    inquiries_view: false, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
   },
   'محاسب': {
     customers_view: false, customers_add: false, customers_edit: false, customers_delete: false,
@@ -286,6 +288,14 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['dashboard'] = true;
     pages['client-search'] = true;
     pages['flight-tickets'] = true;
+  } else if (role === 'مندوب مبيعات') {
+    pages['dashboard'] = true;
+    pages['client-search'] = true;
+    pages['sales-portal'] = true;
+    pages['bookings'] = true;
+    pages['packages'] = true;
+    pages['offers'] = true;
+    pages['hotels'] = true;
   } else {
     pages['dashboard'] = true;
     pages['client-search'] = true;
