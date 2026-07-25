@@ -33,7 +33,7 @@ export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [packages, setPackages] = useState<Array<{ id: string; name: string; price?: number; destination?: string }>>([]);
+  const [packages, setPackages] = useState<Array<{ id: string; name: string; price?: number; type?: string; hotel?: string }>>([]);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -63,7 +63,7 @@ export default function Payments() {
         .select('*, customer:customers(*), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
-      supabase.from('packages').select('id, name, price, destination').order('name', { ascending: true }),
+      supabase.from('packages').select('id, name, price, type, hotel').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
@@ -74,7 +74,7 @@ export default function Payments() {
     }));
     setPayments(allPayments);
     setBookings(allBookings);
-    setPackages((pkgData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, destination: p.destination })));
+    setPackages((pkgData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, type: p.type, hotel: p.hotel })));
     setTransferredFiles(filesWithPayments);
     setLoading(false);
   };
@@ -515,7 +515,7 @@ export default function Payments() {
                   <option value="">— اختر باقة —</option>
                   {packages.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.name}{p.destination ? ` — ${p.destination}` : ''}{p.price ? ` — ${fmt(p.price)} ج.م` : ''}
+                      {p.name}{p.type ? ` — ${p.type}` : ''}{p.hotel ? ` — ${p.hotel}` : ''}{p.price ? ` — ${fmt(p.price)} ج.م` : ''}
                     </option>
                   ))}
                 </select>
