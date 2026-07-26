@@ -37,7 +37,9 @@ interface Props {
 }
 
 export default function Tasks({}: Props) {
-  useAuth();
+  const { profile } = useAuth();
+  const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام' || profile?.role === 'مدير المبيعات';
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,18 +54,22 @@ export default function Tasks({}: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    load();
+    if (profile) {
+      load();
+    }
     supabase.from('employees').select('*').eq('is_active', true).then(({ data }) => {
       if (data) setEmployees(data as Employee[]);
     });
-  }, []);
+  }, [profile]);
 
   const load = async () => {
+    if (!profile) return;
     setLoading(true);
-    const { data } = await supabase
-      .from('tasks')
-      .select('*, employees(*)')
-      .order('created_at', { ascending: false });
+    let query = supabase.from('tasks').select('*, employees(*)');
+    if (!isManager) {
+      query = query.eq('employee_id', profile.id);
+    }
+    const { data } = await query.order('created_at', { ascending: false });
     setTasks((data as Task[]) || []);
     setLoading(false);
   };
@@ -87,6 +93,7 @@ export default function Tasks({}: Props) {
   };
 
   const createTask = async () => {
+    if (!isManager) return;
     if (!form.title.trim() || !form.due_date) return;
     setSaving(true);
     const { data } = await supabase
@@ -140,9 +147,11 @@ export default function Tasks({}: Props) {
           <h2 className="section-title">إدارة المهام</h2>
           <p className="section-subtitle">متابعة المهام بين جميع الأقسام والموظفين</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-gold">
-          <Plus size={16} /> مهمة جديدة
-        </button>
+        {isManager && (
+          <button onClick={() => setShowForm(!showForm)} className="btn-gold">
+            <Plus size={16} /> مهمة جديدة
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -277,7 +286,9 @@ export default function Tasks({}: Props) {
                       >
                         {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
+                      {isManager && (
+                        <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
+                      )}
                     </div>
                   </div>
                 </div>

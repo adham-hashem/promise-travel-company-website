@@ -261,6 +261,7 @@ export function getDefaultPermissions(role: string): Permissions {
 
 export function getDefaultPagePermissions(role: string): Record<string, boolean> {
   const pages: Record<string, boolean> = {};
+  pages['tasks'] = true;
   if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') {
     ALL_PAGES.forEach(p => { pages[p.key] = true; });
   } else if (role === 'إضافة عملاء') {
