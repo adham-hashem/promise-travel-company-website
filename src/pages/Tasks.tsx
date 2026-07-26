@@ -38,7 +38,7 @@ interface Props {
 
 export default function Tasks({}: Props) {
   const { profile } = useAuth();
-  const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام' || profile?.role === 'مدير المبيعات';
+  const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
   
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
