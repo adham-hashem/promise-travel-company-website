@@ -123,14 +123,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canAccessPage = (pageKey: string): boolean => {
     if (!profile) return false;
     if (profile.role === 'super_admin' || profile.role === 'مالك النظام') return true;
-    
-    // Check custom page_permissions if set
-    if (profile.page_permissions && Object.keys(profile.page_permissions).length > 0) {
-      return profile.page_permissions[pageKey] === true;
-    }
 
     // Default fallbacks by role
     const defaults = getDefaultPagePermissions(profile.role);
+
+    // Check custom page_permissions if set — but fall back to defaults for missing keys
+    if (profile.page_permissions && Object.keys(profile.page_permissions).length > 0) {
+      const custom = profile.page_permissions[pageKey];
+      if (custom !== undefined) return custom === true;
+      // Key not in custom permissions → fall back to role defaults
+      return defaults[pageKey] === true;
+    }
+
     return defaults[pageKey] === true;
   };
 

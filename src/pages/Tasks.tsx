@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, CheckCircle2, Clock, AlertCircle, ListChecks,
-  Filter, Search, Hash, User, Calendar, Trash2, Zap,
+  Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -284,15 +284,20 @@ export default function Tasks({}: Props) {
                       </div>
                       {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
                       {t.employee_response && (
-                        <div className="mt-1 mb-2 p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs text-navy-800">
-                          <span className="font-bold text-navy-900 block mb-0.5">✍️ رد/تحديث الموظف:</span>
-                          <p className="whitespace-pre-wrap">{t.employee_response}</p>
+                        <div className="mt-1 mb-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-navy-800">
+                          <span className="font-bold text-blue-700 flex items-center gap-1 mb-1">
+                            <MessageSquare size={11} /> آخر تحديث من الموظف:
+                          </span>
+                          <p className="whitespace-pre-wrap text-gray-700">{t.employee_response}</p>
                         </div>
                       )}
-                      {profile?.id === t.employee_id && (
-                        <div className="mt-2 mb-3 bg-navy-50/50 p-2.5 rounded-xl border border-navy-100/50 max-w-md">
-                          <label className="block text-[10px] font-bold text-navy-800 mb-1">تحديث الرد الخاص بك (سيظهر للادمن):</label>
+                      {!isManager && profile?.id === t.employee_id && t.status !== 'مكتملة' && (
+                        <div className="mt-2 mb-3 bg-navy-50/60 p-2.5 rounded-xl border border-navy-100 max-w-md">
+                          <label className="block text-[10px] font-bold text-navy-700 mb-1 flex items-center gap-1">
+                            <Send size={10} /> أضف/حدّث ما تم إنجازه (يظهر للأدمن فوراً):
+                          </label>
                           <input
+                            key={`resp-${t.id}-${t.employee_response || ''}`}
                             type="text"
                             placeholder="اكتب ما تم إنجازه في هذه المهمة..."
                             defaultValue={t.employee_response || ''}
@@ -302,7 +307,7 @@ export default function Tasks({}: Props) {
                                 await updateEmployeeResponse(t.id, val);
                               }
                             }}
-                            className="form-input text-xs py-1 px-2.5 bg-white border border-gray-200 rounded-lg w-full focus:border-navy-500 focus:ring-0"
+                            className="form-input text-xs py-1.5 px-2.5 bg-white border border-gray-200 rounded-lg w-full"
                           />
                         </div>
                       )}
