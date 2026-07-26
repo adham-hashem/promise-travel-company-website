@@ -91,6 +91,7 @@ export interface Task {
   booking_id?: string;
   related_section?: string;
   auto_generated?: boolean;
+  employee_response?: string;
   employees?: Employee;
 }
 

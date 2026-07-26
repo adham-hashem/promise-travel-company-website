@@ -135,6 +135,18 @@ export default function Tasks({}: Props) {
     if (data) setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
   };
 
+  const updateEmployeeResponse = async (taskId: string, response: string) => {
+    const { data } = await supabase
+      .from('tasks')
+      .update({ employee_response: response })
+      .eq('id', taskId)
+      .select('*, employees(*)')
+      .single();
+    if (data) {
+      setTasks(tasks.map((t) => (t.id === taskId ? (data as Task) : t)));
+    }
+  };
+
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id);
     setTasks(tasks.filter((t) => t.id !== id));
@@ -271,6 +283,29 @@ export default function Tasks({}: Props) {
                         <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
                       </div>
                       {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
+                      {t.employee_response && (
+                        <div className="mt-1 mb-2 p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs text-navy-800">
+                          <span className="font-bold text-navy-900 block mb-0.5">✍️ رد/تحديث الموظف:</span>
+                          <p className="whitespace-pre-wrap">{t.employee_response}</p>
+                        </div>
+                      )}
+                      {profile?.id === t.employee_id && (
+                        <div className="mt-2 mb-3 bg-navy-50/50 p-2.5 rounded-xl border border-navy-100/50 max-w-md">
+                          <label className="block text-[10px] font-bold text-navy-800 mb-1">تحديث الرد الخاص بك (سيظهر للادمن):</label>
+                          <input
+                            type="text"
+                            placeholder="اكتب ما تم إنجازه في هذه المهمة..."
+                            defaultValue={t.employee_response || ''}
+                            onBlur={async (e) => {
+                              const val = e.target.value.trim();
+                              if (val !== (t.employee_response || '')) {
+                                await updateEmployeeResponse(t.id, val);
+                              }
+                            }}
+                            className="form-input text-xs py-1 px-2.5 bg-white border border-gray-200 rounded-lg w-full focus:border-navy-500 focus:ring-0"
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
                         {t.employees?.name && <span className="flex items-center gap-1"><User size={11} />{t.employees.name}</span>}
                         {t.department && <span className="flex items-center gap-1"><Filter size={11} />{t.department}</span>}
@@ -281,10 +316,14 @@ export default function Tasks({}: Props) {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <select
                         value={t.status}
+                        disabled={t.status === 'مكتملة' && !isManager}
                         onChange={(e) => updateStatus(t, e.target.value as TaskStatus)}
-                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-75"
                       >
-                        {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                        {statuses.map((s) => {
+                          if (s === 'مكتملة' && !isManager) return null;
+                          return <option key={s} value={s}>{s}</option>;
+                        })}
                       </select>
                       {isManager && (
                         <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
