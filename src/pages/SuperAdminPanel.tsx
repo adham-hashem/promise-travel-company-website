@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ALL_PAGES, PERMISSION_GROUPS, type Permissions } from '../lib/permissions';
+import { ALL_PAGES, PERMISSION_GROUPS, getDefaultPagePermissions, type Permissions } from '../lib/permissions';
 
 interface ProfileItem {
   id: string;
@@ -209,9 +209,16 @@ export default function SuperAdminPanel() {
   const handleSelectUser = (p: ProfileItem) => {
     setSelectedAdmin(p);
     setMessage('');
+    const roleDefaults = getDefaultPagePermissions(p.role);
     const pages: Record<string, boolean> = {};
     ALL_PAGES.forEach((pg) => {
-      pages[pg.key] = p.page_permissions?.[pg.key] ?? true;
+      if (p.page_permissions && pg.key in p.page_permissions) {
+        // Use explicitly saved value
+        pages[pg.key] = p.page_permissions[pg.key];
+      } else {
+        // Fall back to role defaults (tasks=true, dashboard/client-search=false unless role has them)
+        pages[pg.key] = roleDefaults[pg.key] ?? false;
+      }
     });
     setPagePerms(pages);
     setActionPerms({ ...p.permissions });
@@ -627,7 +634,7 @@ export default function SuperAdminPanel() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 p-4 bg-gray-50 rounded-xl border border-gray-100 max-h-60 overflow-y-auto">
                     {ALL_PAGES.map((p) => {
-                      const isChecked = pagePerms[p.key] ?? true;
+                      const isChecked = pagePerms[p.key] ?? false;
                       return (
                         <label key={p.key} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-gray-100 hover:border-gold-300 cursor-pointer">
                           <input

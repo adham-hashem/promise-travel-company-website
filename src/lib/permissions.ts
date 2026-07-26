@@ -117,6 +117,8 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'commissions', label: 'العمولات', group: 'الحسابات والتكاليف' },
   { key: 'profit', label: 'تحليل الأرباح', group: 'التقارير والإدارة' },
   { key: 'reports', label: 'التقارير الشاملة', group: 'التقارير والإدارة' },
+  { key: 'tasks', label: 'إدارة المهام', group: 'الإدارة والتحكم' },
+  { key: 'calendar', label: 'التقويم', group: 'الإدارة والتحكم' },
   { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
@@ -261,19 +263,17 @@ export function getDefaultPermissions(role: string): Permissions {
 
 export function getDefaultPagePermissions(role: string): Record<string, boolean> {
   const pages: Record<string, boolean> = {};
+  // tasks is universally enabled for all roles by default
   pages['tasks'] = true;
+
   if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') {
     ALL_PAGES.forEach(p => { pages[p.key] = true; });
   } else if (role === 'إضافة عملاء') {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['inquiries'] = true;
     pages['customers'] = true;
     pages['customer-add'] = true;
     pages['customer-details'] = true;
   } else if (role === 'محاسب') {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['revenue'] = true;
     pages['payments'] = true;
     pages['installments'] = true;
@@ -281,25 +281,24 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['commissions'] = true;
     pages['invoices'] = true;
   } else if (role === 'موظف التشغيل') {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['operations'] = true;
     pages['visa'] = true;
   } else if (role === 'مسؤول طيران') {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['flight-tickets'] = true;
   } else if (role === 'مندوب مبيعات') {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['sales-portal'] = true;
     pages['bookings'] = true;
     pages['packages'] = true;
     pages['offers'] = true;
     pages['hotels'] = true;
+  } else if (role === 'مدير المبيعات') {
+    pages['inquiries'] = true;
+    pages['customers'] = true;
+    pages['bookings'] = true;
+    pages['packages'] = true;
+    pages['offers'] = true;
+    pages['employees'] = true;
   } else {
-    pages['dashboard'] = true;
-    pages['client-search'] = true;
     pages['inquiries'] = true;
     pages['customers'] = true;
     pages['bookings'] = true;
