@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, CheckCircle2, Clock, AlertCircle, ListChecks,
-  Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send,
+  Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Task, TaskPriority, TaskStatus, Employee, Page } from '../types';
+
+interface TaskUpdate {
+  id: string;
+  task_id: string;
+  employee_id?: string;
+  content: string;
+  created_at: string;
+  employees?: { name: string };
+}
 
 const priorities: TaskPriority[] = ['منخفضة', 'متوسطة', 'عالية', 'عاجل'];
 const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مكتملة', 'متأخرة'];
@@ -53,6 +62,12 @@ export default function Tasks({}: Props) {
   });
   const [saving, setSaving] = useState(false);
 
+  // Task updates (timeline per task)
+  const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
+  const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
+  const [sendingUpdate, setSendingUpdate] = useState<string | null>(null);
+  const [expandedUpdates, setExpandedUpdates] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     if (profile) {
       load();
@@ -70,7 +85,25 @@ export default function Tasks({}: Props) {
       query = query.eq('employee_id', profile.id);
     }
     const { data } = await query.order('created_at', { ascending: false });
-    setTasks((data as Task[]) || []);
+    const fetchedTasks = (data as Task[]) || [];
+    setTasks(fetchedTasks);
+
+    // Load task updates for all fetched tasks
+    if (fetchedTasks.length > 0) {
+      const taskIds = fetchedTasks.map(t => t.id);
+      const { data: updates } = await supabase
+        .from('task_updates')
+        .select('*, employees(name)')
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: true });
+      const updatesMap: Record<string, TaskUpdate[]> = {};
+      ((updates || []) as TaskUpdate[]).forEach((u) => {
+        if (!updatesMap[u.task_id]) updatesMap[u.task_id] = [];
+        updatesMap[u.task_id].push(u);
+      });
+      setTaskUpdates(updatesMap);
+    }
+
     setLoading(false);
   };
 
@@ -135,15 +168,27 @@ export default function Tasks({}: Props) {
     if (data) setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
   };
 
-  const updateEmployeeResponse = async (taskId: string, response: string) => {
-    const { data } = await supabase
-      .from('tasks')
-      .update({ employee_response: response })
-      .eq('id', taskId)
-      .select('*, employees(*)')
-      .single();
-    if (data) {
-      setTasks(tasks.map((t) => (t.id === taskId ? (data as Task) : t)));
+  const sendTaskUpdate = async (taskId: string) => {
+    const content = newUpdateText[taskId]?.trim();
+    if (!content || !profile) return;
+    setSendingUpdate(taskId);
+    try {
+      const { data } = await supabase
+        .from('task_updates')
+        .insert({ task_id: taskId, employee_id: profile.id, content })
+        .select('*, employees(name)')
+        .single();
+      if (data) {
+        setTaskUpdates(prev => ({
+          ...prev,
+          [taskId]: [...(prev[taskId] || []), data as TaskUpdate],
+        }));
+        setNewUpdateText(prev => ({ ...prev, [taskId]: '' }));
+        // Auto-expand updates after sending
+        setExpandedUpdates(prev => ({ ...prev, [taskId]: true }));
+      }
+    } finally {
+      setSendingUpdate(null);
     }
   };
 
@@ -283,34 +328,80 @@ export default function Tasks({}: Props) {
                         <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
                       </div>
                       {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
-                      {t.employee_response && (
-                        <div className="mt-1 mb-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-navy-800">
-                          <span className="font-bold text-blue-700 flex items-center gap-1 mb-1">
-                            <MessageSquare size={11} /> آخر تحديث من الموظف:
-                          </span>
-                          <p className="whitespace-pre-wrap text-gray-700">{t.employee_response}</p>
+
+                      {/* Task Updates Timeline */}
+                      {(taskUpdates[t.id] || []).length > 0 && (
+                        <div className="mt-2 mb-2">
+                          <button
+                            onClick={() => setExpandedUpdates(prev => ({ ...prev, [t.id]: !prev[t.id] }))}
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors mb-1.5"
+                          >
+                            <MessageSquare size={12} />
+                            المستجدات ({taskUpdates[t.id].length})
+                            {expandedUpdates[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+
+                          {expandedUpdates[t.id] && (
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {taskUpdates[t.id].map((u, idx) => (
+                                <div key={u.id} className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs relative">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    <span className="text-[10px] text-blue-600 font-semibold">
+                                      {u.employees?.name || 'الموظف'}
+                                    </span>
+                                    <span className="text-[9px] text-gray-400 mr-auto">
+                                      {new Date(u.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </span>
+                                  </div>
+                                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed mr-7">{u.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
+
+                      {/* Add new update — employee only, task not completed */}
                       {!isManager && profile?.id === t.employee_id && t.status !== 'مكتملة' && (
-                        <div className="mt-2 mb-3 bg-navy-50/60 p-2.5 rounded-xl border border-navy-100 max-w-md">
-                          <label className="block text-[10px] font-bold text-navy-700 mb-1 flex items-center gap-1">
-                            <Send size={10} /> أضف/حدّث ما تم إنجازه (يظهر للأدمن فوراً):
-                          </label>
-                          <input
-                            key={`resp-${t.id}-${t.employee_response || ''}`}
-                            type="text"
-                            placeholder="اكتب ما تم إنجازه في هذه المهمة..."
-                            defaultValue={t.employee_response || ''}
-                            onBlur={async (e) => {
-                              const val = e.target.value.trim();
-                              if (val !== (t.employee_response || '')) {
-                                await updateEmployeeResponse(t.id, val);
-                              }
-                            }}
-                            className="form-input text-xs py-1.5 px-2.5 bg-white border border-gray-200 rounded-lg w-full"
-                          />
+                        <div className="mt-2 mb-3 bg-navy-50/60 rounded-xl border border-navy-100 overflow-hidden">
+                          <div className="px-3 pt-2.5 pb-1">
+                            <label className="block text-[10px] font-bold text-navy-700 mb-1.5 flex items-center gap-1">
+                              <Send size={10} /> أضف مستجد / آخر ما تم إنجازه:
+                            </label>
+                            <textarea
+                              value={newUpdateText[t.id] || ''}
+                              onChange={(e) => setNewUpdateText(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendTaskUpdate(t.id);
+                              }}
+                              rows={2}
+                              placeholder="اكتب آخر مستجدات المهمة هنا... (Ctrl+Enter للإرسال)"
+                              className="form-input text-xs resize-none bg-white"
+                            />
+                          </div>
+                          <div className="px-3 pb-2.5 flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400">
+                              {(newUpdateText[t.id] || '').length} حرف
+                            </span>
+                            <button
+                              onClick={() => sendTaskUpdate(t.id)}
+                              disabled={!newUpdateText[t.id]?.trim() || sendingUpdate === t.id}
+                              className="btn-gold text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            >
+                              {sendingUpdate === t.id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Send size={12} />
+                              )}
+                              إرسال التحديث
+                            </button>
+                          </div>
                         </div>
                       )}
+
                       <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
                         {t.employees?.name && <span className="flex items-center gap-1"><User size={11} />{t.employees.name}</span>}
                         {t.department && <span className="flex items-center gap-1"><Filter size={11} />{t.department}</span>}
