@@ -420,13 +420,12 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
                     <select
                       value={manualAssignments[lead.phone || idx.toString()] || ''}
                       onChange={(e) => setManualAssignments((prev) => ({ ...prev, [lead.phone || idx.toString()]: e.target.value }))}
-                      className="form-input w-40 py-1.5 text-xs"
+                      className="form-input w-48 py-1.5 text-xs font-semibold text-navy-950 bg-white"
                     >
-                      <option value="">اختر موظفاً</option>
-                      {selectedEmployeeIds.map((id) => {
-                        const emp = salesEmployees.find((e) => e.id === id);
-                        return <option key={id} value={id}>{emp?.name}</option>;
-                      })}
+                      <option value="">اختر موظفاً...</option>
+                      {salesEmployees.map((emp) => (
+                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                      ))}
                     </select>
                   </div>
                 ))}
