@@ -187,7 +187,10 @@ export default function SalesAgentPortal() {
         const ext = doc.file.name.split('.').pop();
         const filePath = `${customerId}/${Date.now()}_${d.id}.${ext}`;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, doc.file);
-        if (upErr) return;
+        if (upErr) {
+          console.error(`Error uploading document ${d.id}:`, upErr);
+          return;
+        }
         await supabase.from('documents').insert({
           customer_id: customerId,
           uploaded_by: profile?.id || null,
