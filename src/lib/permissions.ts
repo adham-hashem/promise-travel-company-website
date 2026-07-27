@@ -95,6 +95,7 @@ export type PageKey =
   | 'employees'
   | 'settings'
   | 'super-admin'
+  | 'travel-groups'
   | 'sales-portal';
 
 export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
@@ -119,6 +120,7 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'reports', label: 'التقارير الشاملة', group: 'التقارير والإدارة' },
   { key: 'tasks', label: 'إدارة المهام', group: 'الإدارة والتحكم' },
   { key: 'calendar', label: 'التقويم', group: 'الإدارة والتحكم' },
+  { key: 'travel-groups', label: 'الأفواج (Travel Groups)', group: 'قسم التشغيل' },
   { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
@@ -283,6 +285,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
   } else if (role === 'موظف التشغيل') {
     pages['operations'] = true;
     pages['visa'] = true;
+    pages['travel-groups'] = true;
   } else if (role === 'مسؤول طيران') {
     pages['flight-tickets'] = true;
   } else if (role === 'مندوب مبيعات') {

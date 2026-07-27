@@ -6,7 +6,7 @@ import {
   TrendingUp, Wallet, CalendarClock, Receipt, Calculator,
   FileCheck, Building2, FileText, MessageSquare, Zap,
   ChevronDown, ShoppingBag, DollarSign, MapPin,
-  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert,
+  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers,
 } from 'lucide-react';
 import type { Page } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,6 +55,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'payments', label: '3. الحسابات المدفوعات', icon: Wallet, permissionKey: 'accounting_payments' },
       { id: 'operations', label: '4. قسم التشغيل', icon: FileCheck, permissionKey: 'operations_access' },
       { id: 'flight-tickets', label: '5. قسم الطيران', icon: TicketIcon, permissionKey: 'bookings_view' },
+      { id: 'travel-groups', label: 'الأفواج (Travel Groups)', icon: Layers, alwaysVisible: true },
     ],
   },
   {

@@ -332,6 +332,7 @@ export type Page =
   | 'flight-tickets'
   | 'super-admin'
   | 'sales-portal'
+  | 'travel-groups'
   | 'website';
 
 // ===== Accounting types =====
@@ -573,4 +574,45 @@ export interface WorkflowTimelineEvent {
   status: string;
   notes?: string;
   created_at: string;
+}
+
+export type TravelGroupStatus = 'تجميع' | 'مؤكد' | 'سافر' | 'عاد' | 'ملغي';
+
+export interface TravelGroup {
+  id: string;
+  name: string;
+  code: string;
+  package_id?: string;
+  travel_date?: string;
+  return_date?: string;
+  airline?: string;
+  flight_number?: string;
+  hotel_mecca?: string;
+  hotel_medina?: string;
+  supervisor?: string;
+  max_capacity: number;
+  status: TravelGroupStatus;
+  notes?: string;
+  created_at: string;
+  packages?: { name: string; category?: string };
+  travel_group_members?: { id: string }[];
+  member_count?: number;
+}
+
+export interface TravelGroupMember {
+  id: string;
+  group_id: string;
+  customer_id: string;
+  added_at: string;
+  notes?: string;
+  customers: {
+    id: string;
+    name: string;
+    phone: string;
+    client_code: string;
+    national_id?: string;
+    passport_number?: string;
+    service_type?: string;
+    email?: string;
+  };
 }
