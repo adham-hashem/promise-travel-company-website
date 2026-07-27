@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Save, ArrowLeft, ArrowRight, Check, Upload, Download, Eye, Trash2,
+  Save, ArrowLeft, ArrowRight, Check, Upload, Eye, Trash2,
   FileText, Moon, Plane, MapPin, User, Phone, Mail, Package as PackageIcon, Briefcase,
-  CheckCircle2, AlertCircle, Loader2, X, Hash, CreditCard, Calendar,
+  CheckCircle2, AlertCircle, Loader2, Hash, CreditCard, Calendar,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -60,6 +60,27 @@ export default function AddCustomer({ onNavigate }: Props) {
   const [error, setError] = useState('');
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+
+  const [isVip, setIsVip] = useState(false);
+  const [vipForm, setVipForm] = useState({
+    travel_city: '',
+    departure_date: '',
+    return_date: '',
+    airline_preference: '',
+    flight_class: 'Economy',
+    hotel_preference: '',
+    hotel_stars: '',
+    room_type: '',
+    meal_plan: '',
+    view_preference: '',
+    transportation_method: '',
+    train_preference: '',
+    mazarat: '',
+    additional_services: '',
+    travelers_count: 1,
+    special_notes: '',
+    assigned_vip_manager: '',
+  });
 
   const [form, setForm] = useState({
     name: '', phone: '', whatsapp: '', email: '',
@@ -132,7 +153,7 @@ export default function AddCustomer({ onNavigate }: Props) {
           whatsapp: form.whatsapp || null,
           email: form.email || null,
           service_type: form.service_type || null,
-          requested_package_id: form.requested_package_id || null,
+          requested_package_id: isVip ? null : (form.requested_package_id || null),
           assigned_employee_id: form.assigned_employee_id || null,
           status: form.status,
           source: form.source || null,
@@ -145,6 +166,7 @@ export default function AddCustomer({ onNavigate }: Props) {
           gender: form.gender || null,
           city: form.city || null,
           country: form.country || null,
+          is_vip: isVip,
         })
         .select('id, client_code')
         .single();
@@ -154,6 +176,36 @@ export default function AddCustomer({ onNavigate }: Props) {
       setCreatedCode(customer.client_code || null);
 
       const custId = customer.id;
+
+      if (isVip) {
+        const { error: vipErr } = await supabase
+          .from('vip_requests')
+          .insert({
+            customer_id: custId,
+            travel_city: vipForm.travel_city || null,
+            departure_date: vipForm.departure_date || null,
+            return_date: vipForm.return_date || null,
+            airline_preference: vipForm.airline_preference || null,
+            flight_class: vipForm.flight_class || null,
+            hotel_preference: vipForm.hotel_preference || null,
+            hotel_stars: vipForm.hotel_stars || null,
+            room_type: vipForm.room_type || null,
+            meal_plan: vipForm.meal_plan || null,
+            view_preference: vipForm.view_preference || null,
+            transportation_method: vipForm.transportation_method || null,
+            train_preference: vipForm.train_preference || null,
+            mazarat: vipForm.mazarat || null,
+            additional_services: vipForm.additional_services || null,
+            travelers_count: Number(vipForm.travelers_count) || 1,
+            special_notes: vipForm.special_notes || null,
+            assigned_vip_manager: vipForm.assigned_vip_manager || form.assigned_employee_id || null,
+          });
+
+        if (vipErr) {
+          console.error('Error inserting VIP request:', vipErr);
+          throw new Error('فشل حفظ تفاصيل طلب VIP: ' + vipErr.message);
+        }
+      }
 
       const uploadPromises = docTypes.map(async (d) => {
         const doc = docUploads[d.id];
@@ -327,21 +379,56 @@ export default function AddCustomer({ onNavigate }: Props) {
             })}
           </div>
 
+          <h4 className="text-sm font-bold text-navy-800 pt-2">فئة العميل</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setIsVip(false)}
+              className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
+                !isVip ? 'border-gold-500 bg-gold-50 text-navy-900 shadow-sm' : 'border-gray-100 text-gray-500 hover:border-navy-200'
+              }`}
+            >
+              <span className="text-xs font-bold">عميل باقات عادية (Standard)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsVip(true)}
+              className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1 ${
+                isVip ? 'border-gold-500 bg-gold-50 text-navy-900 shadow-sm' : 'border-gray-100 text-gray-500 hover:border-navy-200'
+              }`}
+            >
+              <span className="text-xs font-bold text-gold-600">👑 عميل VIP (مسار مستقل)</span>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="form-label">الباقة</label>
-              <div className="relative">
-                <PackageIcon size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                <select value={form.requested_package_id} onChange={(e) => update('requested_package_id', e.target.value)} className="form-input pr-9">
-                  <option value="">اختر الباقة</option>
-                  {packages
-                    .filter((p) => !form.service_type || p.type === form.service_type)
-                    .map((p) => <option key={p.id} value={p.id}>{p.name} — {p.price.toLocaleString('ar-EG')} ج.م</option>)}
-                </select>
+            {!isVip ? (
+              <div>
+                <label className="form-label">الباقة</label>
+                <div className="relative">
+                  <PackageIcon size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                  <select value={form.requested_package_id} onChange={(e) => update('requested_package_id', e.target.value)} className="form-input pr-9">
+                    <option value="">اختر الباقة</option>
+                    {packages
+                      .filter((p) => !form.service_type || p.type === form.service_type)
+                      .map((p) => <option key={p.id} value={p.id}>{p.name} — {p.price.toLocaleString('ar-EG')} ج.م</option>)}
+                  </select>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="form-label">المشرف المسؤول عن الملف VIP</label>
+                <div className="relative">
+                  <Briefcase size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                  <select value={vipForm.assigned_vip_manager} onChange={(e) => setVipForm({...vipForm, assigned_vip_manager: e.target.value})} className="form-input pr-9">
+                    <option value="">اختر المشرف المسؤول</option>
+                    {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
             <div>
-              <label className="form-label">الموظف المسؤول</label>
+              <label className="form-label">الموظف المسؤول (البيعات)</label>
               <div className="relative">
                 <Briefcase size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
                 <select value={form.assigned_employee_id} onChange={(e) => update('assigned_employee_id', e.target.value)} className="form-input pr-9">
@@ -504,6 +591,84 @@ export default function AddCustomer({ onNavigate }: Props) {
               <input value={form.country} onChange={(e) => update('country', e.target.value)} className="form-input" placeholder="مصر" />
             </div>
           </div>
+
+          {isVip && (
+            <div className="pt-6 border-t border-gray-100 space-y-6">
+              <h3 className="text-sm font-bold text-navy-800 mb-2 flex items-center gap-2">
+                <div className="w-1 h-5 bg-gold-500 rounded-full" /> تفاصيل طلبات VIP الخاصة
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <label className="form-label">مدينة السفر المطلوبة</label>
+                  <input value={vipForm.travel_city} onChange={(e) => setVipForm({...vipForm, travel_city: e.target.value})} className="form-input" placeholder="مكة، المدينة، دبي، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">تاريخ السفر المقترح</label>
+                  <input type="date" value={vipForm.departure_date} onChange={(e) => setVipForm({...vipForm, departure_date: e.target.value})} className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">تاريخ العودة المقترح</label>
+                  <input type="date" value={vipForm.return_date} onChange={(e) => setVipForm({...vipForm, return_date: e.target.value})} className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">شركة الطيران المفضلة</label>
+                  <input value={vipForm.airline_preference} onChange={(e) => setVipForm({...vipForm, airline_preference: e.target.value})} className="form-input" placeholder="مصر للطيران، السعودية، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">درجة السفر</label>
+                  <select value={vipForm.flight_class} onChange={(e) => setVipForm({...vipForm, flight_class: e.target.value})} className="form-input">
+                    <option value="Economy">درجة اقتصادية (Economy)</option>
+                    <option value="Business">درجة رجال أعمال (Business)</option>
+                    <option value="First Class">درجة أولى (First Class)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">عدد المسافرين / المرافقين</label>
+                  <input type="number" min={1} value={vipForm.travelers_count} onChange={(e) => setVipForm({...vipForm, travelers_count: parseInt(e.target.value) || 1})} className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">الفندق المفضل</label>
+                  <input value={vipForm.hotel_preference} onChange={(e) => setVipForm({...vipForm, hotel_preference: e.target.value})} className="form-input" placeholder="دار التوحيد، فندق معني، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">تصنيف الفندق (نجوم)</label>
+                  <input value={vipForm.hotel_stars} onChange={(e) => setVipForm({...vipForm, hotel_stars: e.target.value})} className="form-input" placeholder="5 نجوم، 4 نجوم، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">نوع الغرفة المطلوبة</label>
+                  <input value={vipForm.room_type} onChange={(e) => setVipForm({...vipForm, room_type: e.target.value})} className="form-input" placeholder="مفردة، ثنائية مطلة، جناح رئيسي" />
+                </div>
+                <div>
+                  <label className="form-label">نظام الوجبات</label>
+                  <input value={vipForm.meal_plan} onChange={(e) => setVipForm({...vipForm, meal_plan: e.target.value})} className="form-input" placeholder="فطور فقط، فطور وعشاء، إقامة كاملة" />
+                </div>
+                <div>
+                  <label className="form-label">الإطلالة المفضلة</label>
+                  <input value={vipForm.view_preference} onChange={(e) => setVipForm({...vipForm, view_preference: e.target.value})} className="form-input" placeholder="مطل على الكعبة، مطل على الحرم، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">وسيلة الانتقالات المفضلة</label>
+                  <input value={vipForm.transportation_method} onChange={(e) => setVipForm({...vipForm, transportation_method: e.target.value})} className="form-input" placeholder="سيارة GMC خاصة، حافلة VIP، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">تفضيل القطار السريع</label>
+                  <input value={vipForm.train_preference} onChange={(e) => setVipForm({...vipForm, train_preference: e.target.value})} className="form-input" placeholder="درجة أولى قطار الحرمين، إلخ" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="form-label">المزارات السياحية والجولات المطلوبة</label>
+                  <input value={vipForm.mazarat} onChange={(e) => setVipForm({...vipForm, mazarat: e.target.value})} className="form-input" placeholder="مزارات المدينة المنورة، مزارات مكة المكرمة، إلخ" />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="form-label">خدمات إضافية مطلوبة</label>
+                  <input value={vipForm.additional_services} onChange={(e) => setVipForm({...vipForm, additional_services: e.target.value})} className="form-input" placeholder="كرسي متحرك، مرافق خاص، تأشيرة خاصة، إلخ" />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="form-label">طلبات وملاحظات خاصة أخرى</label>
+                  <textarea value={vipForm.special_notes} onChange={(e) => setVipForm({...vipForm, special_notes: e.target.value})} rows={3} className="form-input resize-none" placeholder="أي تفاصيل أو شروط خاصة أخرى للرحلة..." />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

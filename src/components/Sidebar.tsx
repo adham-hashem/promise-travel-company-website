@@ -6,7 +6,7 @@ import {
   TrendingUp, Wallet, CalendarClock, Receipt, Calculator,
   FileCheck, Building2, FileText, MessageSquare, Zap,
   ChevronDown, ShoppingBag, DollarSign, MapPin,
-  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers,
+  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers, Crown,
 } from 'lucide-react';
 import type { Page } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -51,6 +51,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'inquiries', label: '1. الاستعلامات', icon: MessageSquare, permissionKey: 'inquiries_view' },
       { id: 'sales-portal', label: 'بوابة المندوب', icon: Users },
       { id: 'customers', label: '2. العملاء CRM', icon: Users, permissionKey: 'customers_view' },
+      { id: 'vip-dashboard', label: 'عملاء VIP', icon: Crown, permissionKey: 'vip_management_access' },
       { id: 'revenue', label: '3. الحسابات الإيرادات', icon: TrendingUp, permissionKey: 'accounting_revenue' },
       { id: 'payments', label: '3. الحسابات المدفوعات', icon: Wallet, permissionKey: 'accounting_payments' },
       { id: 'operations', label: '4. قسم التشغيل', icon: FileCheck, permissionKey: 'operations_access' },
@@ -113,7 +114,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   home: ['dashboard', 'client-search', 'tasks', 'calendar'],
-  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
+  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'vip-dashboard', 'vip-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
   accounting_more: ['installments', 'expenses', 'commissions', 'invoices', 'profit'],
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
   internal: ['internal-trips', 'internal-bookings', 'internal-customers', 'internal-reports'],

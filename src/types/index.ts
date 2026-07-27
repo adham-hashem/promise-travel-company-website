@@ -178,7 +178,49 @@ export interface Customer {
   created_at: string;
   packages?: Package;
   employees?: Employee;
+  is_vip?: boolean;
 }
+
+export interface VipRequest {
+  id: string;
+  customer_id: string;
+  travel_city?: string;
+  departure_date?: string;
+  return_date?: string;
+  airline_preference?: string;
+  flight_class?: string;
+  hotel_preference?: string;
+  hotel_stars?: string;
+  room_type?: string;
+  meal_plan?: string;
+  view_preference?: string;
+  transportation_method?: string;
+  train_preference?: string;
+  mazarat?: string;
+  additional_services?: string;
+  travelers_count: number;
+  special_notes?: string;
+  assigned_vip_manager?: string;
+  current_stage: 'accounts' | 'operations' | 'bookings' | 'flights' | 'hotels' | 'housing' | 'visas' | 'ready';
+  created_at: string;
+  updated_at: string;
+  customers?: Customer;
+  employees?: Employee;
+}
+
+export interface VipWorkflowStep {
+  id: string;
+  vip_request_id: string;
+  step_key: string;
+  step_label: string;
+  status: string;
+  assigned_employee_id?: string;
+  execution_date?: string;
+  department_notes?: string;
+  updated_at: string;
+  assigned_employee_name?: string;
+}
+
 
 export interface CommunicationLog {
   id: string;
@@ -333,6 +375,8 @@ export type Page =
   | 'super-admin'
   | 'sales-portal'
   | 'travel-groups'
+  | 'vip-dashboard'
+  | 'vip-details'
   | 'website';
 
 // ===== Accounting types =====

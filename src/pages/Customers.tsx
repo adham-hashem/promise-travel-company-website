@@ -35,6 +35,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
         .from('customers')
         .select('*, packages(*), employees(*)')
         .not('sales_agent_submitted', 'eq', false)
+        .eq('is_vip', false)
         .order('created_at', { ascending: false });
       setCustomers((data as Customer[]) || []);
       setLoading(false);

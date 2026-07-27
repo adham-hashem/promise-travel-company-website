@@ -35,11 +35,14 @@ import FlightTickets from './pages/FlightTickets';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import SalesAgentPortal from './pages/SalesAgentPortal';
 import TravelGroups from './pages/TravelGroups';
+import VIPDashboard from './pages/VIPDashboard';
+import VIPDetails from './pages/VIPDetails';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
-import { ALL_PAGES, type Permissions } from './lib/permissions';
+import { ALL_PAGES } from './lib/permissions';
 
+/*
 const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   customers: 'customers_view',
   'customer-add': 'customers_add',
@@ -70,10 +73,13 @@ const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   visa: 'bookings_view',
   'flight-tickets': 'bookings_view',
   'super-admin': 'settings_access',
+  'vip-dashboard': 'vip_management_access',
+  'vip-details': 'vip_management_access',
 };
+*/
 
 function AppInner() {
-  const { session, profile, loading, signOut, can, canAccessPage } = useAuth();
+  const { session, profile, loading, signOut, canAccessPage } = useAuth();
   
   const [currentPage, setCurrentPage] = useState<Page>(() => {
     if (typeof window === 'undefined') return 'dashboard';
@@ -215,6 +221,8 @@ function AppInner() {
       {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
       {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
       {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
+      {currentPage === 'vip-dashboard' && canAccessPage('vip-dashboard') && <VIPDashboard onNavigate={navigate} />}
+      {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails customerId={selectedCustomerId} onNavigate={navigate} />}
     </Layout></ErrorBoundary>
   );
 }

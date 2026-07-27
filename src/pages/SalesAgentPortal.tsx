@@ -84,6 +84,7 @@ export default function SalesAgentPortal() {
           .from('customers')
           .select('*, packages(*)')
           .eq('assigned_employee_id', profile?.id)
+          .eq('is_vip', false)
           .order('created_at', { ascending: false })
       ]);
 

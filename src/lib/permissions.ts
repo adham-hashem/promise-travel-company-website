@@ -61,6 +61,7 @@ export interface Permissions {
   inquiries_add: boolean;
   inquiries_edit: boolean;
   inquiries_delete: boolean;
+  vip_management_access: boolean;
 }
 
 export type PageKey = 
@@ -96,7 +97,9 @@ export type PageKey =
   | 'settings'
   | 'super-admin'
   | 'travel-groups'
-  | 'sales-portal';
+  | 'sales-portal'
+  | 'vip-dashboard'
+  | 'vip-details';
 
 export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'dashboard', label: 'لوحة التحكم', group: 'الرئيسية' },
@@ -125,6 +128,8 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
   { key: 'sales-portal', label: 'بوابة مندوب المبيعات', group: 'إدارة المبيعات والأعمال' },
+  { key: 'vip-dashboard', label: 'لوحة عملاء VIP', group: 'إدارة المبيعات والأعمال' },
+  { key: 'vip-details', label: 'تفاصيل عميل VIP', group: 'إدارة المبيعات والأعمال' },
 ];
 
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
@@ -141,6 +146,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
+    vip_management_access: true,
   },
   'مالك النظام': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: true,
@@ -155,6 +161,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
+    vip_management_access: true,
   },
   'مدير النظام': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: true,
@@ -169,6 +176,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
+    vip_management_access: true,
   },
   'إضافة عملاء': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
@@ -183,6 +191,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: false, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
+    vip_management_access: false,
   },
   'مدير المبيعات': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
@@ -197,6 +206,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: false,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: false,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
+    vip_management_access: false,
   },
   'مندوب مبيعات': {
     customers_view: false, customers_add: true, customers_edit: true, customers_delete: false,
@@ -211,6 +221,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: false, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
+    vip_management_access: false,
   },
   'محاسب': {
     customers_view: false, customers_add: false, customers_edit: false, customers_delete: false,
@@ -225,6 +236,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: false,
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
+    vip_management_access: false,
   },
   'موظف التشغيل': {
     customers_view: true, customers_add: false, customers_edit: false, customers_delete: false,
@@ -239,6 +251,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
+    vip_management_access: false,
   },
   'مسؤول طيران': {
     customers_view: true, customers_add: false, customers_edit: false, customers_delete: false,
@@ -253,6 +266,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: false, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
+    vip_management_access: false,
   },
 };
 
@@ -270,6 +284,12 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
 
   if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') {
     ALL_PAGES.forEach(p => { pages[p.key] = true; });
+  } else if (role === 'موظف التشغيل') {
+    pages['operations'] = true;
+    pages['visa'] = true;
+    pages['travel-groups'] = true;
+    pages['vip-dashboard'] = true;
+    pages['vip-details'] = true;
   } else if (role === 'إضافة عملاء') {
     pages['inquiries'] = true;
     pages['customers'] = true;
@@ -347,6 +367,7 @@ export const PERMISSION_GROUPS = [
       { key: 'operations_edit', label: 'تعديل وثائق التشغيل' },
       { key: 'documents_upload', label: 'رفع المستندات والجوازات' },
       { key: 'documents_view', label: 'معاينة وتنزيل المستندات' },
+      { key: 'vip_management_access', label: 'إدارة ومتابعة عملاء VIP' },
     ],
   },
   {
