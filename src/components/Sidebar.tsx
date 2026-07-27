@@ -51,12 +51,20 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'inquiries', label: '1. الاستعلامات', icon: MessageSquare, permissionKey: 'inquiries_view' },
       { id: 'sales-portal', label: 'بوابة المندوب', icon: Users },
       { id: 'customers', label: '2. العملاء CRM', icon: Users, permissionKey: 'customers_view' },
-      { id: 'vip-dashboard', label: 'عملاء VIP', icon: Crown, permissionKey: 'vip_management_access' },
       { id: 'revenue', label: '3. الحسابات الإيرادات', icon: TrendingUp, permissionKey: 'accounting_revenue' },
       { id: 'payments', label: '3. الحسابات المدفوعات', icon: Wallet, permissionKey: 'accounting_payments' },
       { id: 'operations', label: '4. قسم التشغيل', icon: FileCheck, permissionKey: 'operations_access' },
       { id: 'flight-tickets', label: '5. قسم الطيران', icon: TicketIcon, permissionKey: 'bookings_view' },
       { id: 'travel-groups', label: 'الأفواج (Travel Groups)', icon: Layers, alwaysVisible: true },
+    ],
+  },
+  {
+    id: 'vip',
+    label: 'قسم عملاء VIP',
+    icon: Crown,
+    anyPermission: ['vip_management_access'],
+    items: [
+      { id: 'vip-dashboard', label: 'لوحة عملاء VIP', icon: Crown, permissionKey: 'vip_management_access' },
     ],
   },
   {
@@ -114,7 +122,8 @@ const NAV_SECTIONS: NavSection[] = [
 
 const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   home: ['dashboard', 'client-search', 'tasks', 'calendar'],
-  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'vip-dashboard', 'vip-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
+  workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
+  vip: ['vip-dashboard', 'vip-details'],
   accounting_more: ['installments', 'expenses', 'commissions', 'invoices', 'profit'],
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
   internal: ['internal-trips', 'internal-bookings', 'internal-customers', 'internal-reports'],
@@ -137,6 +146,7 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
   });
   defaultOpen['home'] = true;
   defaultOpen['workflow'] = true;
+  defaultOpen['vip'] = true;
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(defaultOpen);
 
