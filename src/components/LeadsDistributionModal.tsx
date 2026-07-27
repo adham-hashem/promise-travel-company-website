@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { X, Upload, Users, Shuffle, Hand, FileSpreadsheet, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Upload, Users, Shuffle, Hand, FileSpreadsheet, Check, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Employee } from '../types';
+import * as XLSX from 'xlsx';
 
 type DistributionMode = 'auto' | 'manual';
 type InputMode = 'file' | 'manual';
@@ -31,6 +32,11 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
   const [error, setError] = useState('');
 
   const salesEmployees = employees.filter((e) => e.is_active && e.role === 'مندوب مبيعات');
+
+  useEffect(() => {
+    const ids = salesEmployees.map((e) => e.id);
+    setSelectedEmployeeIds(ids);
+  }, [employees]);
 
   const parseManualText = (): ParsedLead[] => {
     return manualText
@@ -63,26 +69,62 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
 
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = String(ev.target?.result || '');
-      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-      // Skip header row if it contains non-numeric in the second column
-      const startIdx = lines.length > 1 && !/\d/.test(lines[0].split(/[,\t|]/)[1] || '') ? 1 : 0;
-      const leads: ParsedLead[] = [];
-      for (let i = startIdx; i < lines.length; i++) {
-        const parts = lines[i].split(/[,\t|]/).map((p) => p.trim());
-        if (parts.length === 1 && parts[0]) {
-          leads.push({ name: `عميل ${parts[0].slice(-4)}`, phone: parts[0] });
-        } else if (parts.length >= 2) {
-          leads.push({
-            name: parts[0] || `عميل ${parts[1].slice(-4)}`,
-            phone: parts[1],
-            governorate: parts[2] || undefined,
-          });
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Convert to JSON array of arrays
+        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        if (rows.length === 0) {
+          setError('الملف فارغ أو لا يحتوي على صفوف بيانات');
+          return;
         }
+
+        // Find headers or assume order
+        const firstRow = (rows[0] || []).map(cell => String(cell || '').trim().toLowerCase());
+        
+        // Search for column indices by keywords
+        let nameIdx = firstRow.findIndex(h => h.includes('الاسم') || h.includes('الاسم الكامل') || h.includes('name') || h.includes('العميل'));
+        let phoneIdx = firstRow.findIndex(h => h.includes('الهاتف') || h.includes('تليفون') || h.includes('phone') || h.includes('mobile') || h.includes('جوال') || h.includes('رقم'));
+        let govIdx = firstRow.findIndex(h => h.includes('المحافظة') || h.includes('governorate') || h.includes('المدينة') || h.includes('city') || h.includes('محافظه'));
+
+        // Fallbacks to default column positions if headers aren't detected
+        if (nameIdx === -1) nameIdx = 0;
+        if (phoneIdx === -1) phoneIdx = 1;
+        if (govIdx === -1) govIdx = 2;
+
+        // Skip header if it is not numeric and contains text labels
+        const startRow = (/\d/.test(firstRow[phoneIdx] || '') && !firstRow[phoneIdx].includes('الهاتف') && !firstRow[phoneIdx].includes('phone')) ? 0 : 1;
+        
+        const leads: ParsedLead[] = [];
+        for (let i = startRow; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          const rawPhone = String(row[phoneIdx] !== undefined ? row[phoneIdx] : '').trim();
+          // Clean phone from decimals like .0 if imported as numeric
+          const phone = rawPhone.replace(/\.0$/, '');
+
+          if (!phone) continue;
+
+          const name = String(row[nameIdx] !== undefined ? row[nameIdx] : '').trim() || `عميل ${phone.slice(-4)}`;
+          const governorate = row[govIdx] !== undefined ? String(row[govIdx]).trim() : undefined;
+
+          leads.push({ name, phone, governorate });
+        }
+
+        if (leads.length === 0) {
+          setError('لم يتم العثور على أرقام هواتف صالحة في الملف. يرجى التأكد من التنسيق.');
+        } else {
+          setFileLeads(leads);
+        }
+      } catch (err) {
+        setError('حدث خطأ أثناء قراءة ملف Excel: ' + (err as Error).message);
       }
-      setFileLeads(leads);
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const distribute = async () => {
@@ -151,7 +193,10 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
         }
       }
 
-      const { error: insertError } = await supabase.from('customers').insert(rows);
+      const { data: insertedCustomers, error: insertError } = await supabase
+        .from('customers')
+        .insert(rows)
+        .select('id, name, client_code, assigned_employee_id');
 
       if (insertError) {
         setError(insertError.message);
@@ -159,18 +204,33 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
         return;
       }
 
+      // Automatically add follow-up tasks for these employees
+      if (insertedCustomers && insertedCustomers.length > 0) {
+        const taskRows = insertedCustomers.map((cust: any) => ({
+          title: `متابعة العميل الجديد: ${cust.name}`,
+          description: `تم توزيع هذا العميل عليك تلقائياً للمتابعة والتواصل.`,
+          employee_id: cust.assigned_employee_id,
+          priority: 'متوسطة',
+          status: 'جديدة',
+          start_date: new Date().toISOString().split('T')[0],
+          due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 days from now
+          client_code: cust.client_code,
+        }));
+        await supabase.from('tasks').insert(taskRows);
+      }
+
       // Insert notifications: new_lead for each assigned employee
       const notifs = Array.from(new Set(rows.map((r) => r.assigned_employee_id))).map((empId) => ({
         employee_id: empId,
         type: 'new_lead' as const,
         title: 'وصول عملاء جدد',
-        body: `تم توزيع ${rows.filter((r) => r.assigned_employee_id === empId).length} عميل جديد عليك`,
+        body: `تم توزيع ${rows.filter((r) => r.assigned_employee_id === empId).length} عميل جديد عليك وتعيين مهام لمتابعتهم`,
       }));
       if (notifs.length > 0) {
         await supabase.from('notifications').insert(notifs);
       }
 
-        const perEmployee: Record<string, number> = {};
+      const perEmployee: Record<string, number> = {};
       rows.forEach((r) => {
         perEmployee[r.assigned_employee_id] = (perEmployee[r.assigned_employee_id] || 0) + 1;
       });
@@ -257,15 +317,44 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
                 )}
               </div>
             ) : (
-              <div>
+              <div className="space-y-3">
                 <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-navy-400 hover:bg-gray-50 transition-all">
                   <Upload size={28} className="text-gray-400 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-gray-600 mb-1">
                     {fileName || 'اضغط لرفع ملف Excel أو CSV'}
                   </p>
-                  <p className="text-[10px] text-gray-400">الصيغة: اسم، هاتف، (محافظة)</p>
+                  <p className="text-[10px] text-gray-400">الصيغ المدعومة: .xlsx, .xls, .csv, .txt</p>
                   <input type="file" accept=".csv,.xlsx,.xls,.txt" onChange={handleFileUpload} className="hidden" />
                 </label>
+
+                {/* Excel guide widget */}
+                <div className="bg-navy-50/70 border border-navy-100 rounded-xl p-4 text-xs text-navy-800 space-y-2">
+                  <p className="font-bold flex items-center gap-1.5 text-navy-900">
+                    <Info size={14} className="text-gold-500" />
+                    تنسيق ملف الـ Excel الصحيح للاستيراد:
+                  </p>
+                  <p className="text-[11px] text-gray-600">
+                    يجب أن يحتوي الملف على عمود للهاتف (إجباري)، بينما بقية الأعمدة اختيارية:
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 bg-white p-2.5 rounded-lg border border-gray-100 text-center font-mono">
+                    <div className="p-1.5 bg-gray-50 rounded">
+                      <span className="block font-bold text-[10px] text-gray-400">العمود 1</span>
+                      <span className="text-[11px] text-navy-900 font-bold">الاسم</span>
+                    </div>
+                    <div className="p-1.5 bg-navy-100/50 rounded border border-navy-200">
+                      <span className="block font-bold text-[10px] text-blue-600">العمود 2 *</span>
+                      <span className="text-[11px] text-blue-900 font-bold">الهاتف</span>
+                    </div>
+                    <div className="p-1.5 bg-gray-50 rounded">
+                      <span className="block font-bold text-[10px] text-gray-400">العمود 3</span>
+                      <span className="text-[11px] text-navy-900 font-bold">المحافظة</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 italic">
+                    ملاحظة: يتعرف النظام تلقائياً على الأعمدة إذا كانت تحتوي على العناوين (الاسم، الهاتف، المحافظة).
+                  </p>
+                </div>
+
                 {fileLeads.length > 0 && (
                   <p className="text-xs text-emerald-600 mt-1.5 font-medium">تم تحديد {fileLeads.length} عميل من الملف</p>
                 )}
