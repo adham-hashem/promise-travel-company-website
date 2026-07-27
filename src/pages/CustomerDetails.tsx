@@ -4,7 +4,7 @@ import {
   MessageCircle, Calendar, CheckCircle, Plus, Clock, Hash,
   Plane, CreditCard as CardIcon, FileText, CreditCard, Wallet, Receipt,
   CheckCircle2, AlertCircle, Loader2, Hotel as HotelIcon, FileCheck, GitCommit, Plane as PlaneIcon,
-  Eye, Download,
+  Eye, Download, Layers,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent } from '../types';
@@ -61,6 +61,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
   const [showAddLog, setShowAddLog] = useState(false);
   const [newLog, setNewLog] = useState({ type: 'مكالمة' as CommType, result: '', notes: '', agreed_on: '', next_follow_up: '' });
   const [saving, setSaving] = useState(false);
+  const [travelGroup, setTravelGroup] = useState<any>(null);
 
   const [showTransferAccountsModal, setShowTransferAccountsModal] = useState(false);
   const [targetAccountsEmpId, setTargetAccountsEmpId] = useState('');
@@ -152,6 +153,14 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
       // Fetch workflow timeline
       const { data: tlData } = await supabase.from('workflow_timeline').select('*').eq('customer_id', customerId).order('created_at', { ascending: true });
       setWorkflowTimeline((tlData as WorkflowTimelineEvent[]) || []);
+
+      // Fetch travel group membership
+      const { data: tgData } = await supabase
+        .from('travel_group_members')
+        .select('*, travel_groups(*)')
+        .eq('customer_id', customerId)
+        .maybeSingle();
+      setTravelGroup(tgData ? tgData.travel_groups : null);
 
       const totalBookings = (bkRes.data as Booking[])?.reduce((s, b) => s + Number(b.total_amount || 0), 0) || 0;
       const totalPaid = (payRes.data as Payment[])?.reduce((s, p) => s + Number(p.amount || 0), 0) || 0;
@@ -257,6 +266,46 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
               ))}
             </div>
           </div>
+
+          {/* Travel Group Widget */}
+          {travelGroup && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+              <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2">
+                <Layers size={16} className="text-gold-500" /> الفوج الحالي (Travel Group)
+              </h4>
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-2.5">
+                <div>
+                  <span className="text-[10px] text-gray-400 block">اسم الفوج</span>
+                  <span className="text-sm font-bold text-navy-900">{travelGroup.name}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">كود الفوج</span>
+                    <span className="font-semibold text-navy-800 font-mono">{travelGroup.code}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">الحالة</span>
+                    <span className="badge bg-blue-100 text-blue-700 text-[10px] mt-0.5 inline-block">{travelGroup.status}</span>
+                  </div>
+                  {travelGroup.travel_date && (
+                    <div className="col-span-2">
+                      <span className="text-[10px] text-gray-400 block">تاريخ السفر</span>
+                      <span className="font-semibold text-navy-800">
+                        {new Date(travelGroup.travel_date).toLocaleDateString('ar-EG')}
+                      </span>
+                    </div>
+                  )}
+                  {travelGroup.supervisor && (
+                    <div className="col-span-2">
+                      <span className="text-[10px] text-gray-400 block">المشرف المسؤول</span>
+                      <span className="font-semibold text-navy-800">{travelGroup.supervisor}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {/* Accounts Summary */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
