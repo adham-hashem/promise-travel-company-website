@@ -3,7 +3,7 @@ import {
   Plus, X, Loader2, Search, Plane, FileText,
   Trash2, Download, Upload, Eye, CheckCircle2, AlertCircle,
   Clock, XCircle, FileCheck, Wallet, User,
-  Globe,
+  Globe, Undo2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -66,6 +66,46 @@ export default function VisaManagement({ onNavigate }: Props) {
     setVisas((visaRes.data as Visa[]) || []);
     setCustomers((custRes.data as Customer[]) || []);
     setLoading(false);
+  };
+
+  // Workflow stages ordered sequence for revert logic
+  const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
+  const stageArabicNames: Record<string, string> = {
+    new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
+    flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
+  };
+
+  const revertCustomerFromVisa = async (customerId: string, customerName: string) => {
+    // Fetch the customer's operation file to check current workflow_stage
+    const { data: opFiles } = await supabase
+      .from('operation_files')
+      .select('id, workflow_stage')
+      .eq('customer_id', customerId)
+      .limit(1);
+    if (!opFiles || opFiles.length === 0) {
+      alert('لا يوجد ملف تشغيل لهذا العميل.');
+      return;
+    }
+    const opFile = opFiles[0];
+    const currentIdx = workflowStagesOrder.indexOf(opFile.workflow_stage);
+    if (currentIdx <= 0) {
+      alert('العميل في أول مرحلة ولا يمكن الإرجاع.');
+      return;
+    }
+    const prevStage = workflowStagesOrder[currentIdx - 1];
+    const currentLabel = stageArabicNames[opFile.workflow_stage] || opFile.workflow_stage;
+    const prevLabel = stageArabicNames[prevStage] || prevStage;
+    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${customerName}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    if (!window.confirm(confirmMsg)) return;
+    const { error } = await supabase
+      .from('operation_files')
+      .update({ workflow_stage: prevStage })
+      .eq('id', opFile.id);
+    if (error) {
+      alert('فشل إرجاع المرحلة: ' + error.message);
+      return;
+    }
+    alert(`تم إرجاع العميل "${customerName}" من "${currentLabel}" إلى "${prevLabel}" بنجاح.`);
   };
 
   const filtered = visas.filter((v) => {
@@ -546,9 +586,17 @@ export default function VisaManagement({ onNavigate }: Props) {
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100 flex-wrap gap-2">
                 {selected.customer_id && (
                   <button onClick={() => onNavigate('customer-details', selected.customer_id)} className="text-xs text-navy-600 font-semibold hover:underline">عرض ملف العميل ←</button>
+                )}
+                {selected.customer_id && (
+                  <button
+                    onClick={() => revertCustomerFromVisa(selected.customer_id, selected.full_name)}
+                    className="text-xs text-amber-700 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <Undo2 size={12} /> إرجاع العميل لمرحلة سابقة
+                  </button>
                 )}
                 <button onClick={() => deleteVisa(selected.id)} className="text-xs text-red-500 font-semibold hover:underline">حذف ملف التأشيرة</button>
               </div>

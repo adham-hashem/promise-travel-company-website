@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plane, Plus, X, Loader2, Search, Upload, Eye, Download,
-  FileText, CheckCircle2, Clock, User, Ticket,
+  FileText, CheckCircle2, Clock, User, Ticket, Undo2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -91,6 +91,41 @@ export default function FlightTickets({ onNavigate }: Props) {
     }));
     setReadyCustomers(opsData);
     setLoading(false);
+  };
+
+  // Workflow stages ordered sequence for revert logic
+  const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
+  const stageArabicNames: Record<string, string> = {
+    new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
+    flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
+  };
+
+  const revertCustomerStage = async (r: typeof readyCustomers[0]) => {
+    const currentIdx = workflowStagesOrder.indexOf(r.workflow_stage);
+    if (currentIdx <= 0) return;
+    const prevStage = workflowStagesOrder[currentIdx - 1];
+    const currentLabel = stageArabicNames[r.workflow_stage] || r.workflow_stage;
+    const prevLabel = stageArabicNames[prevStage] || prevStage;
+    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${r.customer_name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    if (!window.confirm(confirmMsg)) return;
+    // Find the operation_file by customer_id to update its workflow_stage
+    const { error } = await supabase
+      .from('operation_files')
+      .update({ workflow_stage: prevStage })
+      .eq('customer_id', r.customer_id);
+    if (error) {
+      alert('فشل إرجاع المرحلة: ' + error.message);
+      return;
+    }
+    // Update local state — if reverting to a stage before 'flight', remove from list; otherwise update
+    const prevIdx = workflowStagesOrder.indexOf(prevStage);
+    const flightIdx = workflowStagesOrder.indexOf('flight');
+    if (prevIdx < flightIdx) {
+      // Customer no longer in flight+ stages, remove from the readyCustomers list
+      setReadyCustomers(prev => prev.filter(c => c.customer_id !== r.customer_id));
+    } else {
+      setReadyCustomers(prev => prev.map(c => c.customer_id === r.customer_id ? { ...c, workflow_stage: prevStage } : c));
+    }
   };
 
   const filteredReady = readyCustomers.filter(r => {
@@ -278,6 +313,13 @@ export default function FlightTickets({ onNavigate }: Props) {
                       <Ticket size={13} /> إصدار تذكرة
                     </button>
                   )}
+                  <button
+                    onClick={() => revertCustomerStage(r)}
+                    title={`إرجاع العميل من مرحلة ${stageArabicNames[r.workflow_stage] || r.workflow_stage}`}
+                    className="w-full text-xs py-2 mt-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Undo2 size={13} /> إرجاع لمرحلة سابقة
+                  </button>
                 </div>
               );
             })}

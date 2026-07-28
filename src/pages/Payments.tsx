@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, Loader2, X, Wallet, Upload, Eye,
-  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package,
+  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package, Undo2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -77,6 +77,37 @@ export default function Payments() {
     setPackages((pkgData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, type: p.type, hotel: p.hotel })));
     setTransferredFiles(filesWithPayments);
     setLoading(false);
+  };
+
+  // Workflow stages ordered sequence for revert logic
+  const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
+  const stageArabicLabels: Record<string, string> = {
+    new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
+    flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
+  };
+
+  const revertFileStage = async (file: any) => {
+    const currentIdx = workflowStagesOrder.indexOf(file.workflow_stage);
+    if (currentIdx <= 0) return; // Can't revert from 'new'
+    const prevStage = workflowStagesOrder[currentIdx - 1];
+    const currentLabel = stageArabicLabels[file.workflow_stage] || file.workflow_stage;
+    const prevLabel = stageArabicLabels[prevStage] || prevStage;
+    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    if (!window.confirm(confirmMsg)) return;
+    const { error } = await supabase
+      .from('operation_files')
+      .update({ workflow_stage: prevStage })
+      .eq('id', file.id);
+    if (error) {
+      alert('فشل إرجاع المرحلة: ' + error.message);
+      return;
+    }
+    // Update local state
+    setTransferredFiles((prev: any[]) =>
+      prevStage === 'new'
+        ? prev.filter((f: any) => f.id !== file.id)
+        : prev.map((f: any) => f.id === file.id ? { ...f, workflow_stage: prevStage } : f)
+    );
   };
 
   const openAdd = () => {
@@ -454,6 +485,13 @@ export default function Payments() {
                         محوّل ✔
                       </span>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); revertFileStage(file); }}
+                      title={`إرجاع العميل من مرحلة ${stageArabicLabels[file.workflow_stage] || file.workflow_stage}`}
+                      className="text-[11px] py-1.5 px-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1"
+                    >
+                      <Undo2 size={12} /> إرجاع
+                    </button>
                   </div>
                 </div>
               );
