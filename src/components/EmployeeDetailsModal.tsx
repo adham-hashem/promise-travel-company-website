@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  X, Search, Users, CalendarCheck, ListChecks, Calendar,
-  Clock, CheckCircle2, AlertCircle, Filter, FileSpreadsheet, FileText, ChevronLeft,
+  X, Search, Users, CalendarCheck,
+  CheckCircle2, Filter, FileSpreadsheet, FileText,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { exportToCSV, exportToPDF } from '../lib/export';
-import type { Employee, Customer, Booking, Task, Page } from '../types';
+import type { Employee, Customer, Booking, Page } from '../types';
 
-type Tab = 'info' | 'clients' | 'bookings' | 'tasks';
+type Tab = 'info' | 'clients' | 'bookings';
 
 type PeriodFilter = 'week' | 'month' | 'year' | 'custom';
 
@@ -27,19 +27,6 @@ const bookingStatusColors: Record<string, string> = {
   ملغي: 'bg-red-100 text-red-700',
 };
 
-const taskStatusColors: Record<string, string> = {
-  جديدة: 'bg-blue-100 text-blue-700',
-  'قيد التنفيذ': 'bg-amber-100 text-amber-700',
-  مكتملة: 'bg-emerald-100 text-emerald-700',
-  متأخرة: 'bg-red-100 text-red-700',
-};
-
-const priorityColors: Record<string, string> = {
-  منخفضة: 'bg-gray-100 text-gray-700',
-  متوسطة: 'bg-amber-100 text-amber-700',
-  عالية: 'bg-red-100 text-red-700',
-};
-
 const PIE_COLORS = ['#0c224f', '#c9941a', '#10b981', '#ef4444', '#a855f7'];
 
 interface Props {
@@ -52,7 +39,6 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
   const [tab, setTab] = useState<Tab>('info');
   const [clients, setClients] = useState<Customer[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('الكل');
@@ -71,14 +57,12 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
 
   const loadAll = async (empId: string) => {
     setLoading(true);
-    const [c, b, t] = await Promise.all([
+    const [c, b] = await Promise.all([
       supabase.from('customers').select('*, employees(*)').eq('assigned_employee_id', empId).order('created_at', { ascending: false }),
       supabase.from('bookings').select('*, customers(*), packages(*), employees(*)').eq('employee_id', empId).order('created_at', { ascending: false }),
-      supabase.from('tasks').select('*, employees(*)').eq('employee_id', empId).order('due_date', { ascending: true }),
     ]);
     setClients((c.data as Customer[]) || []);
     setBookings((b.data as Booking[]) || []);
-    setTasks((t.data as Task[]) || []);
     setLoading(false);
   };
 
@@ -164,17 +148,7 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
     ]));
   };
 
-  // ===== Task stats =====
-  const taskStats = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    return {
-      total: tasks.length,
-      today: tasks.filter(t => t.start_date <= todayStr && t.due_date >= todayStr).length,
-      completed: tasks.filter(t => t.status === 'مكتملة').length,
-      pending: tasks.filter(t => t.status !== 'مكتملة').length,
-      overdue: tasks.filter(t => t.status === 'متأخرة').length,
-    };
-  }, [tasks]);
+
 
   if (!employee) return null;
 
@@ -198,7 +172,7 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
         </div>
 
         {/* Quick stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-gray-50 border-b border-gray-100 flex-shrink-0">
           <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
             <Users size={14} className="text-navy-600 mx-auto mb-1" />
             <p className="text-xl font-black text-navy-800">{employee.clients_count}</p>
@@ -208,11 +182,6 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
             <CalendarCheck size={14} className="text-gold-600 mx-auto mb-1" />
             <p className="text-xl font-black text-gold-700">{employee.bookings_count}</p>
             <p className="text-[10px] text-gray-500">حجز</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
-            <ListChecks size={14} className="text-purple-600 mx-auto mb-1" />
-            <p className="text-xl font-black text-purple-700">{taskStats.total}</p>
-            <p className="text-[10px] text-gray-500">مهمة</p>
           </div>
           <div className="bg-white rounded-xl p-3 text-center border border-gray-100">
             <CheckCircle2 size={14} className="text-emerald-600 mx-auto mb-1" />
@@ -227,7 +196,6 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
             { id: 'info' as Tab, label: 'البيانات', icon: Users },
             { id: 'clients' as Tab, label: 'العملاء', icon: Users, count: clients.length },
             { id: 'bookings' as Tab, label: 'الحجوزات', icon: CalendarCheck, count: bookings.length },
-            { id: 'tasks' as Tab, label: 'المهام', icon: ListChecks, count: tasks.length },
           ].map((t) => {
             const Icon = t.icon;
             return (
@@ -283,28 +251,7 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
                     </div>
                   </div>
 
-                  {/* Task summary */}
-                  <h4 className="text-xs font-bold text-navy-700 mb-3 mt-6 flex items-center gap-2">
-                    <div className="w-1 h-4 bg-gold-500 rounded-full" />ملخص المهام
-                  </h4>
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="bg-blue-50 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-black text-blue-700">{taskStats.today}</p>
-                      <p className="text-[10px] text-gray-500">يومية</p>
-                    </div>
-                    <div className="bg-emerald-50 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-black text-emerald-700">{taskStats.completed}</p>
-                      <p className="text-[10px] text-gray-500">مكتملة</p>
-                    </div>
-                    <div className="bg-amber-50 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-black text-amber-700">{taskStats.pending}</p>
-                      <p className="text-[10px] text-gray-500">متبقية</p>
-                    </div>
-                    <div className="bg-red-50 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-black text-red-700">{taskStats.overdue}</p>
-                      <p className="text-[10px] text-gray-500">متأخرة</p>
-                    </div>
-                  </div>
+
                 </div>
               )}
 
@@ -479,40 +426,6 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
                 </div>
               )}
 
-              {/* Tasks Tab */}
-              {tab === 'tasks' && (
-                <div className="space-y-4">
-                  {tasks.length === 0 ? (
-                    <div className="text-center py-12 text-gray-400">
-                      <ListChecks size={40} className="mx-auto mb-3 opacity-30" />
-                      <p className="font-medium">لا توجد مهام لهذا الموظف</p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-3">
-                      {tasks.map((t) => (
-                        <div key={t.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-start gap-3 hover:shadow-sm transition-shadow">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${taskStatusColors[t.status]}`}>
-                            {t.status === 'مكتملة' ? <CheckCircle2 size={16} /> : t.status === 'متأخرة' ? <AlertCircle size={16} /> : <Clock size={16} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <p className="font-bold text-navy-800 text-sm">{t.title}</p>
-                              <span className={`badge ${priorityColors[t.priority]}`}>{t.priority}</span>
-                              <span className={`badge ${taskStatusColors[t.status]}`}>{t.status}</span>
-                            </div>
-                            {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
-                            <div className="flex items-center gap-4 text-[11px] text-gray-400">
-                              <span className="flex items-center gap-1"><Calendar size={11} />{new Date(t.start_date).toLocaleDateString('ar-EG')}</span>
-                              <span className="flex items-center gap-1"><Clock size={11} />{new Date(t.due_date).toLocaleDateString('ar-EG')}</span>
-                            </div>
-                          </div>
-                          <ChevronLeft size={14} className="text-gray-300 flex-shrink-0" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </>
           )}
         </div>

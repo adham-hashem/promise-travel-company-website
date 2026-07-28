@@ -297,6 +297,28 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setSaving(false);
   };
 
+  const deleteFile = async () => {
+    if (!selected) return;
+    const confirmDelete = window.confirm('هل أنت متأكد من حذف ملف التشغيل هذا نهائياً؟ سيتم إلغاء تقدم الملف في جميع المراحل.');
+    if (!confirmDelete) return;
+    
+    setSaving(true);
+    const { error } = await supabase
+      .from('operation_files')
+      .delete()
+      .eq('id', selected.id);
+      
+    if (error) {
+      alert(`فشل حذف الملف: ${error.message}`);
+      setSaving(false);
+      return;
+    }
+    
+    setFiles(files.filter(f => f.id !== selected.id));
+    setSelected(null);
+    setSaving(false);
+  };
+
   const uploadOpDoc = async (file: File) => {
     if (!selected) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -305,7 +327,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       return;
     }
     setUploadingDoc(true);
-    const filePath = `op-docs/${selected.id}/${Date.now()}-${file.name}`;
+    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filePath = `op-docs/${selected.id}/${Date.now()}-${cleanFileName}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploadingDoc(false); return; }
     const { data } = await supabase
@@ -724,7 +747,19 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               )}
 
               {/* Assignment + Status + Priority controls */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="form-label text-gold-600 font-bold">مرحلة ملف العمل</label>
+                  <select
+                    value={selected.workflow_stage || 'accounts'}
+                    onChange={(e) => updateFile({ workflow_stage: e.target.value })}
+                    className="form-input border-gold-300 font-bold text-navy-900 bg-white"
+                  >
+                    {workflowStages.map((stage) => (
+                      <option key={stage.key} value={stage.key}>{stage.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="form-label">الموظف المسؤول</label>
                   <select
@@ -847,15 +882,24 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 )}
               </div>
 
-              {/* Navigate to customer */}
-              {onNavigate && selected.customer?.id && (
+              {/* Delete and Navigation actions */}
+              <div className="pt-4 border-t border-red-100 flex items-center justify-between mt-4">
                 <button
-                  onClick={() => onNavigate('customer-details', selected.customer!.id)}
-                  className="text-xs text-navy-600 font-semibold hover:underline flex items-center gap-1"
+                  onClick={deleteFile}
+                  disabled={saving}
+                  className="btn-outline !border-red-200 !text-red-600 hover:!bg-red-50 text-xs py-2 px-4 flex items-center gap-1.5 font-bold"
                 >
-                  عرض ملف العميل الكامل <ChevronRight size={12} />
+                  <Trash2 size={14} /> حذف ملف التشغيل نهائياً
                 </button>
-              )}
+                {onNavigate && selected.customer?.id && (
+                  <button
+                    onClick={() => onNavigate('customer-details', selected.customer!.id)}
+                    className="text-xs text-navy-600 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    عرض ملف العميل الكامل <ChevronRight size={12} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>,

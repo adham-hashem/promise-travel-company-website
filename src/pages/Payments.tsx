@@ -178,7 +178,8 @@ export default function Payments() {
       return;
     }
     setUploading(true);
-    const filePath = `payment-proofs/${selectedPayment.id}/${Date.now()}-${file.name}`;
+    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filePath = `payment-proofs/${selectedPayment.id}/${Date.now()}-${cleanFileName}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase

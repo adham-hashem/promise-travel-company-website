@@ -148,7 +148,8 @@ export default function VisaManagement({ onNavigate }: Props) {
   const uploadDoc = async (file: File) => {
     if (!selected) return;
     setUploading(true);
-    const filePath = `visa-docs/${selected.id}/${Date.now()}-${file.name}`;
+    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filePath = `visa-docs/${selected.id}/${Date.now()}-${cleanFileName}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase

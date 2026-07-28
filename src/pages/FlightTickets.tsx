@@ -122,7 +122,8 @@ export default function FlightTickets({ onNavigate }: Props) {
     setSaving(true);
 
     const tempTicketId = crypto.randomUUID();
-    const filePath = `ticket-files/${tempTicketId}/${Date.now()}-${ticketFile.name}`;
+    const cleanFileName = ticketFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filePath = `ticket-files/${tempTicketId}/${Date.now()}-${cleanFileName}`;
     
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, ticketFile);
     if (upErr) {
@@ -166,7 +167,8 @@ export default function FlightTickets({ onNavigate }: Props) {
       return;
     }
     setUploading(true);
-    const filePath = `ticket-files/${selectedTicket.id}/${Date.now()}-${file.name}`;
+    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filePath = `ticket-files/${selectedTicket.id}/${Date.now()}-${cleanFileName}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase
