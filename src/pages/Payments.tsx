@@ -165,9 +165,20 @@ export default function Payments() {
 
   const handleDelete = async (p: PayRow) => {
     if (!confirm('هل أنت متأكد من حذف هذه الدفعة؟')) return;
-    if (p.booking_id) await syncBookingPayment(p.booking_id, p.amount, true);
-    await supabase.from('payments').delete().eq('id', p.id);
-    setPayments(payments.filter(x => x.id !== p.id));
+    try {
+      const { error: delErr } = await supabase.from('payments').delete().eq('id', p.id);
+      if (delErr) {
+        alert(`فشل حذف الدفعة: ${delErr.message}`);
+        return;
+      }
+      if (p.booking_id) {
+        await syncBookingPayment(p.booking_id, p.amount, true);
+      }
+      setPayments(payments.filter(x => x.id !== p.id));
+    } catch (err: any) {
+      console.error('Error deleting payment:', err);
+      alert('حدث خطأ أثناء محاولة حذف الدفعة');
+    }
   };
 
   const uploadProof = async (file: File) => {

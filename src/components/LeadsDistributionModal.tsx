@@ -31,11 +31,12 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
   const [result, setResult] = useState<{ count: number; perEmployee: Record<string, number> } | null>(null);
   const [error, setError] = useState('');
 
-  const salesEmployees = employees.filter((e) => e.is_active && e.role === 'مندوب مبيعات');
+  const salesEmployees = employees.filter((e) => e.is_active);
 
   useEffect(() => {
-    const ids = salesEmployees.map((e) => e.id);
-    setSelectedEmployeeIds(ids);
+    const defaultEmps = employees.filter((e) => e.is_active && e.role === 'مندوب مبيعات');
+    const targetEmps = defaultEmps.length > 0 ? defaultEmps : employees.filter((e) => e.is_active);
+    setSelectedEmployeeIds(targetEmps.map((e) => e.id));
   }, [employees]);
 
   const parseManualText = (): ParsedLead[] => {
@@ -159,9 +160,39 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
       // Build insert rows
       const rows: { name: string; phone: string; governorate: string | null; assigned_employee_id: string; status: string }[] = [];
 
-      if (mode === 'auto') {
-        // Round-robin assign
-        leadsToInsert.forEach((lead, idx) => {
+      const manuallyAssigned: typeof leadsToInsert = [];
+      const autoAssigned: typeof leadsToInsert = [];
+
+      leadsToInsert.forEach((lead, idx) => {
+        const key = lead.phone || idx.toString();
+        const empId = manualAssignments[key];
+        if (empId) {
+          manuallyAssigned.push(lead);
+          rows.push({
+            name: lead.name,
+            phone: lead.phone,
+            governorate: lead.governorate || null,
+            assigned_employee_id: empId,
+            status: 'جديد',
+          });
+        } else {
+          autoAssigned.push(lead);
+        }
+      });
+
+      if (mode === 'manual' && autoAssigned.length > 0) {
+        setError(`بقي ${autoAssigned.length} عميل بدون موظف محدد. اضغط على اسم موظف لكل عميل.`);
+        setDistributing(false);
+        return;
+      }
+
+      if (mode === 'auto' && autoAssigned.length > 0) {
+        if (selectedEmployeeIds.length === 0) {
+          setError('اختر موظفاً واحداً على الأقل للتوزيع التلقائي لبقية العملاء');
+          setDistributing(false);
+          return;
+        }
+        autoAssigned.forEach((lead, idx) => {
           const empId = selectedEmployeeIds[idx % selectedEmployeeIds.length];
           rows.push({
             name: lead.name,
@@ -171,26 +202,6 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
             status: 'جديد',
           });
         });
-      } else {
-        // Manual assignments
-        leadsToInsert.forEach((lead, idx) => {
-          const empId = manualAssignments[lead.phone || idx.toString()];
-          if (!empId) return;
-          rows.push({
-            name: lead.name,
-            phone: lead.phone,
-            governorate: lead.governorate || null,
-            assigned_employee_id: empId,
-            status: 'جديد',
-          });
-        });
-
-        const noEmp = leadsToInsert.filter((_, idx) => !manualAssignments[_.phone || idx.toString()]);
-        if (noEmp.length > 0) {
-          setError(`بقي ${noEmp.length} عميل بدون موظف محدد. اضغط على اسم موظف لكل عميل.`);
-          setDistributing(false);
-          return;
-        }
       }
 
       const { data: insertedCustomers, error: insertError } = await supabase
@@ -375,7 +386,7 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{e.name}</p>
-                    <p className="text-[10px] text-gray-400">{e.clients_count} عميل حالي</p>
+                    <p className="text-[10px] text-gray-400">{e.role} · {e.clients_count} عميل</p>
                   </div>
                 </label>
               ))}
@@ -404,33 +415,39 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
             </div>
           </div>
 
-          {/* Manual assignment UI */}
-          {mode === 'manual' && parsedLeads.length > 0 && (
+          {/* Leads Assignment List */}
+          {parsedLeads.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-navy-700 mb-3 flex items-center gap-2">
-                <div className="w-1 h-4 bg-gold-500 rounded-full" />توزيع كل عميل على موظف
+                <div className="w-1 h-4 bg-gold-500 rounded-full" />
+                {mode === 'manual' ? 'تحديد الموظف لكل عميل (إجباري)' : 'تخصيص عملاء لموظفين معينين (اختياري)'}
               </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {parsedLeads.slice(0, 100).map((lead, idx) => (
-                  <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl p-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{lead.name}</p>
-                      <p className="text-xs text-gray-400" dir="ltr">{lead.phone}</p>
+              <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+                {parsedLeads.slice(0, 100).map((lead, idx) => {
+                  const key = lead.phone || idx.toString();
+                  return (
+                    <div key={idx} className="flex items-center gap-3 bg-white rounded-xl p-2.5 border border-gray-50 shadow-xs">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{lead.name}</p>
+                        <p className="text-xs text-gray-400" dir="ltr">{lead.phone}</p>
+                      </div>
+                      <select
+                        value={manualAssignments[key] || ''}
+                        onChange={(e) => setManualAssignments((prev) => ({ ...prev, [key]: e.target.value }))}
+                        className="form-input w-48 py-1.5 text-xs font-semibold text-navy-950 bg-white"
+                      >
+                        <option value="">
+                          {mode === 'manual' ? 'اختر موظفاً...' : 'توزيع تلقائي'}
+                        </option>
+                        {salesEmployees.map((emp) => (
+                          <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
                     </div>
-                    <select
-                      value={manualAssignments[lead.phone || idx.toString()] || ''}
-                      onChange={(e) => setManualAssignments((prev) => ({ ...prev, [lead.phone || idx.toString()]: e.target.value }))}
-                      className="form-input w-48 py-1.5 text-xs font-semibold text-navy-950 bg-white"
-                    >
-                      <option value="">اختر موظفاً...</option>
-                      {salesEmployees.map((emp) => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                  );
+                })}
                 {parsedLeads.length > 100 && (
-                  <p className="text-center text-xs text-gray-400 p-2">عرض أول 100 عميل</p>
+                  <p className="text-center text-xs text-gray-400 p-2">عرض أول 100 عميل فقط</p>
                 )}
               </div>
             </div>
@@ -439,11 +456,19 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
           {/* Auto preview */}
           {mode === 'auto' && parsedLeads.length > 0 && selectedEmployeeIds.length > 0 && (
             <div className="bg-emerald-50 rounded-xl p-4 text-center">
-              <p className="text-sm text-emerald-700">
-                سيتم توزيع <span className="font-bold">{parsedLeads.length}</span> عميل على{' '}
-                <span className="font-bold">{selectedEmployeeIds.length}</span> موظف تقريباً{' '}
-                <span className="font-bold">{Math.ceil(parsedLeads.length / selectedEmployeeIds.length)}</span> عميل لكل موظف
-              </p>
+              {(() => {
+                const manualCount = Object.keys(manualAssignments).filter(k => manualAssignments[k]).length;
+                const autoCount = Math.max(0, parsedLeads.length - manualCount);
+                return (
+                  <p className="text-sm text-emerald-700">
+                    إجمالي العملاء: <span className="font-bold">{parsedLeads.length}</span> · 
+                    مخصص يدوياً: <span className="font-bold">{manualCount}</span> · 
+                    متبقي للتوزيع التلقائي: <span className="font-bold">{autoCount}</span> على{' '}
+                    <span className="font-bold">{selectedEmployeeIds.length}</span> موظف (حوالي{' '}
+                    <span className="font-bold">{selectedEmployeeIds.length > 0 ? Math.ceil(autoCount / selectedEmployeeIds.length) : 0}</span> عميل لكل موظف)
+                  </p>
+                );
+              })()}
             </div>
           )}
 
