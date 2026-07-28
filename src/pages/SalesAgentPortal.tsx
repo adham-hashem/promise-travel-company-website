@@ -65,6 +65,10 @@ export default function SalesAgentPortal() {
   const [hasPhoto, setHasPhoto] = useState(false);
   const [sendNotes, setSendNotes] = useState('');
 
+  // Details Modal States
+  const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
+  const [viewCustomerDocs, setViewCustomerDocs] = useState<any[]>([]);
+
   // Document upload states
   const [docUploads, setDocUploads] = useState<Record<string, DocUpload>>(
     Object.fromEntries(docTypes.map((d) => [d.id, { type: d.id, file: null, uploaded: false }]))
@@ -74,6 +78,21 @@ export default function SalesAgentPortal() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (viewCustomer) {
+      supabase
+        .from('documents')
+        .select('*')
+        .eq('customer_id', viewCustomer.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => {
+          if (data) setViewCustomerDocs(data);
+        });
+    } else {
+      setViewCustomerDocs([]);
+    }
+  }, [viewCustomer]);
 
   const loadData = async () => {
     setLoading(true);
@@ -390,6 +409,13 @@ export default function SalesAgentPortal() {
                         {activeTab === 'drafts' ? (
                           <>
                             <button
+                              onClick={() => setViewCustomer(c)}
+                              className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600"
+                              title="عرض التفاصيل"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
                               onClick={() => handleInitiateSend(c)}
                               disabled={submittingId === c.id}
                               className="btn-gold py-1 px-3 text-[11px] flex items-center gap-1 shadow-xs"
@@ -418,9 +444,18 @@ export default function SalesAgentPortal() {
                             </button>
                           </>
                         ) : (
-                          <span className="text-emerald-600 text-xs font-bold flex items-center gap-1">
-                            <CheckCircle2 size={14} /> تم الإرسال لـ CRM
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-600 text-xs font-bold flex items-center gap-1">
+                              <CheckCircle2 size={14} /> تم الإرسال لـ CRM
+                            </span>
+                            <button
+                              onClick={() => setViewCustomer(c)}
+                              className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600"
+                              title="عرض التفاصيل"
+                            >
+                              <Eye size={14} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -783,6 +818,108 @@ export default function SalesAgentPortal() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* View Customer Details Modal */}
+      {viewCustomer && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setViewCustomer(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-navy p-5 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm">
+                  {viewCustomer.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">{viewCustomer.name}</h3>
+                  <p className="text-[10px] text-gold-300">تفاصيل بيانات العميل</p>
+                </div>
+              </div>
+              <button onClick={() => setViewCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10 text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><User size={11} /> الاسم بالكامل</p>
+                  <p className="font-bold text-navy-900">{viewCustomer.name}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><Phone size={11} /> رقم الهاتف</p>
+                  <p className="font-bold text-navy-900" dir="ltr">{viewCustomer.phone}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><Phone size={11} /> رقم واتساب</p>
+                  <p className="font-bold text-navy-900" dir="ltr">{viewCustomer.whatsapp || '—'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><Mail size={11} /> البريد الإلكتروني</p>
+                  <p className="font-bold text-navy-900" dir="ltr">{viewCustomer.email || '—'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><MapPin size={11} /> نوع الخدمة</p>
+                  <span className="badge bg-navy-100 text-navy-800 font-bold">{viewCustomer.service_type || '—'}</span>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><PackageIcon size={11} /> الباقة المطلوبة</p>
+                  <p className="font-bold text-navy-900">{viewCustomer.packages?.name || '—'}</p>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-xs">
+                <p className="text-[10px] text-gray-400 mb-1 flex items-center gap-1"><FileText size={11} /> ملاحظات إضافية</p>
+                <p className="font-medium text-navy-900 whitespace-pre-line leading-relaxed">{viewCustomer.notes || 'لا توجد ملاحظات إضافية مضافة'}</p>
+              </div>
+
+              {/* Uploaded Documents */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-navy-800 flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-gold-500 rounded-full" /> المستندات المرفوعة للعميل
+                </h4>
+                {viewCustomerDocs.length === 0 ? (
+                  <p className="text-center text-gray-400 text-xs py-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">لا توجد مستندات مرفوعة لهذا العميل حالياً</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {viewCustomerDocs.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <FileText size={15} className="text-blue-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-navy-900">{doc.doc_type}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{doc.file_name}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 3600);
+                            if (data) window.open(data.signedUrl);
+                          }}
+                          className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
+                          title="عرض"
+                        >
+                          <Eye size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setViewCustomer(null)}
+                className="btn-gold text-xs py-2 px-6"
+              >
+                إغلاق
+              </button>
             </div>
           </div>
         </div>
