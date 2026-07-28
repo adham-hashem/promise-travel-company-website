@@ -554,13 +554,29 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     const Icon = stage.icon;
                     const isDone = i <= currentStageIndex;
                     const isCurrent = i === currentStageIndex;
+                    // Allow reverting any completed stage except the very first one
+                    const canRevert = isDone && i > 0;
                     return (
                       <div key={stage.key} className="flex items-center gap-1 flex-shrink-0">
-                        <div className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl transition-all ${isCurrent ? 'bg-navy-100 ring-2 ring-navy-400' : isDone ? 'bg-emerald-50' : 'bg-gray-50'}`}>
+                        <div className={`relative flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl transition-all group ${isCurrent ? 'bg-navy-100 ring-2 ring-navy-400' : isDone ? 'bg-emerald-50' : 'bg-gray-50'}`}>
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isDone ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
                             {isDone ? <CheckCircle2 size={14} /> : <Icon size={13} />}
                           </div>
                           <span className={`text-xs font-medium ${isDone ? 'text-emerald-700' : 'text-gray-400'}`}>{stage.label}</span>
+                          {canRevert && (
+                            <button
+                              title={`إلغاء مرحلة "${stage.label}" وجميع المراحل اللاحقة`}
+                              onClick={async () => {
+                                const prevStage = workflowStages[i - 1];
+                                const confirmMsg = `هل تريد إلغاء مرحلة "${stage.label}" وإرجاع العميل إلى مرحلة "${prevStage.label}"؟\n\nسيتم أيضاً إلغاء جميع المراحل اللاحقة تلقائياً.`;
+                                if (!window.confirm(confirmMsg)) return;
+                                await updateFile({ workflow_stage: prevStage.key });
+                              }}
+                              className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                            >
+                              <X size={11} />
+                            </button>
+                          )}
                         </div>
                         {i < workflowStages.length - 1 && <div className={`w-4 h-0.5 ${i < currentStageIndex ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
                       </div>
