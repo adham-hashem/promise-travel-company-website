@@ -1,26 +1,45 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Plus, ListChecks, CheckCircle2, Clock, AlertCircle, ChevronLeft,
+  Plus, X, Loader2, CheckCircle2, Clock, AlertCircle, ListChecks,
+  Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Employee, Task, Page } from '../types';
-import TaskModal from '../components/TaskModal';
+import type { Task, TaskPriority, TaskStatus, Employee, Page } from '../types';
 
-const taskStatusColors: Record<string, string> = {
-  جديدة: 'bg-blue-100 text-blue-700 border border-blue-200',
-  'قيد التنفيذ': 'bg-amber-100 text-amber-700 border border-amber-200',
-  مكتملة: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-  متأخرة: 'bg-red-100 text-red-700 border border-red-200',
+interface TaskUpdate {
+  id: string;
+  task_id: string;
+  employee_id?: string;
+  content: string;
+  created_at: string;
+  employees?: { name: string };
+}
+
+const priorities: TaskPriority[] = ['منخفضة', 'متوسطة', 'عالية', 'عاجل'];
+const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مكتملة', 'متأخرة'];
+const departments = ['المبيعات', 'الحسابات', 'التشغيل', 'الفنادق', 'السياحة الداخلية'];
+
+const priorityColors: Record<TaskPriority, string> = {
+  منخفضة: 'bg-gray-100 text-gray-600',
+  متوسطة: 'bg-blue-100 text-blue-700',
+  عالية: 'bg-amber-100 text-amber-700',
+  عاجل: 'bg-red-100 text-red-700',
 };
 
-const priorityColors: Record<string, string> = {
-  منخفضة: 'bg-gray-100 text-gray-700',
-  متوسطة: 'bg-amber-100 text-amber-700',
-  عالية: 'bg-red-100 text-red-700',
+const statusColors: Record<string, string> = {
+  'جديدة': 'bg-blue-100 text-blue-700',
+  'قيد التنفيذ': 'bg-amber-100 text-amber-700',
+  'مكتملة': 'bg-emerald-100 text-emerald-700',
+  'متأخرة': 'bg-red-100 text-red-700',
 };
 
-const todayStr = () => new Date().toISOString().split('T')[0];
+const statusIcons: Record<string, React.ElementType> = {
+  'جديدة': Clock,
+  'قيد التنفيذ': Loader2,
+  'مكتملة': CheckCircle2,
+  'متأخرة': AlertCircle,
+};
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
@@ -29,243 +48,390 @@ interface Props {
 export default function Tasks({}: Props) {
   const { profile } = useAuth();
   const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
-
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState({
+    title: '', description: '', employee_id: '', department: '',
+    priority: 'متوسطة' as TaskPriority, due_date: '', client_code: '',
+  });
+  const [saving, setSaving] = useState(false);
 
-  // TaskModal states
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const [defaultTaskEmployee, setDefaultTaskEmployee] = useState<string | undefined>(undefined);
+  // Task updates (timeline per task)
+  const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
+  const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
+  const [sendingUpdate, setSendingUpdate] = useState<string | null>(null);
+  const [expandedUpdates, setExpandedUpdates] = useState<Record<string, boolean>>({});
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    if (profile) {
+      load();
+    }
+    supabase.from('employees').select('*').eq('is_active', true).then(({ data }) => {
+      if (data) setEmployees(data as Employee[]);
+    });
+  }, [profile]);
+
+  const load = async () => {
     if (!profile) return;
     setLoading(true);
-    
-    // Load active employees
-    const { data: empRes } = await supabase.from('employees').select('*').eq('is_active', true);
-    setEmployees((empRes as Employee[]) || []);
-
-    // Load tasks (filter by user if not manager)
     let query = supabase.from('tasks').select('*, employees(*)');
     if (!isManager) {
       query = query.eq('employee_id', profile.id);
     }
-    const { data: taskRes } = await query.order('due_date', { ascending: true });
-    setTasks((taskRes as Task[]) || []);
-    
+    const { data } = await query.order('created_at', { ascending: false });
+    const fetchedTasks = (data as Task[]) || [];
+    setTasks(fetchedTasks);
+
+    // Load task updates for all fetched tasks
+    if (fetchedTasks.length > 0) {
+      const taskIds = fetchedTasks.map(t => t.id);
+      const { data: updates } = await supabase
+        .from('task_updates')
+        .select('*, employees(name)')
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: true });
+      const updatesMap: Record<string, TaskUpdate[]> = {};
+      ((updates || []) as TaskUpdate[]).forEach((u) => {
+        if (!updatesMap[u.task_id]) updatesMap[u.task_id] = [];
+        updatesMap[u.task_id].push(u);
+      });
+      setTaskUpdates(updatesMap);
+    }
+
     setLoading(false);
-  }, [profile, isManager]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const openAddTask = (employeeId?: string) => {
-    setEditTask(null);
-    setDefaultTaskEmployee(employeeId);
-    setShowTaskModal(true);
   };
 
-  const openEditTask = (t: Task) => {
-    // Standard users can edit status of their own tasks, but we let TaskModal handle editing
-    setEditTask(t);
-    setDefaultTaskEmployee(t.employee_id);
-    setShowTaskModal(true);
+  const filtered = tasks.filter((t) => {
+    if (filterStatus && t.status !== filterStatus) return false;
+    if (filterDept && t.department !== filterDept) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!t.title.toLowerCase().includes(q) && !(t.client_code || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const stats = {
+    total: tasks.length,
+    pending: tasks.filter((t) => t.status === 'جديدة').length,
+    inProgress: tasks.filter((t) => t.status === 'قيد التنفيذ').length,
+    completed: tasks.filter((t) => t.status === 'مكتملة').length,
+    overdue: tasks.filter((t) => t.status === 'متأخرة').length,
   };
 
-  const totals = useMemo(() => {
-    const today = todayStr();
-    return {
-      todayTasks: tasks.filter(t => t.start_date <= today && t.due_date >= today).length,
-      completedTasks: tasks.filter(t => t.status === 'مكتملة').length,
-      pendingTasks: tasks.filter(t => t.status !== 'مكتملة').length,
-      overdueTasks: tasks.filter(t => t.status === 'متأخرة').length,
-    };
-  }, [tasks]);
+  const createTask = async () => {
+    if (!isManager) return;
+    if (!form.title.trim() || !form.due_date) return;
+    setSaving(true);
+    const { data } = await supabase
+      .from('tasks')
+      .insert({
+        title: form.title,
+        description: form.description || null,
+        employee_id: form.employee_id || null,
+        department: form.department || null,
+        priority: form.priority,
+        due_date: form.due_date,
+        client_code: form.client_code || null,
+        status: 'جديدة',
+        start_date: new Date().toISOString().split('T')[0],
+      })
+      .select('*, employees(*)')
+      .single();
+    if (data) {
+      setTasks([data as Task, ...tasks]);
+      if (form.employee_id) {
+        await supabase.from('notifications').insert({
+          employee_id: form.employee_id,
+          type: 'task_assigned',
+          title: `مهمة جديدة: ${form.title}`,
+          body: form.department ? `قسم ${form.department}` : undefined,
+          is_read: false,
+        });
+      }
+    }
+    setForm({ title: '', description: '', employee_id: '', department: '', priority: 'متوسطة', due_date: '', client_code: '' });
+    setShowForm(false);
+    setSaving(false);
+  };
 
-  const today = todayStr();
-  const dailyTasksPerEmployee = useMemo(() => {
-    return employees.map((e) => {
-      const etasks = tasks.filter((t) => t.employee_id === e.id);
-      return {
-        employee: e,
-        total: etasks.filter(t => t.start_date <= today && t.due_date >= today).length,
-        completed: etasks.filter(t => t.status === 'مكتملة' && t.start_date <= today && t.due_date >= today).length,
-        pending: etasks.filter(t => t.status !== 'مكتملة' && t.start_date <= today && t.due_date >= today).length,
-        overdue: etasks.filter(t => t.status === 'متأخرة').length,
-      };
-    });
-  }, [employees, tasks, today]);
+  const updateStatus = async (task: Task, status: TaskStatus) => {
+    const updates: Record<string, unknown> = { status };
+    if (status === 'مكتملة') updates.completed_at = new Date().toISOString();
+    const { data } = await supabase.from('tasks').update(updates).eq('id', task.id).select('*, employees(*)').single();
+    if (data) setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
+  };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-40 gap-3" dir="rtl">
-        <Loader2 size={36} className="animate-spin text-gold-500" />
-        <p className="text-gray-500 font-semibold text-sm">جارٍ تحميل المهام...</p>
-      </div>
-    );
-  }
+  const sendTaskUpdate = async (taskId: string) => {
+    const content = newUpdateText[taskId]?.trim();
+    if (!content || !profile) return;
+    setSendingUpdate(taskId);
+    try {
+      const { data } = await supabase
+        .from('task_updates')
+        .insert({ task_id: taskId, employee_id: profile.id, content })
+        .select('*, employees(name)')
+        .single();
+      if (data) {
+        setTaskUpdates(prev => ({
+          ...prev,
+          [taskId]: [...(prev[taskId] || []), data as TaskUpdate],
+        }));
+        setNewUpdateText(prev => ({ ...prev, [taskId]: '' }));
+        // Auto-expand updates after sending
+        setExpandedUpdates(prev => ({ ...prev, [taskId]: true }));
+      }
+    } finally {
+      setSendingUpdate(null);
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    await supabase.from('tasks').delete().eq('id', id);
+    setTasks(tasks.filter((t) => t.id !== id));
+  };
 
   return (
-    <div className="space-y-6 animate-fadeIn" dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="section-title flex items-center gap-2">
-            <ListChecks size={22} className="text-gold-500" /> إدارة المهام والواجبات
-          </h2>
-          <p className="section-subtitle">تنظيم وإسناد المهام اليومية للموظفين ومتابعة مؤشرات الأداء</p>
+          <h2 className="section-title">إدارة المهام</h2>
+          <p className="section-subtitle">متابعة المهام بين جميع الأقسام والموظفين</p>
         </div>
-
         {isManager && (
-          <button onClick={() => openAddTask()} className="btn-gold shadow-sm">
-            <Plus size={16} /> إضافة مهمة جديدة
+          <button onClick={() => setShowForm(!showForm)} className="btn-gold">
+            <Plus size={16} /> مهمة جديدة
           </button>
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs text-gray-400 font-semibold mb-1">مهام اليوم</p>
-          <p className="text-2xl font-black text-navy-950">{totals.todayTasks}</p>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs text-gray-400 font-semibold mb-1">المهام المكتملة</p>
-          <p className="text-2xl font-black text-emerald-600">{totals.completedTasks}</p>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs text-gray-400 font-semibold mb-1">المهام المتبقية</p>
-          <p className="text-2xl font-black text-amber-600">{totals.pendingTasks}</p>
-        </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <p className="text-xs text-gray-400 font-semibold mb-1">مهام متأخرة</p>
-          <p className="text-2xl font-black text-red-600">{totals.overdueTasks}</p>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: 'الكل', value: stats.total, color: 'text-navy-700', bg: 'bg-navy-50' },
+          { label: 'جديدة', value: stats.pending, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'قيد التنفيذ', value: stats.inProgress, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'مكتملة', value: stats.completed, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'متأخرة', value: stats.overdue, color: 'text-red-600', bg: 'bg-red-50' },
+        ].map((s) => (
+          <div key={s.label} className="stat-card">
+            <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-2`}>
+              <ListChecks size={20} className={s.color} />
+            </div>
+            <p className="text-2xl font-black text-navy-900">{s.value}</p>
+            <p className="text-xs text-gray-500">{s.label}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Daily Task Breakdown per Employee (Managers Only) */}
-      {isManager && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-navy-900 flex items-center gap-2">
-            <div className="w-1.5 h-4 bg-gold-500 rounded-full" /> مهام اليوم لكل موظف
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
-            {dailyTasksPerEmployee.map(({ employee, total, completed, pending, overdue }) => (
-              <div key={employee.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:border-gold-300 transition-all">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm">
-                    {employee.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-navy-900 text-sm truncate">{employee.name}</p>
-                    <p className="text-[10px] text-gray-400">{employee.role}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="text-center bg-blue-50 rounded-lg p-2">
-                    <p className="text-base font-black text-blue-700">{total}</p>
-                    <p className="text-[9px] text-gray-500">يومية</p>
-                  </div>
-                  <div className="text-center bg-emerald-50 rounded-lg p-2">
-                    <p className="text-base font-black text-emerald-700">{completed}</p>
-                    <p className="text-[9px] text-gray-500">مكتملة</p>
-                  </div>
-                  <div className="text-center bg-amber-50 rounded-lg p-2">
-                    <p className="text-base font-black text-amber-700">{pending}</p>
-                    <p className="text-[9px] text-gray-500">متبقية</p>
-                  </div>
-                </div>
-                {overdue > 0 && (
-                  <div className="bg-red-50 rounded-lg p-2 text-center mb-2">
-                    <p className="text-xs font-black text-red-700">{overdue} مهمة متأخرة</p>
-                  </div>
-                )}
-                <button
-                  onClick={() => openAddTask(employee.id)}
-                  className="w-full text-xs font-semibold text-navy-700 bg-navy-50 hover:bg-navy-100 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 mt-2"
-                >
-                  <Plus size={11} /> إضافة مهمة
-                </button>
-              </div>
-            ))}
+      {/* Filters */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالعنوان أو Client Code..." className="form-input pr-9" />
+        </div>
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-input sm:w-40">
+          <option value="">كل الحالات</option>
+          {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="form-input sm:w-44">
+          <option value="">كل الأقسام</option>
+          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4 animate-fadeIn">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-navy-800">إنشاء مهمة جديدة</h3>
+            <button onClick={() => setShowForm(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"><X size={16} /></button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="form-label">عنوان المهمة <span className="text-red-500">*</span></label>
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="form-input" placeholder="عنوان المهمة" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="form-label">وصف المهمة</label>
+              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="form-input resize-none" placeholder="وصف تفصيلي..." />
+            </div>
+            <div>
+              <label className="form-label">الموظف المسؤول</label>
+              <select value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} className="form-input">
+                <option value="">— اختر —</option>
+                {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">القسم</label>
+              <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="form-input">
+                <option value="">— اختر —</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">الأولوية</label>
+              <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as TaskPriority })} className="form-input">
+                {priorities.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Deadline <span className="text-red-500">*</span></label>
+              <input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="form-input" dir="ltr" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="form-label">Client Code (اختياري)</label>
+              <input value={form.client_code} onChange={(e) => setForm({ ...form, client_code: e.target.value })} className="form-input" placeholder="CL-1001" dir="ltr" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowForm(false)} className="btn-outline text-xs py-2 px-4">إلغاء</button>
+            <button onClick={createTask} disabled={!form.title.trim() || !form.due_date || saving} className="btn-gold text-xs py-2 px-4">
+              {saving ? 'جارٍ الحفظ...' : 'إنشاء المهمة'}
+            </button>
           </div>
         </div>
       )}
 
-      {/* All Tasks Table */}
+      {/* Tasks list */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-base font-bold text-navy-900">{isManager ? 'جدول جميع المهام' : 'مهامي الشخصية'}</h3>
-          <button onClick={() => openAddTask()} className="btn-gold text-xs py-2 px-3">
-            <Plus size={13} /> إضافة مهمة
-          </button>
-        </div>
-
-        {tasks.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-navy-700" /></div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <ListChecks size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">لا توجد مهام حالية</p>
+            <ListChecks size={48} className="mx-auto mb-3 opacity-30" />
+            <p className="font-medium">لا توجد مهام</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {tasks.map((t) => (
-              <div
-                key={t.id}
-                className="p-4 flex items-start gap-3 hover:bg-blue-50/30 cursor-pointer transition-colors"
-                onClick={() => openEditTask(t)}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${taskStatusColors[t.status] || 'bg-gray-100 text-gray-500'}`}>
-                  {t.status === 'مكتملة' ? <CheckCircle2 size={16} /> : t.status === 'متأخرة' ? <AlertCircle size={16} /> : <Clock size={16} />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-bold text-navy-800 text-sm">{t.title}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${priorityColors[t.priority] || 'bg-gray-100'}`}>{t.priority}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${taskStatusColors[t.status] || 'bg-gray-100'}`}>{t.status}</span>
+            {filtered.map((t) => {
+              const StatusIcon = statusIcons[t.status] || Clock;
+              return (
+                <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]}`}>
+                      <StatusIcon size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="text-sm font-bold text-navy-900">{t.title}</h3>
+                        {t.auto_generated && (
+                          <span className="badge bg-purple-100 text-purple-700 text-[10px]"><Zap size={9} className="inline ml-0.5" />تلقائي</span>
+                        )}
+                        <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
+                      </div>
+                      {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
+
+                      {/* Task Updates Timeline */}
+                      {(taskUpdates[t.id] || []).length > 0 && (
+                        <div className="mt-2 mb-2">
+                          <button
+                            onClick={() => setExpandedUpdates(prev => ({ ...prev, [t.id]: !prev[t.id] }))}
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors mb-1.5"
+                          >
+                            <MessageSquare size={12} />
+                            المستجدات ({taskUpdates[t.id].length})
+                            {expandedUpdates[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+
+                          {expandedUpdates[t.id] && (
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                              {taskUpdates[t.id].map((u, idx) => (
+                                <div key={u.id} className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs relative">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    <span className="text-[10px] text-blue-600 font-semibold">
+                                      {u.employees?.name || 'الموظف'}
+                                    </span>
+                                    <span className="text-[9px] text-gray-400 mr-auto">
+                                      {new Date(u.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </span>
+                                  </div>
+                                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed mr-7">{u.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Add new update — employee only, task not completed */}
+                      {!isManager && profile?.id === t.employee_id && t.status !== 'مكتملة' && (
+                        <div className="mt-2 mb-3 bg-navy-50/60 rounded-xl border border-navy-100 overflow-hidden">
+                          <div className="px-3 pt-2.5 pb-1">
+                            <label className="block text-[10px] font-bold text-navy-700 mb-1.5 flex items-center gap-1">
+                              <Send size={10} /> أضف مستجد / آخر ما تم إنجازه:
+                            </label>
+                            <textarea
+                              value={newUpdateText[t.id] || ''}
+                              onChange={(e) => setNewUpdateText(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendTaskUpdate(t.id);
+                              }}
+                              rows={2}
+                              placeholder="اكتب آخر مستجدات المهمة هنا... (Ctrl+Enter للإرسال)"
+                              className="form-input text-xs resize-none bg-white"
+                            />
+                          </div>
+                          <div className="px-3 pb-2.5 flex items-center justify-between">
+                            <span className="text-[10px] text-gray-400">
+                              {(newUpdateText[t.id] || '').length} حرف
+                            </span>
+                            <button
+                              onClick={() => sendTaskUpdate(t.id)}
+                              disabled={!newUpdateText[t.id]?.trim() || sendingUpdate === t.id}
+                              className="btn-gold text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            >
+                              {sendingUpdate === t.id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Send size={12} />
+                              )}
+                              إرسال التحديث
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
+                        {t.employees?.name && <span className="flex items-center gap-1"><User size={11} />{t.employees.name}</span>}
+                        {t.department && <span className="flex items-center gap-1"><Filter size={11} />{t.department}</span>}
+                        {t.client_code && <span className="flex items-center gap-1 font-mono text-gold-600"><Hash size={11} />{t.client_code}</span>}
+                        <span className="flex items-center gap-1"><Calendar size={11} />{new Date(t.due_date).toLocaleDateString('ar-EG')}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={t.status}
+                        disabled={t.status === 'مكتملة' && !isManager}
+                        onChange={(e) => updateStatus(t, e.target.value as TaskStatus)}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-75"
+                      >
+                        {statuses.map((s) => {
+                          if (s === 'مكتملة' && !isManager) return null;
+                          return <option key={s} value={s}>{s}</option>;
+                        })}
+                      </select>
+                      {isManager && (
+                        <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
+                      )}
+                    </div>
                   </div>
-                  {t.description && <p className="text-xs text-gray-500 mb-1.5">{t.description}</p>}
-                  <div className="flex items-center gap-3 text-[11px] text-gray-400">
-                    {isManager && <span>المسؤول: <span className="font-semibold text-navy-950">{t.employees?.name || '—'}</span></span>}
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} /> تاريخ الاستحقاق: {t.due_date ? new Date(t.due_date).toLocaleDateString('ar-EG') : '—'}
-                    </span>
-                  </div>
                 </div>
-                <ChevronLeft size={14} className="text-gray-300 flex-shrink-0 self-center" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Task Add/Edit Modal */}
-      <TaskModal
-        open={showTaskModal}
-        onClose={() => setShowTaskModal(false)}
-        onSaved={load}
-        employees={employees}
-        defaultEmployeeId={defaultTaskEmployee}
-        editTask={editTask}
-      />
     </div>
-  );
-}
-
-// Helper Loader icon
-function Loader2({ size, className }: { size?: number; className?: string }) {
-  return (
-    <svg
-      className={`animate-spin ${className}`}
-      style={{ width: size, height: size }}
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-    </svg>
   );
 }

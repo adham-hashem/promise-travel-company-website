@@ -165,20 +165,9 @@ export default function Payments() {
 
   const handleDelete = async (p: PayRow) => {
     if (!confirm('هل أنت متأكد من حذف هذه الدفعة؟')) return;
-    try {
-      const { error: delErr } = await supabase.from('payments').delete().eq('id', p.id);
-      if (delErr) {
-        alert(`فشل حذف الدفعة: ${delErr.message}`);
-        return;
-      }
-      if (p.booking_id) {
-        await syncBookingPayment(p.booking_id, p.amount, true);
-      }
-      setPayments(payments.filter(x => x.id !== p.id));
-    } catch (err: any) {
-      console.error('Error deleting payment:', err);
-      alert('حدث خطأ أثناء محاولة حذف الدفعة');
-    }
+    if (p.booking_id) await syncBookingPayment(p.booking_id, p.amount, true);
+    await supabase.from('payments').delete().eq('id', p.id);
+    setPayments(payments.filter(x => x.id !== p.id));
   };
 
   const uploadProof = async (file: File) => {
@@ -392,17 +381,43 @@ export default function Payments() {
                       {file.customer?.service_type && <p>✈️ الخدمة: <span className="font-semibold text-navy-800">{file.customer.service_type}</span></p>}
                       {/* Payment summary */}
                       {(totalPaid > 0 || bookingTotal > 0) && (
-                        <div className="bg-navy-50 rounded-lg p-2 mt-1">
-                          <p className="text-navy-700 font-semibold text-[11px]">
-                            💳 مدفوع: {totalPaid.toLocaleString('ar-EG')} ج.م
-                            {bookingTotal > 0 && <span className="text-gray-500"> / {bookingTotal.toLocaleString('ar-EG')} ج.م ({paidPct}%)</span>}
-                          </p>
+                        <div className="bg-navy-50 rounded-lg p-2 mt-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-navy-700 font-semibold text-[11px]">
+                              💳 مدفوع: {totalPaid.toLocaleString('ar-EG')} ج.م
+                              {bookingTotal > 0 && <span className="text-gray-500"> / {bookingTotal.toLocaleString('ar-EG')} ج.م ({paidPct}%)</span>}
+                            </p>
+                            <span className="text-[10px] text-gray-400">{filePayments.length} دفعة</span>
+                          </div>
                           {bookingTotal > 0 && (
-                            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
                               <div className="bg-gold-500 h-1.5 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
                             </div>
                           )}
-                          <p className="text-[10px] text-gray-500 mt-0.5">{filePayments.length} دفعة مسجّلة</p>
+                          
+                          {/* List of payments for this file */}
+                          {filePayments.length > 0 && (
+                            <div className="pt-2 border-t border-gray-200/60 space-y-1.5 max-h-32 overflow-y-auto">
+                              {filePayments.map((p: any) => (
+                                <div key={p.id} className="flex items-center justify-between text-[10px] bg-white p-1 px-2 rounded border border-gray-100">
+                                  <span className="font-bold text-gray-700">{p.amount.toLocaleString('ar-EG')} ج.م ({p.payment_type})</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-gray-400">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</span>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(p);
+                                      }}
+                                      title="حذف الدفعة" 
+                                      className="text-red-500 hover:text-red-700 p-0.5"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       {file.notes && (
@@ -736,6 +751,22 @@ export default function Payments() {
                   )}
                 </div>
               )}
+
+              {/* Delete payment action */}
+              <div className="pt-4 border-t border-gray-100 mt-4">
+                <button
+                  onClick={async () => {
+                    const confirmDelete = window.confirm('هل أنت متأكد من حذف هذه الدفعة نهائياً؟');
+                    if (confirmDelete) {
+                      await handleDelete(selectedPayment);
+                      setSelectedPayment(null);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-bold"
+                >
+                  <Trash2 size={13} /> حذف هذه الدفعة نهائياً من النظام
+                </button>
+              </div>
             </div>
           </div>
         </div>

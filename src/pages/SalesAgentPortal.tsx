@@ -182,11 +182,21 @@ export default function SalesAgentPortal() {
       }
 
       // Upload documents
+      const docTypeKey: Record<string, string> = {
+        'جواز سفر': 'passport',
+        'جواز السفر': 'passport',
+        'بطاقة رقم قومي': 'national_id',
+        'البطاقة الشخصية': 'national_id',
+        'صورة شخصية': 'personal_photo',
+        'تأشيرة': 'visa',
+        'مستند إضافي': 'extra_doc',
+      };
       const uploadPromises = docTypes.map(async (d) => {
         const doc = docUploads[d.id];
         if (!doc.file) return;
-        const ext = doc.file.name.split('.').pop();
-        const filePath = `${customerId}/${Date.now()}_${d.id}.${ext}`;
+        const ext = (doc.file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+        const safeDocType = docTypeKey[d.id] || 'document';
+        const filePath = `${customerId}/${Date.now()}_${safeDocType}.${ext}`;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, doc.file);
         if (upErr) {
           console.error(`Error uploading document ${d.id}:`, upErr);
