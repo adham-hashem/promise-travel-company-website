@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import {
-  Plus, Search, Eye, Pencil, Trash2, X, Phone, Globe, MessageCircle,
+  Plus, Eye, Pencil, Trash2, X, Phone,
   MapPin, CheckCircle2, AlertCircle, Loader2, Send, FileText, Upload,
-  User, Check, Package as PackageIcon, Mail, Hash
+  User, Package as PackageIcon, Mail
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Customer, Package, ServiceType, CustomerStatus } from '../types';
+import type { Customer, Package, ServiceType } from '../types';
 
 const serviceTypes: { value: ServiceType; label: string; prefix: string }[] = [
   { value: 'حج', label: 'حج', prefix: 'HJ' },
