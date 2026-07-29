@@ -106,7 +106,7 @@ export default function SalesAgentPortal() {
         roleStr === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
-        .select('*, packages(*), employees(*), user_profiles:assigned_employee_id(name, role)');
+        .select('*, packages(*), employees(*)');
       
       if (!isSuperOrAdmin && profile?.id) {
         custQuery = custQuery.eq('assigned_employee_id', profile.id);
@@ -126,7 +126,8 @@ export default function SalesAgentPortal() {
       setDrafts(allCustomers.filter(c => (c as any).sales_agent_submitted === false));
       setSubmitted(allCustomers.filter(c => {
         if ((c as any).sales_agent_submitted === false) return false;
-        const role = (c as any).user_profiles?.role || c.employees?.role;
+        if (c.source !== 'مندوب مبيعات') return false;
+        const role = c.employees?.role;
         return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
       }));
     } catch (e) {
@@ -412,9 +413,9 @@ export default function SalesAgentPortal() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-gray-800">{c.name}</span>
-                            {((c as any).user_profiles?.name || c.employees?.name) && (
+                            {c.employees?.name && (
                               <span className="text-[10px] text-gold-600 bg-gold-50 border border-gold-200/60 px-1.5 py-0.5 rounded">
-                                بواسطة: {(c as any).user_profiles?.name || c.employees?.name}
+                                بواسطة: {c.employees.name}
                               </span>
                             )}
                           </div>
