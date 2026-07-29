@@ -106,7 +106,7 @@ export default function SalesAgentPortal() {
         roleStr === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
-        .select('*, packages(*), employees(*)');
+        .select('*, packages(*), employees(*), user_profiles:assigned_employee_id(name)');
       
       if (!isSuperOrAdmin && profile?.id) {
         custQuery = custQuery.eq('assigned_employee_id', profile.id);
@@ -124,7 +124,7 @@ export default function SalesAgentPortal() {
       const allCustomers = (custData as Customer[]) || [];
       // Filter drafts vs submitted
       setDrafts(allCustomers.filter(c => (c as any).sales_agent_submitted === false));
-      setSubmitted(allCustomers.filter(c => (c as any).sales_agent_submitted !== false));
+      setSubmitted(allCustomers.filter(c => (c as any).sales_agent_submitted === true));
     } catch (e) {
       console.error(e);
     } finally {
@@ -408,9 +408,9 @@ export default function SalesAgentPortal() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-gray-800">{c.name}</span>
-                            {c.employees?.name && (
+                            {((c as any).user_profiles?.name || c.employees?.name) && (
                               <span className="text-[10px] text-gold-600 bg-gold-50 border border-gold-200/60 px-1.5 py-0.5 rounded">
-                                بواسطة: {c.employees.name}
+                                بواسطة: {(c as any).user_profiles?.name || c.employees?.name}
                               </span>
                             )}
                           </div>
