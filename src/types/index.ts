@@ -388,6 +388,7 @@ export type InstallmentStatus = 'نشط' | 'متأخر' | 'مكتمل';
 export interface Payment {
   id: string;
   booking_id?: string;
+  package_id?: string;
   customer_id?: string;
   employee_id?: string;
   amount: number;
@@ -407,6 +408,7 @@ export interface Payment {
   created_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
   user_profiles?: Employee;
 }
 

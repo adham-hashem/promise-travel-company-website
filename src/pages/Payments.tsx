@@ -10,6 +10,7 @@ import { exportToExcel } from '../lib/export';
 
 const emptyForm = {
   booking_id: '',
+  package_id: '',
   customer_id: '',
   amount: '',
   payment_method: 'كاش' as PaymentMethod,
@@ -33,6 +34,8 @@ export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [customersList, setCustomersList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -54,13 +57,15 @@ export default function Payments() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
-      supabase.from('payments').select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
+    const [{ data: payData }, { data: bkData }, { data: opsData }, { data: pkgData }, { data: custData }] = await Promise.all([
+      supabase.from('payments').select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
       supabase.from('operation_files')
         .select('*, customer:customers(*), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
+      supabase.from('packages').select('*').eq('is_active', true).order('name', { ascending: true }),
+      supabase.from('customers').select('id, name').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
@@ -71,6 +76,8 @@ export default function Payments() {
     }));
     setPayments(allPayments);
     setBookings(allBookings);
+    setPackages(pkgData || []);
+    setCustomersList(custData || []);
     setTransferredFiles(filesWithPayments);
     setLoading(false);
   };
@@ -114,6 +121,7 @@ export default function Payments() {
   const openEdit = (p: PayRow) => {
     setForm({
       booking_id: p.booking_id || '',
+      package_id: p.package_id || '',
       customer_id: p.customer_id || '',
       amount: String(p.amount),
       payment_method: p.payment_method,
@@ -123,11 +131,6 @@ export default function Payments() {
       payment_type: p.payment_type || 'دفعة عادية',
     });
     setEditId(p.id); setShowModal(true);
-  };
-
-  const onBookingChange = (bookingId: string) => {
-    const bk = bookings.find(b => b.id === bookingId);
-    setForm({ ...form, booking_id: bookingId, customer_id: bk?.customer_id || '' });
   };
 
   const syncBookingPayment = async (bookingId: string, deltaAmount: number, isDelete: boolean) => {
@@ -159,6 +162,7 @@ export default function Payments() {
     }
     const payload = {
       booking_id: form.booking_id || null,
+      package_id: form.package_id || null,
       customer_id: form.customer_id || null,
       amount: parseFloat(form.amount),
       payment_method: form.payment_method,
@@ -169,14 +173,14 @@ export default function Payments() {
       payment_type: form.payment_type,
     };
     if (editId) {
-      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
       if (error) { alert(`خطأ في تحديث الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments(payments.map(p => p.id === editId ? (data as PayRow) : p));
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
       }
     } else {
-      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
+      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
       if (error) { alert(`خطأ في إضافة الدفعة: ${error.message}`); setSaving(false); return; }
       if (data) {
         setPayments([data as PayRow, ...payments]);
@@ -521,7 +525,7 @@ export default function Payments() {
           <table className="w-full data-table min-w-[1000px]">
             <thead>
               <tr>
-                <th>رقم العملية</th><th>العميل</th><th>نوع العملية</th><th>المبلغ</th>
+                <th>رقم العملية</th><th>العميل</th><th>الباقة</th><th>نوع العملية</th><th>المبلغ</th>
                 <th>الطريقة</th><th>التاريخ</th><th>الحالة</th><th>الاعتماد</th><th>إجراءات</th>
               </tr>
             </thead>
@@ -530,6 +534,7 @@ export default function Payments() {
                 <tr key={p.id} className="cursor-pointer hover:bg-gray-50/50" onClick={() => setSelectedPayment(p)}>
                   <td className="font-mono text-xs text-gray-500">#{p.id.slice(0, 8)}</td>
                   <td className="font-semibold text-gray-800">{p.customers?.name || '—'}</td>
+                  <td className="text-sm text-gray-600 font-semibold">{p.packages?.name || '—'}</td>
                   <td><span className="badge bg-navy-50 text-navy-700 text-xs">{p.payment_type || 'دفعة عادية'}</span></td>
                   <td className="font-bold text-navy-900">{fmt(p.amount)} ج.م</td>
                   <td><span className="badge bg-gray-100 text-gray-600 text-xs">{p.payment_method}</span></td>
@@ -563,16 +568,34 @@ export default function Payments() {
             
             <div className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> الحجز المرتبط (اختياري)</label>
+                <label className="form-label flex items-center gap-1.5">العميل *</label>
                 <select
-                  value={form.booking_id}
-                  onChange={(e) => onBookingChange(e.target.value)}
+                  value={form.customer_id}
+                  onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
                   className="form-input text-sm"
+                  required
                 >
-                  <option value="">— بدون حجز —</option>
-                  {bookings.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.customers?.name || 'حجز'} — {b.packages?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
+                  <option value="">— اختر عميل —</option>
+                  {customersList.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> اختيار الباقة *</label>
+                <select
+                  value={form.package_id}
+                  onChange={(e) => setForm({ ...form, package_id: e.target.value })}
+                  className="form-input text-sm"
+                  required
+                >
+                  <option value="">— اختر باقة —</option>
+                  {packages.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {fmt(Number(p.price || 0))} ج.م
                     </option>
                   ))}
                 </select>

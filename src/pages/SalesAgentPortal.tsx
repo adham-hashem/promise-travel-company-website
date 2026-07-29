@@ -97,14 +97,20 @@ export default function SalesAgentPortal() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const isSuperOrAdmin = (profile?.role as string) === 'superadmin' || (profile?.role as string) === 'admin';
+      let custQuery = supabase
+        .from('customers')
+        .select('*, packages(*)');
+      
+      if (!isSuperOrAdmin && profile?.id) {
+        custQuery = custQuery.eq('assigned_employee_id', profile.id);
+      }
+      
+      custQuery = custQuery.eq('is_vip', false).order('created_at', { ascending: false });
+
       const [{ data: pkgData }, { data: custData }] = await Promise.all([
         supabase.from('packages').select('*').eq('is_active', true),
-        supabase
-          .from('customers')
-          .select('*, packages(*)')
-          .eq('assigned_employee_id', profile?.id)
-          .eq('is_vip', false)
-          .order('created_at', { ascending: false })
+        custQuery
       ]);
 
       if (pkgData) setPackages(pkgData as Package[]);
