@@ -33,7 +33,6 @@ export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [packages, setPackages] = useState<Array<{ id: string; name: string; price?: number; type?: string; hotel?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -55,14 +54,13 @@ export default function Payments() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: payData }, { data: bkData }, { data: opsData }, { data: pkgData }] = await Promise.all([
+    const [{ data: payData }, { data: bkData }, { data: opsData }] = await Promise.all([
       supabase.from('payments').select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
       supabase.from('operation_files')
         .select('*, customer:customers(*), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
-      supabase.from('packages').select('id, name, price, type, hotel').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
@@ -73,7 +71,6 @@ export default function Payments() {
     }));
     setPayments(allPayments);
     setBookings(allBookings);
-    setPackages((pkgData || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price, type: p.type, hotel: p.hotel })));
     setTransferredFiles(filesWithPayments);
     setLoading(false);
   };
@@ -575,7 +572,7 @@ export default function Payments() {
                   <option value="">— بدون حجز —</option>
                   {bookings.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.customers?.name || 'حجز'} — {b.package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
+                      {b.customers?.name || 'حجز'} — {b.packages?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
                     </option>
                   ))}
                 </select>
