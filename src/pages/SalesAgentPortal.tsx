@@ -97,15 +97,16 @@ export default function SalesAgentPortal() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const roleStr = (profile?.role as string) || '';
       const isSuperOrAdmin =
-        profile?.role === 'super_admin' ||
-        profile?.role === 'superadmin' ||
-        profile?.role === 'admin' ||
-        profile?.role === 'مالك النظام' ||
-        profile?.role === 'مدير النظام';
+        roleStr === 'super_admin' ||
+        roleStr === 'superadmin' ||
+        roleStr === 'admin' ||
+        roleStr === 'مالك النظام' ||
+        roleStr === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
-        .select('*, packages(*)');
+        .select('*, packages(*), employees(*)');
       
       if (!isSuperOrAdmin && profile?.id) {
         custQuery = custQuery.eq('assigned_employee_id', profile.id);
@@ -404,7 +405,16 @@ export default function SalesAgentPortal() {
                         <div className="w-9 h-9 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm">
                           {c.name.charAt(0)}
                         </div>
-                        <span className="font-semibold text-gray-800">{c.name}</span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800">{c.name}</span>
+                            {c.employees?.name && (
+                              <span className="text-[10px] text-gold-600 bg-gold-50 border border-gold-200/60 px-1.5 py-0.5 rounded">
+                                بواسطة: {c.employees.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td dir="ltr" className="text-gray-600">{c.phone}</td>
