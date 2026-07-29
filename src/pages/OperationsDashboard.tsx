@@ -5,7 +5,7 @@ import {
   Calendar, CheckCircle2, AlertCircle, FileText, CreditCard, Wallet,
   Download, Eye, ChevronRight, Globe, Clock, X, Upload,
   Trash2, UserCheck, Flag, Users, MessageSquare, Phone, Mail,
-  Package, Shield, FilePlus, Briefcase,
+  Package, Shield, FilePlus, Briefcase, Undo2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -319,6 +319,59 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setSaving(false);
   };
 
+  const revertFileStageDirect = async (file: OpFile) => {
+    const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
+    const stageArabicLabels: Record<string, string> = {
+      new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
+      flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
+    };
+    const currentIdx = workflowStagesOrder.indexOf(file.workflow_stage || 'new');
+    if (currentIdx <= 0) return;
+    const prevStage = workflowStagesOrder[currentIdx - 1];
+    const currentLabel = stageArabicLabels[file.workflow_stage || 'new'] || file.workflow_stage;
+    const prevLabel = stageArabicLabels[prevStage] || prevStage;
+    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('operation_files')
+      .update({ workflow_stage: prevStage })
+      .eq('id', file.id)
+      .select(`
+        *,
+        customer:customers(*),
+        booking:bookings(*),
+        hotel:hotels(*)
+      `)
+      .single();
+
+    if (error) {
+      alert('فشل إرجاع المرحلة: ' + error.message);
+      setSaving(false);
+      return;
+    }
+
+    if (data) {
+      const emp = file.assigned_to
+        ? employees.find((e) => e.id === file.assigned_to) || null
+        : file.assigned_employee;
+      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
+      
+      setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
+      if (selected && selected.id === updated.id) {
+        setSelected(updated);
+      }
+      setStats((s) => ({
+        ...s,
+        ready: files.filter((f) => f.id === updated.id ? updated.file_status === 'جاهز للسفر' : f.file_status === 'جاهز للسفر').length,
+        incomplete: files.filter((f) => f.id === updated.id ? updated.file_status === 'مستندات ناقصة' : f.file_status === 'مستندات ناقصة').length,
+        inProgress: files.filter((f) => f.id === updated.id ? ['قيد التجهيز', 'جديد'].includes(updated.file_status) : ['قيد التجهيز', 'جديد'].includes(f.file_status)).length,
+      }));
+    }
+    setSaving(false);
+  };
+
   const uploadOpDoc = async (file: File) => {
     if (!selected) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -511,7 +564,19 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     </div>
 
                     {/* Status */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      {f.workflow_stage && f.workflow_stage !== 'new' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await revertFileStageDirect(f);
+                          }}
+                          className="text-[11px] py-1.5 px-2.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1 font-bold shadow-xs"
+                          title="إرجاع لمرحلة سابقة"
+                        >
+                          <Undo2 size={11} /> إرجاع
+                        </button>
+                      )}
                       <span className={`badge text-xs ${sc.bg} ${sc.color}`}>{f.file_status}</span>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>

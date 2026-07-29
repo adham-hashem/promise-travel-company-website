@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CustomerStatus, Page } from '../types';
 
@@ -21,8 +21,12 @@ interface Props {
   searchValue: string;
 }
 
+interface CustomerWithOpFile extends Customer {
+  operation_files?: Array<{ id: string; workflow_stage: string }>;
+}
+
 export default function Customers({ onNavigate, searchValue }: Props) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerWithOpFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'الكل'>('الكل');
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
@@ -33,15 +37,70 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     async function load() {
       const { data } = await supabase
         .from('customers')
-        .select('*, packages(*), employees(*)')
+        .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
         .not('sales_agent_submitted', 'eq', false)
         .eq('is_vip', false)
         .order('created_at', { ascending: false });
-      setCustomers((data as Customer[]) || []);
+      setCustomers((data as CustomerWithOpFile[]) || []);
       setLoading(false);
     }
     load();
   }, []);
+
+  const revertCustomerStage = async (c: CustomerWithOpFile) => {
+    const op = c.operation_files?.[0];
+    if (!op) return;
+
+    const workflowStagesOrder = ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
+    const stageArabicLabels: Record<string, string> = {
+      accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
+      flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
+    };
+
+    const currentStage = op.workflow_stage || 'accounts';
+    const currentIdx = workflowStagesOrder.indexOf(currentStage);
+
+    if (currentIdx === 0) {
+      const confirmMsg = `هل تريد إلغاء تحويل العميل "${c.name}" إلى الحسابات؟\n\nسيتم حذف ملف التشغيل وإرجاع العميل لقائمة العملاء CRM فقط.`;
+      if (!window.confirm(confirmMsg)) return;
+
+      const { error } = await supabase
+        .from('operation_files')
+        .delete()
+        .eq('id', op.id);
+
+      if (error) {
+        alert('فشل إلغاء التحويل: ' + error.message);
+        return;
+      }
+
+      setCustomers(prev => prev.map(cust => cust.id === c.id ? { ...cust, operation_files: [] } : cust));
+      alert('تم إلغاء تحويل العميل بنجاح.');
+    } else if (currentIdx > 0) {
+      const prevStage = workflowStagesOrder[currentIdx - 1];
+      const currentLabel = stageArabicLabels[currentStage] || currentStage;
+      const prevLabel = stageArabicLabels[prevStage] || prevStage;
+
+      const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${c.name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+      if (!window.confirm(confirmMsg)) return;
+
+      const { error } = await supabase
+        .from('operation_files')
+        .update({ workflow_stage: prevStage })
+        .eq('id', op.id);
+
+      if (error) {
+        alert('فشل إرجاع المرحلة: ' + error.message);
+        return;
+      }
+
+      setCustomers(prev => prev.map(cust => cust.id === c.id ? {
+        ...cust,
+        operation_files: [{ ...op, workflow_stage: prevStage }]
+      } : cust));
+      alert(`تم إرجاع العميل إلى مرحلة "${prevLabel}" بنجاح.`);
+    }
+  };
 
   const filtered = customers.filter((c) => {
     const matchSearch = !searchValue || c.name.includes(searchValue) || c.phone.includes(searchValue) || (c.client_code && c.client_code.includes(searchValue));
@@ -165,14 +224,30 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setTransferCustomer(c)}
-                          className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
-                          title="تحويل ملف العميل إلى قسم الحسابات"
-                        >
-                          <ArrowRightLeft size={13} />
-                          تحويل للحسابات
-                        </button>
+                        {c.operation_files && c.operation_files.length > 0 ? (
+                          <>
+                            <span className="text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-semibold whitespace-nowrap">
+                              محوّل ✔
+                            </span>
+                            <button
+                              onClick={() => revertCustomerStage(c)}
+                              className="btn-outline border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 text-[11px] py-1 px-2 flex items-center gap-1 shadow-xs whitespace-nowrap font-bold"
+                              title="إرجاع العميل لمرحلة سابقة / إلغاء التحويل"
+                            >
+                              <Undo2 size={12} />
+                              إرجاع
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setTransferCustomer(c)}
+                            className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
+                            title="تحويل ملف العميل إلى قسم الحسابات"
+                          >
+                            <ArrowRightLeft size={13} />
+                            تحويل للحسابات
+                          </button>
+                        )}
                         <button
                           onClick={() => onNavigate('customer-details', c.id)}
                           className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600 transition-colors"
