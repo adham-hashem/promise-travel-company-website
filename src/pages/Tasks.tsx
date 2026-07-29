@@ -61,6 +61,7 @@ export default function Tasks({}: Props) {
     priority: 'متوسطة' as TaskPriority, due_date: '', client_code: '',
   });
   const [saving, setSaving] = useState(false);
+  const [taskCustomers, setTaskCustomers] = useState<Record<string, { name: string; phone: string; whatsapp?: string }>>({});
 
   // Task updates (timeline per task)
   const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
@@ -110,6 +111,24 @@ export default function Tasks({}: Props) {
     const { data } = await query.order('created_at', { ascending: false });
     const fetchedTasks = (data as Task[]) || [];
     setTasks(fetchedTasks);
+
+    // Fetch associated customers for these tasks
+    const clientCodes = fetchedTasks.map(t => t.client_code).filter(Boolean);
+    const customersMap: Record<string, { name: string; phone: string; whatsapp?: string }> = {};
+    if (clientCodes.length > 0) {
+      const { data: custData } = await supabase
+        .from('customers')
+        .select('client_code, name, phone, whatsapp')
+        .in('client_code', clientCodes);
+      if (custData) {
+        custData.forEach(c => {
+          if (c.client_code) {
+            customersMap[c.client_code] = c;
+          }
+        });
+      }
+    }
+    setTaskCustomers(customersMap);
 
     // Load task updates for all fetched tasks
     if (fetchedTasks.length > 0) {
@@ -337,6 +356,7 @@ export default function Tasks({}: Props) {
           <div className="divide-y divide-gray-50">
             {filtered.map((t) => {
               const StatusIcon = statusIcons[t.status] || Clock;
+              const associatedCust = t.client_code ? taskCustomers[t.client_code] : undefined;
               return (
                 <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-start gap-4">
@@ -357,7 +377,31 @@ export default function Tasks({}: Props) {
                         )}
                         <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
                       </div>
-                      {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
+                      {t.description && <p className="text-xs text-gray-500 mb-2 whitespace-pre-wrap">{t.description}</p>}
+
+                      {associatedCust && (
+                        <div className="mt-2 mb-3 bg-gray-50 border border-gray-150 rounded-xl p-3 text-xs space-y-1 max-w-md">
+                          <p className="font-bold text-navy-800 flex items-center gap-1.5">👤 بيانات العميل المرتبط:</p>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-gray-600 mt-1">
+                            <div><strong>الاسم:</strong> {associatedCust.name}</div>
+                            <div><strong>رمز العميل:</strong> {t.client_code}</div>
+                            <div>
+                              <strong>الهاتف:</strong>{' '}
+                              <a href={`tel:${associatedCust.phone}`} className="text-blue-600 hover:underline font-semibold font-mono">
+                                {associatedCust.phone}
+                              </a>
+                            </div>
+                            {associatedCust.whatsapp && (
+                              <div>
+                                <strong>واتساب:</strong>{' '}
+                                <a href={`https://wa.me/${associatedCust.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-650 hover:underline font-semibold font-mono">
+                                  {associatedCust.whatsapp}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Task Updates Timeline */}
                       {(taskUpdates[t.id] || []).length > 0 && (
