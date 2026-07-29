@@ -97,7 +97,12 @@ export default function SalesAgentPortal() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const isSuperOrAdmin = (profile?.role as string) === 'superadmin' || (profile?.role as string) === 'admin';
+      const isSuperOrAdmin =
+        profile?.role === 'super_admin' ||
+        profile?.role === 'superadmin' ||
+        profile?.role === 'admin' ||
+        profile?.role === 'مالك النظام' ||
+        profile?.role === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
         .select('*, packages(*)');
