@@ -34,7 +34,6 @@ export default function Payments() {
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [packages, setPackages] = useState<Array<{ id: string; name: string; price?: number; type?: string; hotel?: string }>>([]);
-  const [selectedPackageId, setSelectedPackageId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -113,7 +112,6 @@ export default function Payments() {
   const openAdd = () => {
     setForm(emptyForm);
     setEditId(null);
-    setSelectedPackageId('');
     setShowModal(true);
   };
   const openEdit = (p: PayRow) => {
@@ -560,84 +558,41 @@ export default function Payments() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-bold text-navy-900">{editId ? 'تعديل الدفعة' : 'إضافة دفعة جديدة'}</h3>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-3">
-                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> الباقة المرتبطة</label>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> الحجز المرتبط (اختياري)</label>
                 <select
-                  value={selectedPackageId}
-                  onChange={(e) => {
-                    setSelectedPackageId(e.target.value);
-                    // Reset booking selection when package changes
-                    setForm(prev => ({ ...prev, booking_id: '', customer_id: '' }));
-                  }}
-                  className="form-input"
+                  value={form.booking_id}
+                  onChange={(e) => onBookingChange(e.target.value)}
+                  className="form-input text-sm"
                 >
-                  <option value="">— اختر باقة —</option>
-                  {packages.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}{p.type ? ` — ${p.type}` : ''}{p.hotel ? ` — ${p.hotel}` : ''}{p.price ? ` — ${fmt(p.price)} ج.م` : ''}
+                  <option value="">— بدون حجز —</option>
+                  {bookings.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.customers?.name || 'حجز'} — {b.package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
                     </option>
                   ))}
                 </select>
-
-                {selectedPackageId && (
-                  <div>
-                    <label className="form-label">الحجز المرتبط (من هذه الباقة)</label>
-                    <select
-                      value={form.booking_id}
-                      onChange={(e) => onBookingChange(e.target.value)}
-                      className="form-input"
-                    >
-                      <option value="">— اختر حجز العميل —</option>
-                      {bookings
-                        .filter(b => (b as any).package?.id === selectedPackageId)
-                        .map(b => (
-                          <option key={b.id} value={b.id}>
-                            {b.customers?.name || 'عميل'} — {fmt(Number(b.total_amount || 0))} ج.م
-                          </option>
-                        ))}
-                    </select>
-                    {bookings.filter(b => (b as any).package?.id === selectedPackageId).length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                        ⚠️ لا يوجد حجوزات مرتبطة بهذه الباقة. يمكنك إضافة الدفعة بدون حجز محدد.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {!selectedPackageId && (
-                  <div>
-                    <label className="form-label">أو: حجز محدد مباشرة (اختياري)</label>
-                    <select
-                      value={form.booking_id}
-                      onChange={(e) => onBookingChange(e.target.value)}
-                      className="form-input"
-                    >
-                      <option value="">— بدون حجز —</option>
-                      {bookings.map(b => (
-                        <option key={b.id} value={b.id}>
-                          {b.customers?.name || 'حجز'} — {(b as any).package?.name || 'بدون باقة'} — {fmt(Number(b.total_amount || 0))} ج.م
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
               </div>
+
               <div>
                 <label className="form-label">نوع العملية المالية</label>
                 <select value={form.payment_type} onChange={(e) => setForm({ ...form, payment_type: e.target.value })} className="form-input">
                   {paymentTypes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
+              
               <div>
                 <label className="form-label">المبلغ (ج.م) <span className="text-red-500">*</span></label>
                 <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="form-input" placeholder="5000" />
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">طريقة الدفع</label>
@@ -650,18 +605,21 @@ export default function Payments() {
                   <input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} className="form-input" />
                 </div>
               </div>
+              
               <div>
                 <label className="form-label">حالة الدفع</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Payment['status'] })} className="form-input">
                   {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+              
               <div>
                 <label className="form-label">ملاحظات</label>
                 <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input min-h-[60px] resize-none" placeholder="ملاحظات إضافية" />
               </div>
             </div>
-            <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+            
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
               <button onClick={() => setShowModal(false)} className="btn-outline">إلغاء</button>
               <button onClick={handleSave} disabled={saving || !form.amount} className="btn-gold">{saving ? 'جارٍ الحفظ...' : 'حفظ'}</button>
             </div>
