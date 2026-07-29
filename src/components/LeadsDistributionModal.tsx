@@ -196,7 +196,7 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
       const { data: insertedCustomers, error: insertError } = await supabase
         .from('customers')
         .insert(rows)
-        .select('id, name, client_code, assigned_employee_id');
+        .select('id, name, client_code, assigned_employee_id, phone, governorate');
 
       if (insertError) {
         setError(insertError.message);
@@ -208,7 +208,7 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
       if (insertedCustomers && insertedCustomers.length > 0) {
         const taskRows = insertedCustomers.map((cust: any) => ({
           title: `متابعة العميل الجديد: ${cust.name}`,
-          description: `تم توزيع هذا العميل عليك تلقائياً للمتابعة والتواصل.`,
+          description: `تم توزيع هذا العميل عليك تلقائياً للمتابعة والتواصل.\n\n📞 الهاتف: ${cust.phone || 'غير متوفر'}${cust.governorate ? `\n📍 المحافظة: ${cust.governorate}` : ''}\nرمز العميل: ${cust.client_code || '—'}`,
           employee_id: cust.assigned_employee_id,
           priority: 'متوسطة',
           status: 'جديدة',
