@@ -22,6 +22,53 @@ const stagesConfig = [
 
 const statusOptions = ['لم يبدأ', 'قيد التنفيذ', 'تم التأكيد', 'مكتمل', 'ملغي'];
 
+const stepLabelMap: Record<string, string> = {
+  pricing: 'تم إصدار عرض السعر',
+  payment_approval: 'تم اعتماد الدفع',
+  hotel_booking: 'جاري حجز الفندق',
+  hotel_confirmation: 'تم تأكيد الفندق',
+  flight_booking: 'جاري حجز الطيران',
+  flight_issuance: 'تم إصدار التذكرة',
+  train_booking: 'جاري حجز القطار',
+  train_confirmation: 'تم تأكيد القطار',
+  visa_processing: 'جاري تجهيز التأشيرة',
+  visa_issuance: 'صدرت التأشيرة',
+  itinerary_prep: 'جاري تجهيز برنامج الرحلة',
+  travel_ready: 'جاهز للسفر',
+};
+
+interface StepMeta {
+  startDate: string;
+  endDate: string;
+  notes: string;
+}
+
+function parseStepNotes(notesText: string | null | undefined): StepMeta {
+  if (!notesText) return { startDate: '', endDate: '', notes: '' };
+  try {
+    const trimmed = notesText.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      const parsed = JSON.parse(trimmed);
+      return {
+        startDate: parsed.startDate || '',
+        endDate: parsed.endDate || '',
+        notes: parsed.notes || '',
+      };
+    }
+  } catch (e) {
+    // fallback to text notes
+  }
+  return { startDate: '', endDate: '', notes: notesText };
+}
+
+function serializeStepNotes(meta: StepMeta): string {
+  return JSON.stringify({
+    startDate: meta.startDate,
+    endDate: meta.endDate,
+    notes: meta.notes,
+  });
+}
+
 interface Props {
   customerId: string | undefined;
   onNavigate: (page: Page, id?: string) => void;
@@ -48,8 +95,9 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
   const [stepForm, setStepForm] = useState({
     status: '',
     assigned_employee_id: '',
-    execution_date: '',
-    department_notes: '',
+    startDate: '',
+    endDate: '',
+    notes: '',
   });
 
   // Uploading doc state
@@ -230,43 +278,53 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
   };
 
   const handleStartEditStep = (step: VipWorkflowStep) => {
+    const meta = parseStepNotes(step.department_notes);
     setEditingStepId(step.id);
     setStepForm({
       status: step.status || 'لم يبدأ',
       assigned_employee_id: step.assigned_employee_id || '',
-      execution_date: step.execution_date || '',
-      department_notes: step.department_notes || '',
+      startDate: meta.startDate,
+      endDate: meta.endDate,
+      notes: meta.notes,
     });
   };
 
   const handleSaveStep = async (step: VipWorkflowStep) => {
     try {
+      const serializedNotes = serializeStepNotes({
+        startDate: stepForm.startDate,
+        endDate: stepForm.endDate,
+        notes: stepForm.notes,
+      });
+
       const { error: stepErr } = await supabase
         .from('vip_workflow_steps')
         .update({
           status: stepForm.status,
           assigned_employee_id: stepForm.assigned_employee_id || null,
-          execution_date: stepForm.execution_date || null,
-          department_notes: stepForm.department_notes || null,
+          execution_date: stepForm.endDate || null,
+          department_notes: serializedNotes,
           updated_at: new Date().toISOString(),
         })
         .eq('id', step.id);
 
       if (stepErr) throw stepErr;
 
+      const displayLabel = stepLabelMap[step.step_key] || step.step_label;
+
       // Log timeline
       const empName = employees.find(e => e.id === stepForm.assigned_employee_id)?.name || 'غير معين';
       await supabase.from('workflow_timeline').insert({
         customer_id: customer?.id,
         stage: 'vip_step_update',
-        stage_label: step.step_label,
-        notes: `تحديث خطوة [${step.step_label}] | الحالة: ${stepForm.status} | الموظف: ${empName}`,
+        stage_label: displayLabel,
+        notes: `تحديث خطوة [${displayLabel}] | الحالة: ${stepForm.status} | الموظف: ${empName}`,
         employee_id: profile?.id,
         employee_name: profile?.name,
       });
 
       setEditingStepId(null);
-      setSuccess(`تم تحديث خطوة "${step.step_label}" بنجاح`);
+      setSuccess(`تم تحديث خطوة "${displayLabel}" بنجاح`);
       setTimeout(() => setSuccess(''), 3000);
       loadData();
     } catch (e: any) {
@@ -744,14 +802,24 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
                             {idx + 1}
                           </span>
                           <div>
-                            <h4 className="text-xs font-black text-navy-900">{step.step_label}</h4>
+                            <h4 className="text-xs font-black text-navy-900">{stepLabelMap[step.step_key] || step.step_label}</h4>
                             {!isEditing && (
-                              <p className="text-[10px] text-gray-400 mt-0.5">
-                                الموظف: <span className="font-bold text-navy-800">{assignedEmpName}</span>
-                                {step.execution_date && (
-                                  <> | التاريخ: <span className="font-bold text-navy-800">{step.execution_date}</span></>
-                                )}
-                              </p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-400 mt-0.5">
+                                <span>الموظف المسؤول: <span className="font-bold text-navy-800">{assignedEmpName}</span></span>
+                                {(() => {
+                                  const meta = parseStepNotes(step.department_notes);
+                                  return (
+                                    <>
+                                      {meta.startDate && (
+                                        <span>تاريخ البدء: <span className="font-bold text-navy-800">{meta.startDate}</span></span>
+                                      )}
+                                      {meta.endDate && (
+                                        <span>تاريخ الانتهاء: <span className="font-bold text-navy-800">{meta.endDate}</span></span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -794,7 +862,7 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
 
                       {/* Edit Step Form */}
                       {isEditing && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-4 pt-3.5 border-t border-dashed border-gray-200 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5 mt-4 pt-3.5 border-t border-dashed border-gray-200 text-xs">
                           <div>
                             <label className="form-label text-[10px]">الحالة</label>
                             <select
@@ -817,19 +885,28 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
                             </select>
                           </div>
                           <div>
-                            <label className="form-label text-[10px]">تاريخ التنفيذ</label>
+                            <label className="form-label text-[10px]">تاريخ البدء</label>
                             <input
                               type="date"
-                              value={stepForm.execution_date}
-                              onChange={(e) => setStepForm({ ...stepForm, execution_date: e.target.value })}
+                              value={stepForm.startDate}
+                              onChange={(e) => setStepForm({ ...stepForm, startDate: e.target.value })}
                               className="form-input text-xs py-1.5 bg-white"
                             />
                           </div>
-                          <div className="md:col-span-3">
+                          <div>
+                            <label className="form-label text-[10px]">تاريخ الانتهاء</label>
+                            <input
+                              type="date"
+                              value={stepForm.endDate}
+                              onChange={(e) => setStepForm({ ...stepForm, endDate: e.target.value })}
+                              className="form-input text-xs py-1.5 bg-white"
+                            />
+                          </div>
+                          <div className="md:col-span-4">
                             <label className="form-label text-[10px]">ملاحظات وتوجيهات القسم</label>
                             <textarea
-                              value={stepForm.department_notes}
-                              onChange={(e) => setStepForm({ ...stepForm, department_notes: e.target.value })}
+                              value={stepForm.notes}
+                              onChange={(e) => setStepForm({ ...stepForm, notes: e.target.value })}
                               rows={2}
                               placeholder="أضف تفاصيل إتمام الخطوة أو المعوقات أو أي ملاحظات..."
                               className="form-input text-xs py-1.5 resize-none bg-white"
@@ -839,11 +916,17 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
                       )}
 
                       {/* Step notes display */}
-                      {!isEditing && step.department_notes && (
-                        <div className="mt-2.5 bg-white/60 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
-                          <Info size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                          <p className="text-[10px] text-gray-600 italic leading-relaxed">{step.department_notes}</p>
-                        </div>
+                      {!isEditing && (
+                        (() => {
+                          const meta = parseStepNotes(step.department_notes);
+                          if (!meta.notes) return null;
+                          return (
+                            <div className="mt-2.5 bg-white/60 p-2.5 rounded-xl border border-gray-100 flex items-start gap-2">
+                              <Info size={13} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                              <p className="text-[10px] text-gray-600 italic leading-relaxed">{meta.notes}</p>
+                            </div>
+                          );
+                        })()
                       )}
                     </div>
                   );

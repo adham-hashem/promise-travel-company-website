@@ -627,6 +627,7 @@ export interface TravelGroup {
   name: string;
   code: string;
   package_id?: string;
+  internal_trip_id?: string;
   travel_date?: string;
   return_date?: string;
   airline?: string;
@@ -639,6 +640,7 @@ export interface TravelGroup {
   notes?: string;
   created_at: string;
   packages?: { name: string; category?: string };
+  internal_trips?: { name: string };
   travel_group_members?: { id: string }[];
   member_count?: number;
 }

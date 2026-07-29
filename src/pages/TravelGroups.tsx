@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
 import {
   Plus, Search, X, Loader2, Users, CalendarDays, Plane,
   Printer, Edit2, Trash2, UserPlus, UserMinus, CheckCircle2,
-  Clock, AlertCircle, Hash, Building2, User, Download,
-  ChevronDown, ChevronUp, Package2, ArrowLeft, FileText,
-  RefreshCw, Layers,
+  AlertCircle, Building2, User, Download,
+  Package2, ArrowLeft, RefreshCw, Layers,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import type { TravelGroup, TravelGroupMember, TravelGroupStatus, Package, Customer, Page } from '../types';
 
 // ─── constants ──────────────────────────────────────────────────────────────
@@ -23,7 +21,7 @@ const STATUS_CFG: Record<TravelGroupStatus, { color: string; icon: React.Element
 };
 
 const EMPTY_FORM = {
-  name: '', code: '', package_id: '',
+  name: '', code: '', package_id: '', internal_trip_id: '',
   travel_date: '', return_date: '',
   airline: '', flight_number: '',
   hotel_mecca: '', hotel_medina: '',
@@ -43,12 +41,10 @@ const cap = (filled: number, max: number) => Math.min(Math.round((filled / max) 
 interface Props { onNavigate: (page: Page, id?: string) => void; }
 
 export default function TravelGroups({}: Props) {
-  const { can } = useAuth();
-  const canWrite = can('employees_add'); // permission gate — adjust if needed
-
   // ── data state ──
   const [groups, setGroups] = useState<TravelGroup[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
+  const [internalTrips, setInternalTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ── filter / search ──
@@ -59,6 +55,7 @@ export default function TravelGroups({}: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<TravelGroup | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [groupType, setGroupType] = useState<'package' | 'internal'>('package');
   const [saving, setSaving] = useState(false);
 
   // ── group detail panel ──
@@ -81,13 +78,16 @@ export default function TravelGroups({}: Props) {
     supabase.from('packages').select('id, name, type').then(({ data }) => {
       if (data) setPackages(data as Package[]);
     });
+    supabase.from('internal_trips').select('id, name').then(({ data }) => {
+      if (data) setInternalTrips(data || []);
+    });
   }, []);
 
   const loadGroups = async () => {
     setLoading(true);
     const { data } = await supabase
       .from('travel_groups')
-      .select('*, packages(name), travel_group_members(id)')
+      .select('*, packages(name), internal_trips:internal_trip_id(name), travel_group_members(id)')
       .order('created_at', { ascending: false });
     const processed = ((data || []) as TravelGroup[]).map(g => ({
       ...g,
@@ -108,7 +108,7 @@ export default function TravelGroups({}: Props) {
     setLoadingMembers(false);
   };
 
-  const loadAvailableCustomers = async (groupId: string) => {
+  const loadAvailableCustomers = async (_groupId?: string) => {
     // all active customers NOT already in this group
     const currentIds = members.map(m => m.customer_id);
     const { data } = await supabase
@@ -124,29 +124,35 @@ export default function TravelGroups({}: Props) {
   const openCreate = () => {
     setEditTarget(null);
     setForm({ ...EMPTY_FORM });
+    setGroupType('package');
     setShowForm(true);
   };
 
   const openEdit = (g: TravelGroup) => {
     setEditTarget(g);
     setForm({
-      name: g.name, code: g.code, package_id: g.package_id || '',
+      name: g.name, code: g.code, package_id: g.package_id || '', internal_trip_id: g.internal_trip_id || '',
       travel_date: g.travel_date || '', return_date: g.return_date || '',
       airline: g.airline || '', flight_number: g.flight_number || '',
       hotel_mecca: g.hotel_mecca || '', hotel_medina: g.hotel_medina || '',
       supervisor: g.supervisor || '', max_capacity: g.max_capacity,
       status: g.status, notes: g.notes || '',
     });
+    setGroupType(g.internal_trip_id ? 'internal' : 'package');
     setShowForm(true);
   };
 
   const saveGroup = async () => {
-    if (!form.name.trim() || !form.code.trim() || !form.package_id) return;
+    if (!form.name.trim() || !form.code.trim()) return;
+    if (groupType === 'package' && !form.package_id) return;
+    if (groupType === 'internal' && !form.internal_trip_id) return;
+
     setSaving(true);
     const payload = {
       name: form.name,
       code: form.code.toUpperCase(),
-      package_id: form.package_id || null,
+      package_id: groupType === 'package' ? form.package_id || null : null,
+      internal_trip_id: groupType === 'internal' ? form.internal_trip_id || null : null,
       travel_date: form.travel_date || null,
       return_date: form.return_date || null,
       airline: form.airline || null,
@@ -159,14 +165,14 @@ export default function TravelGroups({}: Props) {
       notes: form.notes || null,
     };
     if (editTarget) {
-      const { data } = await supabase.from('travel_groups').update(payload).eq('id', editTarget.id).select('*, packages(name), travel_group_members(id)').single();
+      const { data } = await supabase.from('travel_groups').update(payload).eq('id', editTarget.id).select('*, packages(name), internal_trips:internal_trip_id(name), travel_group_members(id)').single();
       if (data) {
         const updated = { ...(data as TravelGroup), member_count: (data as TravelGroup).travel_group_members?.length || 0 };
         setGroups(prev => prev.map(g => g.id === editTarget.id ? updated : g));
         if (detailGroup?.id === editTarget.id) setDetailGroup(updated);
       }
     } else {
-      const { data } = await supabase.from('travel_groups').insert(payload).select('*, packages(name), travel_group_members(id)').single();
+      const { data } = await supabase.from('travel_groups').insert(payload).select('*, packages(name), internal_trips:internal_trip_id(name), travel_group_members(id)').single();
       if (data) {
         const created = { ...(data as TravelGroup), member_count: 0 };
         setGroups(prev => [created, ...prev]);
@@ -444,7 +450,12 @@ export default function TravelGroups({}: Props) {
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-600 mb-3">
                     {g.packages?.name && (
                       <span className="flex items-center gap-1 col-span-2 text-gold-700 font-semibold">
-                        <Package2 size={11} />{g.packages.name}
+                        <Package2 size={11} />{g.packages.name} (حج/عمرة)
+                      </span>
+                    )}
+                    {(g as any).internal_trips?.name && (
+                      <span className="flex items-center gap-1 col-span-2 text-emerald-700 font-semibold">
+                        <Package2 size={11} />{(g as any).internal_trips.name} (رحلة داخلية)
                       </span>
                     )}
                     {(g.travel_date || g.return_date) && (
@@ -532,7 +543,7 @@ export default function TravelGroups({}: Props) {
             </div>
             <div className="p-6 space-y-4">
               {/* Row 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
                   <label className="form-label">اسم الفوج *</label>
                   <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -544,12 +555,39 @@ export default function TravelGroups({}: Props) {
                     className="form-input font-mono" placeholder="UG-001" dir="ltr" />
                 </div>
                 <div>
-                  <label className="form-label">الباقة *</label>
-                  <select value={form.package_id} onChange={e => setForm(f => ({ ...f, package_id: e.target.value }))}
-                    className="form-input">
-                    <option value="">اختر الباقة</option>
-                    {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <label className="form-label">نوع الفوج / الرحلة *</label>
+                  <select
+                    value={groupType}
+                    onChange={(e) => {
+                      setGroupType(e.target.value as 'package' | 'internal');
+                      setForm(f => ({ ...f, package_id: '', internal_trip_id: '' }));
+                    }}
+                    className="form-input"
+                  >
+                    <option value="package">حج / عمرة (برنامج سياحي)</option>
+                    <option value="internal">رحلة داخلية</option>
                   </select>
+                </div>
+                <div className="sm:col-span-2">
+                  {groupType === 'package' ? (
+                    <>
+                      <label className="form-label">الباقة المرتبطة *</label>
+                      <select value={form.package_id} onChange={e => setForm(f => ({ ...f, package_id: e.target.value }))}
+                        className="form-input">
+                        <option value="">اختر الباقة</option>
+                        {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className="form-label">الرحلة الداخلية المرتبطة *</label>
+                      <select value={form.internal_trip_id} onChange={e => setForm(f => ({ ...f, internal_trip_id: e.target.value }))}
+                        className="form-input">
+                        <option value="">اختر الرحلة الداخلية</option>
+                        {internalTrips.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -629,7 +667,12 @@ export default function TravelGroups({}: Props) {
                 <button onClick={() => setShowForm(false)} className="btn-outline py-2 px-5 text-sm">إلغاء</button>
                 <button
                   onClick={saveGroup}
-                  disabled={!form.name.trim() || !form.code.trim() || !form.package_id || saving}
+                  disabled={
+                    !form.name.trim() ||
+                    !form.code.trim() ||
+                    (groupType === 'package' ? !form.package_id : !form.internal_trip_id) ||
+                    saving
+                  }
                   className="btn-gold py-2 px-6 text-sm disabled:opacity-50"
                 >
                   {saving ? <Loader2 size={15} className="animate-spin inline ml-1" /> : null}
@@ -649,7 +692,9 @@ export default function TravelGroups({}: Props) {
             <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-3xl bg-navy-900 text-white">
               <div>
                 <h3 className="font-bold text-lg leading-tight">{detailGroup.name}</h3>
-                <p className="text-navy-300 text-xs font-mono">{detailGroup.code} · {detailGroup.packages?.name || 'بدون باقة'}</p>
+                <p className="text-navy-300 text-xs font-mono">
+                  {detailGroup.code} · {detailGroup.packages?.name || (detailGroup as any).internal_trips?.name || 'بدون برنامج'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={exportCSV} title="تصدير Excel/CSV"
