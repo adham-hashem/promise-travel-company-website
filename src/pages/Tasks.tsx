@@ -67,6 +67,29 @@ export default function Tasks({}: Props) {
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
   const [sendingUpdate, setSendingUpdate] = useState<string | null>(null);
   const [expandedUpdates, setExpandedUpdates] = useState<Record<string, boolean>>({});
+  const [lastViewedUpdates, setLastViewedUpdates] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('last_viewed_task_updates');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const markUpdatesAsRead = (taskId: string) => {
+    const now = new Date().toISOString();
+    const updated = { ...lastViewedUpdates, [taskId]: now };
+    setLastViewedUpdates(updated);
+    localStorage.setItem('last_viewed_task_updates', JSON.stringify(updated));
+  };
+
+  const toggleUpdates = (taskId: string) => {
+    const isExpanding = !expandedUpdates[taskId];
+    setExpandedUpdates(prev => ({ ...prev, [taskId]: isExpanding }));
+    if (isExpanding) {
+      markUpdatesAsRead(taskId);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -186,6 +209,7 @@ export default function Tasks({}: Props) {
         setNewUpdateText(prev => ({ ...prev, [taskId]: '' }));
         // Auto-expand updates after sending
         setExpandedUpdates(prev => ({ ...prev, [taskId]: true }));
+        markUpdatesAsRead(taskId);
       }
     } finally {
       setSendingUpdate(null);
@@ -316,8 +340,14 @@ export default function Tasks({}: Props) {
               return (
                 <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]} relative`}>
                       <StatusIcon size={18} />
+                      {t.status === 'جديدة' && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -333,11 +363,24 @@ export default function Tasks({}: Props) {
                       {(taskUpdates[t.id] || []).length > 0 && (
                         <div className="mt-2 mb-2">
                           <button
-                            onClick={() => setExpandedUpdates(prev => ({ ...prev, [t.id]: !prev[t.id] }))}
+                            onClick={() => toggleUpdates(t.id)}
                             className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors mb-1.5"
                           >
                             <MessageSquare size={12} />
                             المستجدات ({taskUpdates[t.id].length})
+                            {(() => {
+                              const updates = taskUpdates[t.id] || [];
+                              if (updates.length === 0) return false;
+                              const latestUpdate = updates[updates.length - 1];
+                              if (latestUpdate.employee_id === profile?.id) return false;
+                              const lastTime = lastViewedUpdates[t.id];
+                              return !lastTime || new Date(latestUpdate.created_at) > new Date(lastTime);
+                            })() && !expandedUpdates[t.id] && (
+                              <span className="relative flex h-1.5 w-1.5 mr-1">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                              </span>
+                            )}
                             {expandedUpdates[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                           </button>
 

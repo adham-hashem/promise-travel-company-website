@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, CalendarCheck, Package,
   Tag, UserCog, BarChart3, Settings, LogOut,
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { Page } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import type { Permissions } from '../lib/permissions';
 
 interface NavItem {
@@ -140,6 +141,68 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
   const { profile, can, canAccessPage } = useAuth();
   const isSuper = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
 
+  const [hasNewTasksOrUpdates, setHasNewTasksOrUpdates] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    
+    const checkTasks = async () => {
+      try {
+        const isManager = profile.role === 'super_admin' || profile.role === 'مالك النظام' || profile.role === 'مدير النظام';
+        let query = supabase.from('tasks').select('id, status, created_at');
+        if (!isManager) {
+          query = query.eq('employee_id', profile.id);
+        }
+        const { data: tasksData } = await query;
+        if (!tasksData) return;
+        
+        // 1. Check if there are any new tasks (status === 'جديدة')
+        const hasNewTask = tasksData.some(t => t.status === 'جديدة');
+        if (hasNewTask) {
+          setHasNewTasksOrUpdates(true);
+          return;
+        }
+
+        // 2. Check if there are any unread task updates/comments
+        const taskIds = tasksData.map(t => t.id);
+        if (taskIds.length > 0) {
+          const { data: updatesData } = await supabase
+            .from('task_updates')
+            .select('task_id, created_at, employee_id')
+            .in('task_id', taskIds);
+          
+          if (updatesData) {
+            // Load last viewed timestamps from local storage
+            let lastViewed: Record<string, string> = {};
+            try {
+              const saved = localStorage.getItem('last_viewed_task_updates');
+              if (saved) lastViewed = JSON.parse(saved);
+            } catch {}
+            
+            const hasUnreadUpdate = updatesData.some(u => {
+              if (u.employee_id === profile.id) return false;
+              const lastTime = lastViewed[u.task_id];
+              return !lastTime || new Date(u.created_at) > new Date(lastTime);
+            });
+            
+            if (hasUnreadUpdate) {
+              setHasNewTasksOrUpdates(true);
+              return;
+            }
+          }
+        }
+        
+        setHasNewTasksOrUpdates(false);
+      } catch (err) {
+        console.error('Error checking new tasks:', err);
+      }
+    };
+
+    checkTasks();
+    const interval = setInterval(checkTasks, 30000);
+    return () => clearInterval(interval);
+  }, [profile]);
+
   const defaultOpen: Record<string, boolean> = {};
   NAV_SECTIONS.forEach(s => {
     defaultOpen[s.id] = (SECTION_ACTIVE_PAGES[s.id] ?? []).includes(currentPage);
@@ -212,7 +275,13 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
               >
                 <SectionIcon size={16} className={sectionActive || isOpen ? 'text-gold-400' : 'text-gold-400/60'} />
                 <span className="flex-1 text-xs font-semibold text-right">{section.label}</span>
-                {sectionActive && !isOpen && (
+                {section.id === 'home' && hasNewTasksOrUpdates && !isOpen && (
+                  <span className="relative flex h-2 w-2 ml-1 flex-shrink-0 animate-pulse">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  </span>
+                )}
+                {sectionActive && !isOpen && (!hasNewTasksOrUpdates || section.id !== 'home') && (
                   <div className="w-1.5 h-1.5 rounded-full bg-gold-400 flex-shrink-0" />
                 )}
                 <ChevronDown
@@ -238,7 +307,13 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
                         }`}
                       >
                         <ItemIcon size={14} className={isActive ? 'text-navy-900' : 'text-gold-400/70'} />
-                        <span>{item.label}</span>
+                        <span className="flex-1 text-right">{item.label}</span>
+                        {item.id === 'tasks' && hasNewTasksOrUpdates && (
+                          <span className="relative flex h-2 w-2 mr-auto flex-shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                          </span>
+                        )}
                       </button>
                     );
                   })}
