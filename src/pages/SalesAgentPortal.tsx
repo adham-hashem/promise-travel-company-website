@@ -106,7 +106,7 @@ export default function SalesAgentPortal() {
         roleStr === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
-        .select('*, packages(*), employees(*), user_profiles:assigned_employee_id(name)');
+        .select('*, packages(*), employees(*), user_profiles:assigned_employee_id(name, role)');
       
       if (!isSuperOrAdmin && profile?.id) {
         custQuery = custQuery.eq('assigned_employee_id', profile.id);
@@ -124,7 +124,11 @@ export default function SalesAgentPortal() {
       const allCustomers = (custData as Customer[]) || [];
       // Filter drafts vs submitted
       setDrafts(allCustomers.filter(c => (c as any).sales_agent_submitted === false));
-      setSubmitted(allCustomers.filter(c => (c as any).sales_agent_submitted === true));
+      setSubmitted(allCustomers.filter(c => {
+        if ((c as any).sales_agent_submitted === false) return false;
+        const role = (c as any).user_profiles?.role || c.employees?.role;
+        return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
+      }));
     } catch (e) {
       console.error(e);
     } finally {
