@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CustomerStatus, Page } from '../types';
 

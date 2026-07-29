@@ -592,7 +592,7 @@ export default function VisaManagement({ onNavigate }: Props) {
                 )}
                 {selected.customer_id && (
                   <button
-                    onClick={() => revertCustomerFromVisa(selected.customer_id, selected.full_name)}
+                    onClick={() => revertCustomerFromVisa(selected.customer_id!, selected.full_name)}
                     className="text-xs text-amber-700 font-semibold hover:underline flex items-center gap-1"
                   >
                     <Undo2 size={12} /> إرجاع العميل لمرحلة سابقة
