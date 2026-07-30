@@ -107,7 +107,7 @@ export default function VisaManagement({ onNavigate }: Props) {
     const prevStage = workflowStagesOrder[currentIdx - 1];
     const currentLabel = stageArabicNames[opFile.workflow_stage] || opFile.workflow_stage;
     const prevLabel = stageArabicNames[prevStage] || prevStage;
-    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${customerName}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${customerName}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
     if (!window.confirm(confirmMsg)) return;
     const { error } = await supabase
       .from('operation_files')

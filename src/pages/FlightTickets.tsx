@@ -106,7 +106,7 @@ export default function FlightTickets({ onNavigate }: Props) {
     const prevStage = workflowStagesOrder[currentIdx - 1];
     const currentLabel = stageArabicNames[r.workflow_stage] || r.workflow_stage;
     const prevLabel = stageArabicNames[prevStage] || prevStage;
-    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${r.customer_name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${r.customer_name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
     if (!window.confirm(confirmMsg)) return;
     // Find the operation_file by customer_id to update its workflow_stage
     const { error } = await supabase

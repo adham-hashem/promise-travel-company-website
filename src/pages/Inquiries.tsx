@@ -440,7 +440,7 @@ export default function Inquiries() {
 
   const revertInquiryConversion = async (inq: Inquiry) => {
     if (!inq.converted_customer_id) return;
-    const confirmMsg = `هل تريد إلغاء تحويل الاستعلام وإرجاعه للحالة السابقة؟\n\nسيتم حذف العميل المرتبط "${inq.customer_name}" وجميع ملفات الحجز والتشغيل والحسابات المرتبطة به نهائياً.`;
+    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء تحويل الاستعلام وإرجاعه للحالة السابقة؟\n\nسيتم حذف العميل المرتبط "${inq.customer_name}" وجميع ملفات الحجز والتشغيل والحسابات المرتبطة به نهائياً.`;
     if (!window.confirm(confirmMsg)) return;
 
     setLoading(true);

@@ -330,7 +330,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     const prevStage = workflowStagesOrder[currentIdx - 1];
     const currentLabel = stageArabicLabels[file.workflow_stage || 'new'] || file.workflow_stage;
     const prevLabel = stageArabicLabels[prevStage] || prevStage;
-    const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
     if (!window.confirm(confirmMsg)) return;
 
     setSaving(true);
@@ -633,7 +633,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                               title={`إلغاء مرحلة "${stage.label}" وجميع المراحل اللاحقة`}
                               onClick={async () => {
                                 const prevStage = workflowStages[i - 1];
-                                const confirmMsg = `هل تريد إلغاء مرحلة "${stage.label}" وإرجاع العميل إلى مرحلة "${prevStage.label}"؟\n\nسيتم أيضاً إلغاء جميع المراحل اللاحقة تلقائياً.`;
+                                const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${stage.label}" وإرجاع العميل إلى مرحلة "${prevStage.label}"؟\n\nسيتم أيضاً إلغاء جميع المراحل اللاحقة تلقائياً.`;
                                 if (!window.confirm(confirmMsg)) return;
                                 await updateFile({ workflow_stage: prevStage.key });
                               }}

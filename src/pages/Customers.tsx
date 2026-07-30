@@ -89,7 +89,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     const currentIdx = workflowStagesOrder.indexOf(currentStage);
 
     if (currentIdx === 0) {
-      const confirmMsg = `هل تريد إلغاء تحويل العميل "${c.name}" إلى الحسابات؟\n\nسيتم حذف ملف التشغيل وإرجاع العميل لقائمة العملاء CRM فقط.`;
+      const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء تحويل العميل "${c.name}" إلى الحسابات؟\n\nسيتم حذف ملف التشغيل وإرجاع العميل لقائمة العملاء CRM فقط.`;
       if (!window.confirm(confirmMsg)) return;
 
       const { error } = await supabase
@@ -109,7 +109,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
       const currentLabel = stageArabicLabels[currentStage] || currentStage;
       const prevLabel = stageArabicLabels[prevStage] || prevStage;
 
-      const confirmMsg = `هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${c.name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
+      const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${c.name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
       if (!window.confirm(confirmMsg)) return;
 
       const { error } = await supabase
