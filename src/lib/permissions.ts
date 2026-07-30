@@ -99,7 +99,9 @@ export type PageKey =
   | 'travel-groups'
   | 'sales-portal'
   | 'vip-dashboard'
-  | 'vip-details';
+  | 'vip-details'
+  | 'internal-groups'
+  | 'quotation-form';
 
 export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'dashboard', label: 'لوحة التحكم', group: 'الرئيسية' },
@@ -124,12 +126,14 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'tasks', label: 'إدارة المهام', group: 'الإدارة والتحكم' },
   { key: 'calendar', label: 'التقويم', group: 'الإدارة والتحكم' },
   { key: 'travel-groups', label: 'الأفواج (Travel Groups)', group: 'قسم التشغيل' },
+  { key: 'internal-groups', label: 'المجموعات (الرحلات الداخلية)', group: 'قسم التشغيل' },
   { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
   { key: 'sales-portal', label: 'بوابة مندوب المبيعات', group: 'إدارة المبيعات والأعمال' },
   { key: 'vip-dashboard', label: 'لوحة عملاء VIP', group: 'إدارة المبيعات والأعمال' },
   { key: 'vip-details', label: 'تفاصيل عميل VIP', group: 'إدارة المبيعات والأعمال' },
+  { key: 'quotation-form', label: 'طلب عرض سعر', group: 'أوامر الطباعة' },
 ];
 
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
@@ -220,7 +224,7 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     documents_upload: true, documents_review: false, documents_view: true, operations_access: false, operations_edit: false, operations_delete: false,
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
-    inquiries_view: false, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
+    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
     vip_management_access: false,
   },
   'محاسب': {
@@ -288,6 +292,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['operations'] = true;
     pages['visa'] = true;
     pages['travel-groups'] = true;
+    pages['internal-groups'] = true;
     pages['vip-dashboard'] = true;
     pages['vip-details'] = true;
   } else if (role === 'إضافة عملاء') {
@@ -306,10 +311,13 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['operations'] = true;
     pages['visa'] = true;
     pages['travel-groups'] = true;
+    pages['internal-groups'] = true;
   } else if (role === 'مسؤول طيران') {
     pages['flight-tickets'] = true;
   } else if (role === 'مندوب مبيعات') {
+    pages['inquiries'] = true;
     pages['sales-portal'] = true;
+    pages['quotation-form'] = true;
     pages['bookings'] = true;
     pages['packages'] = true;
     pages['offers'] = true;
@@ -317,6 +325,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
   } else if (role === 'مدير المبيعات') {
     pages['inquiries'] = true;
     pages['customers'] = true;
+    pages['quotation-form'] = true;
     pages['bookings'] = true;
     pages['packages'] = true;
     pages['offers'] = true;
@@ -331,7 +340,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
 
 export function getRoleHomePage(role: string): PageKey {
   if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') return 'dashboard';
-  if (role === 'مندوب مبيعات') return 'sales-portal';
+  if (role === 'مندوب مبيعات') return 'inquiries';
   if (role === 'مدير المبيعات') return 'inquiries';
   if (role === 'محاسب') return 'payments';
   if (role === 'موظف التشغيل') return 'operations';

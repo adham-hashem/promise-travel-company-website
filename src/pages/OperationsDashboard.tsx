@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 interface OpDoc {
   id: string;
@@ -265,6 +266,38 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
   const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('ar-EG') : '—';
 
+  const handleExportExcel = () => {
+    const data = filtered.map(f => ({
+      'كود العميل': f.customer?.client_code || '—',
+      'اسم العميل': f.customer?.name || '—',
+      'الهاتف': f.customer?.phone || '—',
+      'البرنامج / الباقة': f.booking?.package_name || '—',
+      'الوجهة': f.booking?.destination || '—',
+      'تاريخ السفر': f.travel_date ? new Date(f.travel_date).toLocaleDateString('ar-EG') : '—',
+      'تاريخ العودة': f.return_date ? new Date(f.return_date).toLocaleDateString('ar-EG') : '—',
+      'حالة الملف': f.file_status,
+      'المرحلة': workflowStages.find(w => w.key === f.workflow_stage)?.label || f.workflow_stage || '—',
+      'الموظف المسؤول': f.assigned_employee?.name || '—',
+    }));
+    exportToExcel(data, 'ملفات_التشغيل');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['الكود', 'العميل', 'الهاتف', 'الباقة', 'الوجهة', 'تاريخ السفر', 'حالة الملف', 'المرحلة', 'المسؤول'];
+    const rows = filtered.map(f => [
+      f.customer?.client_code || '—',
+      f.customer?.name || '—',
+      f.customer?.phone || '—',
+      f.booking?.package_name || '—',
+      f.booking?.destination || '—',
+      f.travel_date ? new Date(f.travel_date).toLocaleDateString('ar-EG') : '—',
+      f.file_status,
+      workflowStages.find(w => w.key === f.workflow_stage)?.label || f.workflow_stage || '—',
+      f.assigned_employee?.name || '—',
+    ]);
+    exportToPDF('تقرير ملفات التشغيل والمتابعة', headers, rows);
+  };
+
   const updateFile = async (updates: Record<string, any>) => {
     if (!selected) return;
     setSaving(true);
@@ -319,57 +352,21 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setSaving(false);
   };
 
-  const revertFileStageDirect = async (file: OpFile) => {
-    const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
-    const stageArabicLabels: Record<string, string> = {
-      new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
-      flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
-    };
-    const currentIdx = workflowStagesOrder.indexOf(file.workflow_stage || 'new');
-    if (currentIdx <= 0) return;
-    const prevStage = workflowStagesOrder[currentIdx - 1];
-    const currentLabel = stageArabicLabels[file.workflow_stage || 'new'] || file.workflow_stage;
-    const prevLabel = stageArabicLabels[prevStage] || prevStage;
-    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
-    if (!window.confirm(confirmMsg)) return;
+  const handleDeleteFile = async (file: OpFile) => {
+    const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', file.customer_id).limit(1);
 
-    setSaving(true);
-    const { data, error } = await supabase
-      .from('operation_files')
-      .update({ workflow_stage: prevStage })
-      .eq('id', file.id)
-      .select(`
-        *,
-        customer:customers(*),
-        booking:bookings(*),
-        hotel:hotels(*)
-      `)
-      .single();
-
-    if (error) {
-      alert('فشل إرجاع المرحلة: ' + error.message);
-      setSaving(false);
+    if (hasFlight && hasFlight.length > 0) {
+      alert("لا يمكن حذف الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
       return;
     }
 
-    if (data) {
-      const emp = file.assigned_to
-        ? employees.find((e) => e.id === file.assigned_to) || null
-        : file.assigned_employee;
-      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
-      
-      setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
-      if (selected && selected.id === updated.id) {
-        setSelected(updated);
-      }
-      setStats((s) => ({
-        ...s,
-        ready: files.filter((f) => f.id === updated.id ? updated.file_status === 'جاهز للسفر' : f.file_status === 'جاهز للسفر').length,
-        incomplete: files.filter((f) => f.id === updated.id ? updated.file_status === 'مستندات ناقصة' : f.file_status === 'مستندات ناقصة').length,
-        inProgress: files.filter((f) => f.id === updated.id ? ['قيد التجهيز', 'جديد'].includes(updated.file_status) : ['قيد التجهيز', 'جديد'].includes(f.file_status)).length,
-      }));
-    }
+    if (!confirm('هل أنت متأكد من حذف هذا الملف نهائياً؟')) return;
+    setSaving(true);
+    await supabase.from('operation_files').delete().eq('id', file.id);
+    setFiles(files.filter(f => f.id !== file.id));
+    if (selected?.id === file.id) setSelected(null);
     setSaving(false);
+    alert('تم حذف الملف بنجاح.');
   };
 
   const uploadOpDoc = async (file: File) => {
@@ -410,9 +407,19 @@ export default function OperationsDashboard({ onNavigate }: Props) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="section-title">لوحة التشغيل</h2>
-        <p className="section-subtitle">ملفات التشغيل — إدارة كاملة للعمليات، المستندات، الحسابات، التأشيرات، والطيران</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="section-title">لوحة التشغيل</h2>
+          <p className="section-subtitle">ملفات التشغيل — إدارة كاملة للعمليات، المستندات، الحسابات، التأشيرات، والطيران</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -565,18 +572,16 @@ export default function OperationsDashboard({ onNavigate }: Props) {
 
                     {/* Status */}
                     <div className="flex items-center gap-2.5 flex-shrink-0">
-                      {f.workflow_stage && f.workflow_stage !== 'new' && (
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            await revertFileStageDirect(f);
+                            await handleDeleteFile(f);
                           }}
                           className="text-[11px] py-1.5 px-2.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1 font-bold shadow-xs"
-                          title="إرجاع لمرحلة سابقة"
+                          title="حذف الملف"
                         >
-                          <Undo2 size={11} /> إرجاع
+                          <Trash2 size={11} /> حذف
                         </button>
-                      )}
                       <span className={`badge text-xs ${sc.bg} ${sc.color}`}>{f.file_status}</span>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>

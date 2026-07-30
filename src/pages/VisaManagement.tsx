@@ -87,38 +87,7 @@ export default function VisaManagement({ onNavigate }: Props) {
     flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
   };
 
-  const revertCustomerFromVisa = async (customerId: string, customerName: string) => {
-    // Fetch the customer's operation file to check current workflow_stage
-    const { data: opFiles } = await supabase
-      .from('operation_files')
-      .select('id, workflow_stage')
-      .eq('customer_id', customerId)
-      .limit(1);
-    if (!opFiles || opFiles.length === 0) {
-      alert('لا يوجد ملف تشغيل لهذا العميل.');
-      return;
-    }
-    const opFile = opFiles[0];
-    const currentIdx = workflowStagesOrder.indexOf(opFile.workflow_stage);
-    if (currentIdx <= 0) {
-      alert('العميل في أول مرحلة ولا يمكن الإرجاع.');
-      return;
-    }
-    const prevStage = workflowStagesOrder[currentIdx - 1];
-    const currentLabel = stageArabicNames[opFile.workflow_stage] || opFile.workflow_stage;
-    const prevLabel = stageArabicNames[prevStage] || prevStage;
-    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${customerName}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
-    if (!window.confirm(confirmMsg)) return;
-    const { error } = await supabase
-      .from('operation_files')
-      .update({ workflow_stage: prevStage })
-      .eq('id', opFile.id);
-    if (error) {
-      alert('فشل إرجاع المرحلة: ' + error.message);
-      return;
-    }
-    alert(`تم إرجاع العميل "${customerName}" من "${currentLabel}" إلى "${prevLabel}" بنجاح.`);
-  };
+
 
   const filtered = visas.filter((v) => {
     if (filterStatus && v.visa_status !== filterStatus) return false;
@@ -184,10 +153,20 @@ export default function VisaManagement({ onNavigate }: Props) {
     }
   };
 
-  const deleteVisa = async (id: string) => {
-    await supabase.from('visa_management').delete().eq('id', id);
-    setVisas(visas.filter((v) => v.id !== id));
+  const deleteVisa = async (v: Visa) => {
+    if (v.customer_id) {
+      const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', v.customer_id).limit(1);
+      if (hasFlight && hasFlight.length > 0) {
+        alert("لا يمكن حذف الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
+        return;
+      }
+    }
+
+    if (!confirm('هل أنت متأكد من حذف هذا الملف نهائياً؟')) return;
+    await supabase.from('visa_management').delete().eq('id', v.id);
+    setVisas(visas.filter((x) => x.id !== v.id));
     setSelected(null);
+    alert('تم حذف الملف بنجاح.');
   };
 
   const startEdit = () => {
@@ -551,14 +530,6 @@ export default function VisaManagement({ onNavigate }: Props) {
                 <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-4">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                     <span className="text-sm font-bold text-navy-800 flex items-center gap-2">📝 تعديل بيانات الملف</span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={saveVisa} disabled={saving} className="btn-gold text-xs py-1.5 px-3 flex items-center gap-1">
-                        {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} حفظ التعديلات
-                      </button>
-                      <button onClick={() => setIsEditing(false)} className="btn-outline text-xs py-1.5 px-3">
-                        إلغاء
-                      </button>
-                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div>
@@ -598,6 +569,14 @@ export default function VisaManagement({ onNavigate }: Props) {
                       <label className="form-label">ملاحظات</label>
                       <textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} rows={2} className="form-input text-xs py-1.5 resize-none" />
                     </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 mt-4">
+                    <button onClick={() => setIsEditing(false)} className="btn-outline text-xs py-1.5 px-4">
+                      إلغاء
+                    </button>
+                    <button onClick={saveVisa} disabled={saving} className="btn-gold text-xs py-1.5 px-4 flex items-center gap-1">
+                      {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} حفظ التعديلات
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -747,15 +726,7 @@ export default function VisaManagement({ onNavigate }: Props) {
                 {selected.customer_id && (
                   <button onClick={() => onNavigate('customer-details', selected.customer_id)} className="text-xs text-navy-600 font-semibold hover:underline">عرض ملف العميل ←</button>
                 )}
-                {selected.customer_id && (
-                  <button
-                    onClick={() => revertCustomerFromVisa(selected.customer_id!, selected.full_name)}
-                    className="text-xs text-amber-700 font-semibold hover:underline flex items-center gap-1"
-                  >
-                    <Undo2 size={12} /> إرجاع العميل لمرحلة سابقة
-                  </button>
-                )}
-                <button onClick={() => deleteVisa(selected.id)} className="text-xs text-red-500 font-semibold hover:underline">حذف ملف التأشيرة</button>
+                <button onClick={() => deleteVisa(selected)} className="text-xs text-red-500 font-semibold hover:underline">حذف ملف التأشيرة</button>
               </div>
             </div>
           </div>

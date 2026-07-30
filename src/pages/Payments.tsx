@@ -82,36 +82,7 @@ export default function Payments() {
     setLoading(false);
   };
 
-  // Workflow stages ordered sequence for revert logic
-  const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
-  const stageArabicLabels: Record<string, string> = {
-    new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
-    flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
-  };
 
-  const revertFileStage = async (file: any) => {
-    const currentIdx = workflowStagesOrder.indexOf(file.workflow_stage);
-    if (currentIdx <= 0) return; // Can't revert from 'new'
-    const prevStage = workflowStagesOrder[currentIdx - 1];
-    const currentLabel = stageArabicLabels[file.workflow_stage] || file.workflow_stage;
-    const prevLabel = stageArabicLabels[prevStage] || prevStage;
-    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${file.customer?.name || 'عميل'}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
-    if (!window.confirm(confirmMsg)) return;
-    const { error } = await supabase
-      .from('operation_files')
-      .update({ workflow_stage: prevStage })
-      .eq('id', file.id);
-    if (error) {
-      alert('فشل إرجاع المرحلة: ' + error.message);
-      return;
-    }
-    // Update local state
-    setTransferredFiles((prev: any[]) =>
-      prevStage === 'new'
-        ? prev.filter((f: any) => f.id !== file.id)
-        : prev.map((f: any) => f.id === file.id ? { ...f, workflow_stage: prevStage } : f)
-    );
-  };
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -194,10 +165,25 @@ export default function Payments() {
   };
 
   const handleDelete = async (p: PayRow) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الدفعة؟')) return;
+    const [{ data: hasFlight }, { data: hasOp }] = await Promise.all([
+      supabase.from('flight_tickets').select('id').eq('customer_id', p.customer_id).limit(1),
+      supabase.from('operation_files').select('id').eq('customer_id', p.customer_id).limit(1)
+    ]);
+
+    if (hasFlight && hasFlight.length > 0) {
+      alert("لا يمكن حذف الدفعة لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
+      return;
+    }
+    if (hasOp && hasOp.length > 0) {
+      alert("لا يمكن حذف الدفعة لأن العميل موجود في قسم التشغيل. يجب حذفه من المراحل اللاحقة أولاً.");
+      return;
+    }
+
+    if (!confirm('هل أنت متأكد من حذف هذه الدفعة نهائياً؟')) return;
     if (p.booking_id) await syncBookingPayment(p.booking_id, p.amount, true);
     await supabase.from('payments').delete().eq('id', p.id);
     setPayments(payments.filter(x => x.id !== p.id));
+    alert('تم حذف الدفعة بنجاح.');
   };
 
   const uploadProof = async (file: File) => {
@@ -505,13 +491,6 @@ export default function Payments() {
                         محوّل ✔
                       </span>
                     )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); revertFileStage(file); }}
-                      title={`إرجاع العميل من مرحلة ${stageArabicLabels[file.workflow_stage] || file.workflow_stage}`}
-                      className="text-[11px] py-1.5 px-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1"
-                    >
-                      <Undo2 size={12} /> إرجاع
-                    </button>
                   </div>
                 </div>
               );

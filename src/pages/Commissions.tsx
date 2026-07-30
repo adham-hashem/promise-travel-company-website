@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw, CheckCircle2, Clock, DollarSign, X, Calculator } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { EmployeeCommission, Employee, Booking } from '../types';
-import { exportToExcel } from '../lib/export';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
 
@@ -69,12 +69,33 @@ export default function Commissions() {
   const paidCommission = items.filter(c => c.status === 'مدفوع').reduce((s, c) => s + Number(c.commission_amount || 0), 0);
   const pendingCommission = totalCommission - paidCommission;
 
-  const handleExport = () => {
-    exportToExcel(items.map((c, i) => ({
-      '#': i + 1, 'الموظف': c.user_profiles?.name || '—', 'عدد الحجوزات': c.bookings_count,
-      'إجمالي المبيعات': c.total_sales, 'نسبة العمول': c.commission_rate + '%',
-      'مبلغ العمول': c.commission_amount, 'الفترة': c.period || '', 'الحالة': c.status,
-    })), 'عمولات_الموظفين');
+  const handleExportExcel = () => {
+    const data = items.map((c, i) => ({
+      '#': i + 1,
+      'الموظف': c.user_profiles?.name || '—',
+      'عدد الحجوزات': c.bookings_count,
+      'إجمالي المبيعات': c.total_sales,
+      'نسبة العمول': c.commission_rate + '%',
+      'مبلغ العمول': c.commission_amount,
+      'الفترة': c.period || '',
+      'الحالة': c.status,
+    }));
+    exportToExcel(data, 'عمولات_الموظفين');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['#', 'الموظف', 'عدد الحجوزات', 'إجمالي المبيعات', 'نسبة العمول', 'مبلغ العمول', 'الفترة', 'الحالة'];
+    const rows = items.map((c, i) => [
+      i + 1,
+      c.user_profiles?.name || '—',
+      c.bookings_count,
+      c.total_sales,
+      c.commission_rate + '%',
+      c.commission_amount,
+      c.period || '',
+      c.status,
+    ]);
+    exportToPDF('تقرير عمولات الموظفين', headers, rows);
   };
 
   return (
@@ -85,7 +106,8 @@ export default function Commissions() {
           <p className="section-subtitle">تتبع عمولات المبيعات للموظفين</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="btn-outline">تصدير</button>
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">Excel</button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">PDF</button>
           <button onClick={() => setShowModal(true)} className="btn-gold"><Calculator size={16} /> حساب عمول</button>
         </div>
       </div>

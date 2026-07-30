@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, X, CalendarClock, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Installment, Booking } from '../types';
-import { exportToExcel } from '../lib/export';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 const emptyForm = {
   booking_id: '',
@@ -103,12 +103,28 @@ export default function Installments() {
   const overdue = items.filter(i => i.status === 'متأخر');
   const active = items.filter(i => i.status === 'نشط');
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     exportToExcel(items.map((i, idx) => ({
       '#': idx + 1, 'العميل': i.customers?.name || '—', 'الحجز': i.booking_id?.slice(0, 8) || '—',
       'الإجمالي': i.total_amount, 'المدفوع': i.paid_amount, 'المتبقي': i.remaining_amount,
       'عدد الأقساط': i.number_of_installments, 'القسط التالي': i.next_due_date ? new Date(i.next_due_date).toLocaleDateString('ar-EG') : '—', 'الحالة': i.status,
     })), 'الأقساط');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['#', 'العميل', 'الحجز', 'الإجمالي', 'المدفوع', 'المتبقي', 'عدد الأقساط', 'القسط التالي', 'الحالة'];
+    const rows = items.map((i, idx) => [
+      idx + 1,
+      i.customers?.name || '—',
+      i.booking_id?.slice(0, 8) || '—',
+      i.total_amount,
+      i.paid_amount,
+      i.remaining_amount,
+      i.number_of_installments,
+      i.next_due_date ? new Date(i.next_due_date).toLocaleDateString('ar-EG') : '—',
+      i.status
+    ]);
+    exportToPDF('تقرير الأقساط', headers, rows);
   };
 
   return (
@@ -119,7 +135,8 @@ export default function Installments() {
           <p className="section-subtitle">تتبع الدفعات بالتقسيط</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="btn-outline">تصدير</button>
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">Excel</button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">PDF</button>
           <button onClick={openAdd} className="btn-gold"><Plus size={16} /> إضافة قسط</button>
         </div>
       </div>

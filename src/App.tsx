@@ -35,8 +35,10 @@ import FlightTickets from './pages/FlightTickets';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import SalesAgentPortal from './pages/SalesAgentPortal';
 import TravelGroups from './pages/TravelGroups';
+import InternalGroups from './pages/InternalGroups';
 import VIPDashboard from './pages/VIPDashboard';
 import VIPDetails from './pages/VIPDetails';
+import QuotationForm from './pages/QuotationForm';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
@@ -237,8 +239,10 @@ function AppInner() {
       {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
       {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
       {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
+      {currentPage === 'internal-groups' && canAccessPage('internal-groups') && <InternalGroups onNavigate={navigate} />}
       {currentPage === 'vip-dashboard' && canAccessPage('vip-dashboard') && <VIPDashboard onNavigate={navigate} />}
       {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails customerId={selectedCustomerId} onNavigate={navigate} />}
+      {currentPage === 'quotation-form' && canAccessPage('quotation-form') && <QuotationForm />}
     </Layout></ErrorBoundary>
   );
 }

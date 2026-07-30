@@ -328,10 +328,9 @@ interface DetailModalProps {
   onClose: () => void;
   onEdit: () => void;
   onConvert: () => void;
-  onRevert: () => void;
 }
 
-function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onRevert }: DetailModalProps) {
+function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModalProps) {
   const StatusIcon = STATUS_ICONS[inquiry.status];
   const SourceIcon = SOURCE_ICONS[inquiry.source];
   return (
@@ -396,9 +395,6 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onRevert }: D
             {inquiry.status !== 'تم التحويل' && inquiry.status !== 'مغلق' && (
               <button onClick={onConvert} className="btn-gold justify-center"><ArrowRightLeft size={14} />تحويل</button>
             )}
-            {inquiry.status === 'تم التحويل' && inquiry.converted_customer_id && (
-              <button onClick={onRevert} className="btn-outline border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 justify-center flex items-center gap-1 font-bold"><Undo2 size={14} />إلغاء التحويل</button>
-            )}
           </div>
         </div>
       </div>
@@ -432,45 +428,13 @@ export default function Inquiries() {
 
   useEffect(() => { load(); }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الاستعلام؟')) return;
-    await supabase.from('inquiries').delete().eq('id', id);
-    load();
-  };
-
-  const revertInquiryConversion = async (inq: Inquiry) => {
-    if (!inq.converted_customer_id) return;
-    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء تحويل الاستعلام وإرجاعه للحالة السابقة؟\n\nسيتم حذف العميل المرتبط "${inq.customer_name}" وجميع ملفات الحجز والتشغيل والحسابات المرتبطة به نهائياً.`;
-    if (!window.confirm(confirmMsg)) return;
-
-    setLoading(true);
-    const { error: deleteError } = await supabase
-      .from('customers')
-      .delete()
-      .eq('id', inq.converted_customer_id);
-
-    if (deleteError) {
-      alert('فشل حذف العميل: ' + deleteError.message);
-      setLoading(false);
+  const handleDelete = async (inq: Inquiry) => {
+    if (inq.converted_customer_id) {
+      alert('لا يمكن حذف الاستعلام لأنه تم تحويله ولا يزال موجوداً في مرحلة العملاء (CRM) أو الحسابات. يجب حذفه من المراحل التالية أولاً.');
       return;
     }
-
-    const { error: updateError } = await supabase
-      .from('inquiries')
-      .update({
-        status: 'جديد',
-        converted_customer_id: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', inq.id);
-
-    if (updateError) {
-      alert('فشل تحديث الاستعلام: ' + updateError.message);
-      setLoading(false);
-      return;
-    }
-
-    alert('تم إلغاء تحويل الاستعلام بنجاح وإرجاعه لقائمة الاستعلامات.');
+    if (!confirm('هل أنت متأكد من حذف هذا الاستعلام نهائياً؟')) return;
+    await supabase.from('inquiries').delete().eq('id', inq.id);
     load();
   };
 
@@ -672,17 +636,8 @@ export default function Inquiries() {
                           {inq.status !== 'تم التحويل' && inq.status !== 'مغلق' && can('inquiries_edit') && (
                             <button onClick={() => setConvertInquiry(inq)} className="p-1.5 hover:bg-emerald-50 rounded-lg text-gray-500 hover:text-emerald-600" title="تحويل"><ArrowRightLeft size={15} /></button>
                           )}
-                          {inq.status === 'تم التحويل' && inq.converted_customer_id && can('inquiries_edit') && (
-                            <button
-                              onClick={() => revertInquiryConversion(inq)}
-                              className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 hover:text-red-600"
-                              title="إلغاء التحويل وإرجاع الاستعلام"
-                            >
-                              <Undo2 size={15} />
-                            </button>
-                          )}
                           {can('inquiries_delete') && (
-                            <button onClick={() => handleDelete(inq.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600"><Trash2 size={15} /></button>
+                            <button onClick={() => handleDelete(inq)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600"><Trash2 size={15} /></button>
                           )}
                         </div>
                       </td>
@@ -709,7 +664,6 @@ export default function Inquiries() {
           onClose={() => setDetailInquiry(null)}
           onEdit={() => { setEditInquiry(detailInquiry); setDetailInquiry(null); setShowModal(true); }}
           onConvert={() => { setConvertInquiry(detailInquiry); setDetailInquiry(null); }}
-          onRevert={() => { revertInquiryConversion(detailInquiry); setDetailInquiry(null); }}
         />
       )}
       {convertInquiry && (

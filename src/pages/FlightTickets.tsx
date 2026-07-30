@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plane, Plus, X, Loader2, Search, Upload, Eye, Download,
-  FileText, CheckCircle2, Clock, User, Ticket, Undo2,
+  FileText, CheckCircle2, Clock, User, Ticket, Undo2, Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { FlightTicket, Page } from '../types';
 
 const emptyForm = {
@@ -93,39 +94,15 @@ export default function FlightTickets({ onNavigate }: Props) {
     setLoading(false);
   };
 
-  // Workflow stages ordered sequence for revert logic
-  const workflowStagesOrder = ['new', 'accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
-  const stageArabicNames: Record<string, string> = {
-    new: 'جديد', accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
-    flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
-  };
-
-  const revertCustomerStage = async (r: typeof readyCustomers[0]) => {
-    const currentIdx = workflowStagesOrder.indexOf(r.workflow_stage);
-    if (currentIdx <= 0) return;
-    const prevStage = workflowStagesOrder[currentIdx - 1];
-    const currentLabel = stageArabicNames[r.workflow_stage] || r.workflow_stage;
-    const prevLabel = stageArabicNames[prevStage] || prevStage;
-    const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${r.customer_name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
-    if (!window.confirm(confirmMsg)) return;
-    // Find the operation_file by customer_id to update its workflow_stage
-    const { error } = await supabase
-      .from('operation_files')
-      .update({ workflow_stage: prevStage })
-      .eq('customer_id', r.customer_id);
+  const handleDeleteReadyCustomer = async (r: typeof readyCustomers[0]) => {
+    if (!confirm(`هل أنت متأكد من حذف العميل "${r.customer_name}" من قسم الطيران نهائياً؟\nسيتم حذف ملف التشغيل الخاص به.`)) return;
+    const { error } = await supabase.from('operation_files').delete().eq('customer_id', r.customer_id);
     if (error) {
-      alert('فشل إرجاع المرحلة: ' + error.message);
+      alert('فشل الحذف: ' + error.message);
       return;
     }
-    // Update local state — if reverting to a stage before 'flight', remove from list; otherwise update
-    const prevIdx = workflowStagesOrder.indexOf(prevStage);
-    const flightIdx = workflowStagesOrder.indexOf('flight');
-    if (prevIdx < flightIdx) {
-      // Customer no longer in flight+ stages, remove from the readyCustomers list
-      setReadyCustomers(prev => prev.filter(c => c.customer_id !== r.customer_id));
-    } else {
-      setReadyCustomers(prev => prev.map(c => c.customer_id === r.customer_id ? { ...c, workflow_stage: prevStage } : c));
-    }
+    setReadyCustomers(prev => prev.filter(c => c.customer_id !== r.customer_id));
+    alert('تم حذف العميل بنجاح.');
   };
 
   const filteredReady = readyCustomers.filter(r => {
@@ -219,8 +196,51 @@ export default function FlightTickets({ onNavigate }: Props) {
     setUploading(false);
   };
 
+  const handleDeleteTicket = async (t: FlightTicket) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذه التذكرة بالكامل؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    const { error } = await supabase.from('flight_tickets').delete().eq('id', t.id);
+    if (error) {
+      alert('خطأ في حذف التذكرة: ' + error.message);
+      return;
+    }
+    if (t.ticket_file_path) {
+      await supabase.storage.from('documents').remove([t.ticket_file_path]);
+    }
+    setTickets(tickets.filter(x => x.id !== t.id));
+    if (selectedTicket?.id === t.id) setSelectedTicket(null);
+  };
+
   const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('ar-EG') : '—';
   const fmtDateTime = (d?: string) => d ? new Date(d).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+  const handleExportExcel = () => {
+    const data = filteredTickets.map(t => ({
+      'PNR': t.pnr,
+      'اسم العميل': t.customers?.name || '—',
+      'شركة الطيران': t.airline,
+      'رقم الرحلة': t.flight_number,
+      'مطار المغادرة': t.departure_airport,
+      'مطار الوصول': t.arrival_airport,
+      'تاريخ المغادرة': t.departure_datetime ? new Date(t.departure_datetime).toLocaleDateString('ar-EG') : '—',
+      'رقم التذكرة الإلكترونية': t.e_ticket_number || '—',
+    }));
+    exportToExcel(data, 'تذاكر_الطيران');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['PNR', 'اسم العميل', 'شركة الطيران', 'رقم الرحلة', 'المغادرة', 'الوصول', 'تاريخ المغادرة', 'رقم التذكرة'];
+    const rows = filteredTickets.map(t => [
+      t.pnr,
+      t.customers?.name || '—',
+      t.airline,
+      t.flight_number,
+      t.departure_airport,
+      t.arrival_airport,
+      t.departure_datetime ? new Date(t.departure_datetime).toLocaleDateString('ar-EG') : '—',
+      t.e_ticket_number || '—',
+    ]);
+    exportToPDF('تقرير تذاكر الطيران الصادرة', headers, rows);
+  };
 
   return (
     <div className="space-y-5">
@@ -229,9 +249,17 @@ export default function FlightTickets({ onNavigate }: Props) {
           <h2 className="section-title">قسم الطيران</h2>
           <p className="section-subtitle">إصدار تذاكر الطيران والملفات الجاهزة للإصدار</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-gold">
-          <Plus size={16} /> إصدار تذكرة
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={() => setShowForm(!showForm)} className="btn-gold">
+            <Plus size={16} /> إصدار تذكرة
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -314,11 +342,11 @@ export default function FlightTickets({ onNavigate }: Props) {
                     </button>
                   )}
                   <button
-                    onClick={() => revertCustomerStage(r)}
-                    title={`إرجاع العميل من مرحلة ${stageArabicNames[r.workflow_stage] || r.workflow_stage}`}
+                    onClick={() => handleDeleteReadyCustomer(r)}
+                    title="حذف العميل من قسم الطيران"
                     className="w-full text-xs py-2 mt-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <Undo2 size={13} /> إرجاع لمرحلة سابقة
+                    <Trash2 size={13} /> حذف العميل
                   </button>
                 </div>
               );
@@ -358,7 +386,10 @@ export default function FlightTickets({ onNavigate }: Props) {
                     <td className="text-gray-500 text-xs">{fmtDateTime(t.departure_datetime)}</td>
                     <td className="font-mono text-xs text-navy-600">{t.e_ticket_number || '—'}</td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => setSelectedTicket(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"><Eye size={15} /></button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setSelectedTicket(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="عرض"><Eye size={15} /></button>
+                        <button onClick={() => handleDeleteTicket(t)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={15} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}

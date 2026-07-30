@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Eye, Pencil, Trash2, X, Phone,
   MapPin, CheckCircle2, AlertCircle, Loader2, Send, FileText, Upload,
-  User, Package as PackageIcon, Mail
+  User, Package as PackageIcon, Mail, Download, FileSpreadsheet
 } from 'lucide-react';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Customer, Package, ServiceType } from '../types';
@@ -43,19 +44,17 @@ const emptyForm = {
 export default function SalesAgentPortal() {
   const { profile } = useAuth();
   const roleStr = (profile?.role as string) || '';
-  const isSuperOrAdmin =
+  const isSuperAdminOnly =
     roleStr === 'super_admin' ||
     roleStr === 'superadmin' ||
-    roleStr === 'admin' ||
-    roleStr === 'مالك النظام' ||
-    roleStr === 'مدير النظام';
+    roleStr === 'مالك النظام';
 
   const [drafts, setDrafts] = useState<Customer[]>([]);
   const [submitted, setSubmitted] = useState<Customer[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'drafts' | 'submitted'>('drafts');
-  const isDrafts = !(isSuperOrAdmin && activeTab === 'submitted');
+  const isDrafts = !(isSuperAdminOnly && activeTab === 'submitted');
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -110,7 +109,7 @@ export default function SalesAgentPortal() {
         .from('customers')
         .select('*, packages(*), employees(*)');
       
-      if (!isSuperOrAdmin && profile?.id) {
+      if (!isSuperAdminOnly && profile?.id) {
         custQuery = custQuery.eq('assigned_employee_id', profile.id);
       }
       
@@ -125,14 +124,17 @@ export default function SalesAgentPortal() {
       
       const allCustomers = (custData as Customer[]) || [];
       
-      // Filter only customers added by sales agents (source is 'مندوب مبيعات' or starts with 'مندوب:')
+      // Filter only customers actually assigned to sales agents or the current user
       const salesAgentCustomers = allCustomers.filter(c => {
-        return c.source && (c.source === 'مندوب مبيعات' || c.source.startsWith('مندوب:'));
+        const isAgentSource = c.source && (c.source.startsWith('مندوب') || c.source.startsWith('مسودة: مندوب'));
+        const role = c.employees?.role || '';
+        const isAddedByAgent = role === 'مندوب مبيعات' || role === 'مدير المبيعات' || c.assigned_employee_id === profile?.id;
+        return isAgentSource && isAddedByAgent;
       });
 
       // Filter drafts vs submitted
-      setDrafts(salesAgentCustomers.filter(c => (c as any).sales_agent_submitted === false));
-      setSubmitted(salesAgentCustomers.filter(c => (c as any).sales_agent_submitted === true));
+      setDrafts(salesAgentCustomers.filter(c => c.source && c.source.startsWith('مسودة:')));
+      setSubmitted(salesAgentCustomers.filter(c => c.source && !c.source.startsWith('مسودة:')));
     } catch (e) {
       console.error(e);
     } finally {
@@ -158,7 +160,7 @@ export default function SalesAgentPortal() {
       service_type: c.service_type || '',
       requested_package_id: c.requested_package_id || '',
       notes: c.notes || '',
-      source: c.source ? c.source.replace(/^مندوب:\s*/, '') : 'مندوب مبيعات',
+      source: c.source ? c.source.replace(/^مسودة:\s*/, '').replace(/^مندوب:\s*/, '') : 'مندوب مبيعات',
     });
     setDocUploads(Object.fromEntries(docTypes.map((d) => [d.id, { type: d.id, file: null, uploaded: false }])));
     setError('');
@@ -185,6 +187,7 @@ export default function SalesAgentPortal() {
       let customerId = '';
       if (editCustomer) {
         const formattedSource = form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات';
+        const draftSource = editCustomer.source?.startsWith('مسودة:') ? 'مسودة: ' + formattedSource : formattedSource;
         const { error: err } = await supabase
           .from('customers')
           .update({
@@ -195,13 +198,14 @@ export default function SalesAgentPortal() {
             service_type: form.service_type || null,
             requested_package_id: form.requested_package_id || null,
             notes: form.notes || null,
-            source: formattedSource,
+            source: draftSource,
           })
           .eq('id', editCustomer.id);
         if (err) throw err;
         customerId = editCustomer.id;
       } else {
         const formattedSource = form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات';
+        const draftSource = 'مسودة: ' + formattedSource;
         const { data, error: err } = await supabase
           .from('customers')
           .insert({
@@ -213,9 +217,8 @@ export default function SalesAgentPortal() {
             requested_package_id: form.requested_package_id || null,
             assigned_employee_id: profile?.id,
             status: 'جديد',
-            source: formattedSource,
+            source: draftSource,
             notes: form.notes || null,
-            sales_agent_submitted: false,
           })
           .select('id')
           .single();
@@ -307,9 +310,10 @@ export default function SalesAgentPortal() {
     const c = customerToSend;
     setSubmittingId(c.id);
     try {
+      const newSource = c.source?.replace(/^مسودة:\s*/, '') || 'مندوب مبيعات';
       const { error: err } = await supabase
         .from('customers')
-        .update({ sales_agent_submitted: true })
+        .update({ source: newSource })
         .eq('id', c.id);
       
       if (err) throw err;
@@ -352,6 +356,24 @@ export default function SalesAgentPortal() {
     }
   };
 
+  const handleExport = (type: 'pdf' | 'excel') => {
+    const list = isDrafts ? drafts : submitted;
+    const data = list.map(c => ({
+      'الاسم بالكامل': c.name,
+      'رقم الهاتف': c.phone,
+      'نوع الخدمة': c.service_type || 'غير محدد',
+      'الباقة المطلوبة': c.packages?.name || '—',
+      'تاريخ الإضافة': new Date(c.created_at).toLocaleDateString('ar-EG'),
+      'المندوب المسؤول': c.employees?.name || '—'
+    }));
+
+    if (type === 'pdf') {
+      exportToPDF(data, isDrafts ? 'العملاء_المسودات' : 'العملاء_المرسلون_CRM', isDrafts ? 'قائمة مسودات العملاء - بوابة المندوب' : 'قائمة العملاء المرسلون لـ CRM - بوابة المندوب');
+    } else {
+      exportToExcel(data, isDrafts ? 'العملاء_المسودات' : 'العملاء_المرسلون_CRM');
+    }
+  };
+
   return (
     <div className="space-y-5" dir="rtl">
       {/* Top Banner */}
@@ -360,9 +382,19 @@ export default function SalesAgentPortal() {
           <h2 className="section-title">بوابة مندوب المبيعات</h2>
           <p className="section-subtitle">إضافة العملاء والملفات وتحويلهم إلى نظام CRM لمتابعتهم</p>
         </div>
-        <button onClick={handleOpenAdd} className="btn-gold">
-          <Plus size={16} /> إضافة عميل جديد
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2">
+            <button onClick={() => handleExport('excel')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير Excel">
+              <FileSpreadsheet size={14} className="text-emerald-600" /> تصدير
+            </button>
+            <button onClick={() => handleExport('pdf')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير PDF">
+              <Download size={14} className="text-red-500" /> PDF
+            </button>
+          </div>
+          <button onClick={handleOpenAdd} className="btn-gold">
+            <Plus size={16} /> إضافة عميل جديد
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -377,7 +409,7 @@ export default function SalesAgentPortal() {
         >
           العملاء المضافون (مسودات) ({drafts.length})
         </button>
-        {isSuperOrAdmin && (
+        {isSuperAdminOnly && (
           <button
             onClick={() => setActiveTab('submitted')}
             className={`px-5 py-2.5 font-bold text-xs transition-all border-b-2 ${

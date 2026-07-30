@@ -4,6 +4,7 @@ import {
   Pencil, Trash2, X, CheckCircle, Clock, AlertCircle, Phone,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { useAuth } from '../contexts/AuthContext';
 import type { Invoice, InvoicePaymentStatus, InvoiceServiceType, Customer, Hotel } from '../types';
 
@@ -374,6 +375,40 @@ export default function Invoices() {
     return matchSearch && matchStatus;
   });
 
+  const handleExport = (type: 'pdf' | 'excel') => {
+    const data = filtered.map(inv => ({
+      'رقم الفاتورة': inv.invoice_number,
+      'اسم العميل': inv.customers?.name || '—',
+      'رقم الهاتف': inv.customers?.phone || '—',
+      'نوع الخدمة': inv.service_type || '—',
+      'اسم الباقة / الخدمة': inv.package_name || '—',
+      'الإجمالي': inv.total_amount,
+      'المدفوع': inv.paid_amount,
+      'المتبقي': inv.total_amount - inv.paid_amount,
+      'حالة الدفع': inv.payment_status,
+      'تاريخ الفاتورة': new Date(inv.created_at).toLocaleDateString('ar-EG'),
+    }));
+
+    if (type === 'pdf') {
+      const headers = ['رقم الفاتورة', 'اسم العميل', 'رقم الهاتف', 'نوع الخدمة', 'الباقة', 'الإجمالي', 'المدفوع', 'المتبقي', 'حالة الدفع', 'التاريخ'];
+      const rows = filtered.map(inv => [
+        inv.invoice_number,
+        inv.customers?.name || '—',
+        inv.customers?.phone || '—',
+        inv.service_type || '—',
+        inv.package_name || '—',
+        `${inv.total_amount} ج.م`,
+        `${inv.paid_amount} ج.م`,
+        `${inv.total_amount - inv.paid_amount} ج.م`,
+        inv.payment_status,
+        new Date(inv.created_at).toLocaleDateString('ar-EG'),
+      ]);
+      exportToPDF('تقرير_الفواتير', headers, rows);
+    } else {
+      exportToExcel(data, 'تقرير_الفواتير');
+    }
+  };
+
   const stats = {
     total: invoices.length,
     unpaid: invoices.filter(i => i.payment_status === 'غير مدفوع').length,
@@ -390,11 +425,21 @@ export default function Invoices() {
           <h1 className="text-2xl font-bold text-navy-900">الفواتير</h1>
           <p className="text-gray-500 text-sm mt-0.5">إدارة وطباعة فواتير العملاء</p>
         </div>
-        {can('invoices_add') && (
-          <button onClick={() => { setEditInvoice(null); setShowModal(true); }} className="btn-gold">
-            <Plus size={18} /> إنشاء فاتورة
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2">
+            <button onClick={() => handleExport('excel')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير Excel">
+              <Download size={14} className="text-emerald-600" /> Excel
+            </button>
+            <button onClick={() => handleExport('pdf')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير PDF">
+              <Download size={14} className="text-red-500" /> PDF
+            </button>
+          </div>
+          {can('invoices_add') && (
+            <button onClick={() => { setEditInvoice(null); setShowModal(true); }} className="btn-gold">
+              <Plus size={18} /> إنشاء فاتورة
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

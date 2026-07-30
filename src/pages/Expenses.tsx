@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Loader2, X, Receipt } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Expense, ExpenseCategory } from '../types';
-import { exportToExcel } from '../lib/export';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 const emptyForm = { name: '', category: 'أخرى' as ExpenseCategory, amount: '', expense_date: new Date().toISOString().split('T')[0], notes: '' };
 const categories: ExpenseCategory[] = ['رواتب', 'تسويق', 'تشغيل', 'فنادق', 'نقل', 'إعلانات', 'إيجار', 'أخرى'];
@@ -64,11 +64,24 @@ export default function Expenses() {
   const total = items.reduce((s, e) => s + Number(e.amount || 0), 0);
   const byCategory = categories.map(c => ({ cat: c, total: items.filter(e => e.category === c).reduce((s, e) => s + Number(e.amount || 0), 0) }));
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
     exportToExcel(items.map((e, i) => ({
       '#': i + 1, 'الاسم': e.name, 'الفئة': e.category, 'المبلغ': e.amount,
       'التاريخ': new Date(e.expense_date).toLocaleDateString('ar-EG'), 'ملاحظات': e.notes || '',
     })), 'المصروفات');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['#', 'الاسم', 'الفئة', 'المبلغ', 'التاريخ', 'ملاحظات'];
+    const rows = items.map((e, i) => [
+      i + 1,
+      e.name,
+      e.category,
+      e.amount,
+      new Date(e.expense_date).toLocaleDateString('ar-EG'),
+      e.notes || ''
+    ]);
+    exportToPDF('تقرير المصروفات', headers, rows);
   };
 
   return (
@@ -79,7 +92,8 @@ export default function Expenses() {
           <p className="section-subtitle">تتبع مصروفات الشركة</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="btn-outline">تصدير</button>
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">Excel</button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">PDF</button>
           <button onClick={openAdd} className="btn-gold"><Plus size={16} /> إضافة مصروف</button>
         </div>
       </div>

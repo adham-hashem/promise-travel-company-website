@@ -6,7 +6,7 @@ import {
   TrendingUp, Wallet, CalendarClock, Receipt, Calculator,
   FileCheck, Building2, FileText, MessageSquare, Zap,
   ChevronDown, ShoppingBag, DollarSign, MapPin,
-  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers, Crown,
+  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers, Crown, Printer,
 } from 'lucide-react';
 import type { Page } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -101,9 +101,19 @@ const NAV_SECTIONS: NavSection[] = [
     anyPermission: ['reports_view'],
     items: [
       { id: 'internal-trips', label: 'الرحلات', icon: Plane, permissionKey: 'reports_view' },
+      { id: 'internal-groups', label: 'المجموعات الداخلية', icon: Layers, alwaysVisible: true },
       { id: 'internal-bookings', label: 'الحجوزات الداخلية', icon: ClipboardList, permissionKey: 'reports_view' },
       { id: 'internal-customers', label: 'عملاء الرحلات', icon: Users, permissionKey: 'reports_view' },
       { id: 'internal-reports', label: 'تقارير الرحلات', icon: FileBarChart, permissionKey: 'reports_view' },
+    ],
+  },
+  {
+    id: 'print_orders',
+    label: 'أوامر الطباعة',
+    icon: Printer,
+    anyPermission: ['offers_view', 'inquiries_view'],
+    items: [
+      { id: 'quotation-form', label: 'طلب عرض سعر', icon: FileText, permissionKey: 'inquiries_view' },
     ],
   },
   {
@@ -127,7 +137,8 @@ const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   vip: ['vip-dashboard', 'vip-details'],
   accounting_more: ['installments', 'expenses', 'commissions', 'invoices', 'profit'],
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
-  internal: ['internal-trips', 'internal-bookings', 'internal-customers', 'internal-reports'],
+  internal: ['internal-trips', 'internal-groups', 'internal-bookings', 'internal-customers', 'internal-reports'],
+  print_orders: ['quotation-form'],
   hr_admin: ['employees', 'suppliers', 'reports', 'settings', 'super-admin'],
 };
 

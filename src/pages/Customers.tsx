@@ -36,12 +36,15 @@ export default function Customers({ onNavigate, searchValue }: Props) {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      let { data } = await supabase
         .from('customers')
         .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
-        .not('sales_agent_submitted', 'eq', false)
         .eq('is_vip', false)
         .order('created_at', { ascending: false });
+        
+      if (data) {
+        data = data.filter(c => !c.source || !c.source.startsWith('مسودة:'));
+      }
       setCustomers((data as CustomerWithOpFile[]) || []);
       setLoading(false);
     }
@@ -75,60 +78,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     ]);
     exportToPDF('تقرير عملاء CRM', headers, rows);
   };
-  const revertCustomerStage = async (c: CustomerWithOpFile) => {
-    const op = c.operation_files?.[0];
-    if (!op) return;
 
-    const workflowStagesOrder = ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'];
-    const stageArabicLabels: Record<string, string> = {
-      accounts: 'الحسابات', operations: 'التشغيل', visa: 'التأشيرة',
-      flight: 'الطيران', ready: 'جاهز للسفر', completed: 'مكتمل',
-    };
-
-    const currentStage = op.workflow_stage || 'accounts';
-    const currentIdx = workflowStagesOrder.indexOf(currentStage);
-
-    if (currentIdx === 0) {
-      const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء تحويل العميل "${c.name}" إلى الحسابات؟\n\nسيتم حذف ملف التشغيل وإرجاع العميل لقائمة العملاء CRM فقط.`;
-      if (!window.confirm(confirmMsg)) return;
-
-      const { error } = await supabase
-        .from('operation_files')
-        .delete()
-        .eq('id', op.id);
-
-      if (error) {
-        alert('فشل إلغاء التحويل: ' + error.message);
-        return;
-      }
-
-      setCustomers(prev => prev.map(cust => cust.id === c.id ? { ...cust, operation_files: [] } : cust));
-      alert('تم إلغاء تحويل العميل بنجاح.');
-    } else if (currentIdx > 0) {
-      const prevStage = workflowStagesOrder[currentIdx - 1];
-      const currentLabel = stageArabicLabels[currentStage] || currentStage;
-      const prevLabel = stageArabicLabels[prevStage] || prevStage;
-
-      const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${currentLabel}" وإرجاع العميل "${c.name}" إلى مرحلة "${prevLabel}"؟\n\nسيتم إلغاء جميع المراحل اللاحقة تلقائياً.`;
-      if (!window.confirm(confirmMsg)) return;
-
-      const { error } = await supabase
-        .from('operation_files')
-        .update({ workflow_stage: prevStage })
-        .eq('id', op.id);
-
-      if (error) {
-        alert('فشل إرجاع المرحلة: ' + error.message);
-        return;
-      }
-
-      setCustomers(prev => prev.map(cust => cust.id === c.id ? {
-        ...cust,
-        operation_files: [{ ...op, workflow_stage: prevStage }]
-      } : cust));
-      alert(`تم إرجاع العميل إلى مرحلة "${prevLabel}" بنجاح.`);
-    }
-  };
 
   const filtered = customers.filter((c) => {
     const matchSearch = !searchValue || c.name.includes(searchValue) || c.phone.includes(searchValue) || (c.client_code && c.client_code.includes(searchValue));
@@ -139,10 +89,43 @@ export default function Customers({ onNavigate, searchValue }: Props) {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
+
+    const [{ data: hasFlight }, { data: hasOp }, { data: hasPayment }] = await Promise.all([
+      supabase.from('flight_tickets').select('id').eq('customer_id', deleteTarget.id).limit(1),
+      supabase.from('operation_files').select('id').eq('customer_id', deleteTarget.id).limit(1),
+      supabase.from('payments').select('id').eq('customer_id', deleteTarget.id).limit(1)
+    ]);
+
+    if (hasFlight && hasFlight.length > 0) {
+      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في قسم الطيران. يجب حذفه من المراحل التالية أولاً.");
+      setDeleting(false);
+      setDeleteTarget(null);
+      return;
+    }
+
+    if (hasOp && hasOp.length > 0) {
+      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في قسم التشغيل. يجب حذفه من المراحل التالية أولاً.");
+      setDeleting(false);
+      setDeleteTarget(null);
+      return;
+    }
+
+    if (hasPayment && hasPayment.length > 0) {
+      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في الحسابات - المدفوعات. يجب حذفه من المراحل التالية أولاً.");
+      setDeleting(false);
+      setDeleteTarget(null);
+      return;
+    }
+
     await supabase.from('customers').delete().eq('id', deleteTarget.id);
+    
+    // Auto revert inquiry conversion if it exists
+    await supabase.from('inquiries').update({ converted_customer_id: null, status: 'جديد' }).eq('converted_customer_id', deleteTarget.id);
+
     setCustomers(customers.filter(c => c.id !== deleteTarget.id));
     setDeleteTarget(null);
     setDeleting(false);
+    alert('تم حذف العميل من المرحلة الحالية بنجاح.');
   };
 
   return (
@@ -265,14 +248,6 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                             <span className="text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-semibold whitespace-nowrap">
                               محوّل ✔
                             </span>
-                            <button
-                              onClick={() => revertCustomerStage(c)}
-                              className="btn-outline border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 text-[11px] py-1 px-2 flex items-center gap-1 shadow-xs whitespace-nowrap font-bold"
-                              title="إرجاع العميل لمرحلة سابقة / إلغاء التحويل"
-                            >
-                              <Undo2 size={12} />
-                              إرجاع
-                            </button>
                           </>
                         ) : (
                           <button

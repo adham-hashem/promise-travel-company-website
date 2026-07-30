@@ -190,6 +190,22 @@ export default function BookingPage({ preset, onDone }: Props) {
           travel_date: form.travel_date || null,
           notes: 'تم الإنشاء تلقائياً من حجز الموقع',
         });
+
+        // 6. Create notifications for admins
+        const { data: admins } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .in('role', ['super_admin', 'مالك النظام', 'مدير النظام']);
+          
+        if (admins && admins.length > 0) {
+          const notifications = admins.map(a => ({
+            employee_id: a.id,
+            type: 'new_booking',
+            title: 'حجز جديد من الموقع',
+            body: `حجز جديد باسم ${form.name}`,
+          }));
+          await supabase.from('notifications').insert(notifications);
+        }
       }
 
       setCreatedCode(clientCode);

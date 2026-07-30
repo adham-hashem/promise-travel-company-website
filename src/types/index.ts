@@ -377,7 +377,9 @@ export type Page =
   | 'travel-groups'
   | 'vip-dashboard'
   | 'vip-details'
-  | 'website';
+  | 'internal-groups'
+  | 'website'
+  | 'quotation-form';
 
 // ===== Accounting types =====
 export type PaymentMethod = 'كاش' | 'تحويل بنكي' | 'فودافون كاش' | 'أقساط';

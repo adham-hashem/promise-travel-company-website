@@ -87,7 +87,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   useEffect(() => {
     if (!profile?.email) return;
     let cancelled = false;
-    (async () => {
+    const loadNotifs = async () => {
       const { data: emp } = await supabase
         .from('employees')
         .select('*')
@@ -102,8 +102,15 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
         .order('created_at', { ascending: false })
         .limit(20);
       if (!cancelled) setNotifications((notifs as AppNotification[]) || []);
-    })();
-    return () => { cancelled = true; };
+    };
+
+    loadNotifs();
+    const intervalId = setInterval(loadNotifs, 15000);
+
+    return () => { 
+      cancelled = true; 
+      clearInterval(intervalId);
+    };
   }, [profile?.email]);
 
   // Close dropdown on outside click
