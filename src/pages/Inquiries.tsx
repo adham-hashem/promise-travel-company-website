@@ -3,10 +3,11 @@ import {
   MessageSquare, Plus, Search, Eye, Pencil, Trash2, X,
   Phone, Globe, MessageCircle, PhoneCall, MapPin,
   Facebook, Instagram, ArrowRightLeft, CheckCircle2,
-  Clock, AlertCircle, XCircle, Undo2,
+  Clock, AlertCircle, XCircle, Undo2, Download,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Inquiry, InquiryStatus, InquirySource, InquiryServiceType, Employee } from '../types';
 
 const STATUS_COLORS: Record<InquiryStatus, string> = {
@@ -473,6 +474,35 @@ export default function Inquiries() {
     load();
   };
 
+  const handleExportExcel = () => {
+    const data = filtered.map(inq => ({
+      'رقم الاستعلام': inq.inquiry_number,
+      'الاسم': inq.customer_name,
+      'الهاتف': inq.phone,
+      'نوع الخدمة': inq.service_type || '—',
+      'المصدر': inq.source || '—',
+      'الحالة': inq.status,
+      'الموظف المسؤول': inq.employees?.name || '—',
+      'تاريخ الاستعلام': new Date(inq.created_at).toLocaleDateString('ar-EG'),
+    }));
+    exportToExcel(data, 'الاستعلامات');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['رقم الاستعلام', 'الاسم', 'الهاتف', 'نوع الخدمة', 'المصدر', 'الحالة', 'الموظف المسؤول', 'تاريخ الاستعلام'];
+    const rows = filtered.map(inq => [
+      inq.inquiry_number,
+      inq.customer_name,
+      inq.phone,
+      inq.service_type || '—',
+      inq.source || '—',
+      inq.status,
+      inq.employees?.name || '—',
+      new Date(inq.created_at).toLocaleDateString('ar-EG'),
+    ]);
+    exportToPDF('تقرير استعلامات العملاء', headers, rows);
+  };
+
   const filtered = inquiries.filter(inq => {
     // Sales reps only see their own inquiries
     if (profile?.role === 'مندوب مبيعات') {
@@ -506,11 +536,19 @@ export default function Inquiries() {
           <h1 className="text-2xl font-bold text-navy-900">الاستعلامات</h1>
           <p className="text-gray-500 text-sm mt-0.5">إدارة وتتبع استعلامات العملاء من جميع المصادر</p>
         </div>
-        {can('inquiries_add') && (
-          <button onClick={() => { setEditInquiry(null); setShowModal(true); }} className="btn-gold">
-            <Plus size={18} /> استعلام جديد
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
           </button>
-        )}
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          {can('inquiries_add') && (
+            <button onClick={() => { setEditInquiry(null); setShowModal(true); }} className="btn-gold">
+              <Plus size={18} /> استعلام جديد
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}

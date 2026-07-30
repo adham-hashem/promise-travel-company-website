@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Customer, CustomerStatus, Page } from '../types';
 
 const statusColors: Record<CustomerStatus, string> = {
@@ -46,7 +47,34 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     }
     load();
   }, []);
+  const handleExportExcel = () => {
+    const data = filtered.map(c => ({
+      'الكود': c.client_code || '—',
+      'الاسم': c.name,
+      'الهاتف': c.phone,
+      'المحافظة': c.governorate || '—',
+      'الحالة': c.status,
+      'الموظف المسؤول': c.employees?.name || '—',
+      'تاريخ الإضافة': new Date(c.created_at).toLocaleDateString('ar-EG'),
+      'المصدر': c.source || '—'
+    }));
+    exportToExcel(data, 'العملاء_CRM');
+  };
 
+  const handleExportPDF = () => {
+    const headers = ['الكود', 'الاسم', 'الهاتف', 'المحافظة', 'الحالة', 'الموظف المسؤول', 'تاريخ الإضافة', 'المصدر'];
+    const rows = filtered.map(c => [
+      c.client_code || '—',
+      c.name,
+      c.phone,
+      c.governorate || '—',
+      c.status,
+      c.employees?.name || '—',
+      new Date(c.created_at).toLocaleDateString('ar-EG'),
+      c.source || '—'
+    ]);
+    exportToPDF('تقرير عملاء CRM', headers, rows);
+  };
   const revertCustomerStage = async (c: CustomerWithOpFile) => {
     const op = c.operation_files?.[0];
     if (!op) return;
@@ -138,13 +166,21 @@ export default function Customers({ onNavigate, searchValue }: Props) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => onNavigate('customer-add')}
-          className="btn-gold"
-        >
-          <Plus size={16} />
-          إضافة عميل جديد
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          <button
+            onClick={() => onNavigate('customer-add')}
+            className="btn-gold animate-fadeIn"
+          >
+            <Plus size={16} />
+            إضافة عميل جديد
+          </button>
+        </div>
       </div>
 
       {/* Table Card */}

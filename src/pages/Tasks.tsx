@@ -77,6 +77,23 @@ export default function Tasks({}: Props) {
     }
   });
 
+  const [seenTasks, setSeenTasks] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('seen_tasks');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const markTaskAsSeen = (taskId: string) => {
+    if (!seenTasks.includes(taskId)) {
+      const updated = [...seenTasks, taskId];
+      setSeenTasks(updated);
+      localStorage.setItem('seen_tasks', JSON.stringify(updated));
+    }
+  };
+
   const markUpdatesAsRead = (taskId: string) => {
     const now = new Date().toISOString();
     const updated = { ...lastViewedUpdates, [taskId]: now };
@@ -358,12 +375,12 @@ export default function Tasks({}: Props) {
               const StatusIcon = statusIcons[t.status] || Clock;
               const associatedCust = t.client_code ? taskCustomers[t.client_code] : undefined;
               return (
-                <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors">
+                <div key={t.id} onClick={() => markTaskAsSeen(t.id)} className="p-5 hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-start gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]} relative`}>
                       <StatusIcon size={18} />
-                      {t.status === 'جديدة' && (
-                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                      {t.status === 'جديدة' && !seenTasks.includes(t.id) && (
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                         </span>

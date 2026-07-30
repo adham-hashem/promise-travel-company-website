@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, ClipboardList, Loader2, X, Search,
+  Plus, ClipboardList, Loader2, X, Search, Download,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { InternalTripBooking, InternalBookingStatus, PaymentStatus, Employee, InternalTrip } from '../types';
 
 const bookingStatuses: InternalBookingStatus[] = ['جديدة', 'مؤكدة', 'ملغاة', 'مكتملة'];
@@ -128,6 +129,38 @@ export default function InternalTripBookings() {
     });
   }, [bookings, search, statusFilter]);
 
+  const handleExportExcel = () => {
+    const data = filtered.map(b => ({
+      'العميل': b.customer_name,
+      'رقم الهاتف': b.phone || '—',
+      'الرحلة': b.internal_trips?.name || '—',
+      'المسافرون': b.travelers_count,
+      'المبلغ الإجمالي': b.total_amount,
+      'المدفوع': b.paid_amount,
+      'المسؤول': b.employees?.name || '—',
+      'الحالة': b.booking_status,
+      'حالة الدفع': b.payment_status,
+      'تاريخ الإضافة': new Date(b.created_at || '').toLocaleDateString('ar-EG'),
+    }));
+    exportToExcel(data, 'حجوزات_الرحلات_الداخلية');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['العميل', 'رقم الهاتف', 'الرحلة', 'المسافرون', 'المبلغ الإجمالي', 'المدفوع', 'المسؤول', 'الحالة', 'حالة الدفع'];
+    const rows = filtered.map(b => [
+      b.customer_name,
+      b.phone || '—',
+      b.internal_trips?.name || '—',
+      b.travelers_count,
+      `${b.total_amount} ج.م`,
+      `${b.paid_amount} ج.م`,
+      b.employees?.name || '—',
+      b.booking_status,
+      b.payment_status,
+    ]);
+    exportToPDF('تقرير حجوزات الرحلات الداخلية', headers, rows);
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -135,9 +168,17 @@ export default function InternalTripBookings() {
           <h2 className="section-title">حجوزات الرحلات الداخلية</h2>
           <p className="section-subtitle">إدارة حجوزات العملاء على الرحلات</p>
         </div>
-        <button onClick={openAdd} className="btn-gold text-sm py-2 px-4">
-          <Plus size={15} />إضافة حجز
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={openAdd} className="btn-gold text-sm py-2 px-4">
+            <Plus size={15} />إضافة حجز
+          </button>
+        </div>
       </div>
 
       {/* Status filters */}

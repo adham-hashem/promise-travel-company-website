@@ -19,11 +19,11 @@ export default function Revenue() {
 
   useEffect(() => {
     async function load() {
-      // Fetch actual payments that are completed
+      // Fetch actual payments that are approved
       const { data: payments, error } = await supabase
         .from('payments')
         .select('amount, payment_date, payment_type')
-        .in('status', ['مكتمل', 'معتمد']);
+        .eq('approval_status', 'معتمد');
 
       if (error) {
         console.error(error);

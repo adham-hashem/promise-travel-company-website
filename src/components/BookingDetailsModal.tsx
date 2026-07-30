@@ -122,6 +122,35 @@ export default function BookingDetailsModal({ bookingId, onClose }: Props) {
                 )}
               </div>
 
+              {booking.source === 'Website' && (booking.customers as any)?.sales_agent_submitted === false && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-800">⚡ طلب حجز معلق من الموقع الإلكتروني</h4>
+                    <p className="text-[11px] text-amber-600 mt-0.5">لم يتم تحويل هذا العميل إلى عملاء CRM بعد.</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!booking.customers?.id) return;
+                      const { error } = await supabase
+                        .from('customers')
+                        .update({ sales_agent_submitted: true })
+                        .eq('id', booking.customers.id);
+                      if (error) {
+                        alert('فشل تحويل العميل: ' + error.message);
+                      } else {
+                        alert('تم تحويل العميل وحجز الرحلة إلى عملاء CRM بنجاح!');
+                        onClose();
+                        // Reload the page window to update states
+                        window.location.reload();
+                      }
+                    }}
+                    className="bg-amber-600 hover:bg-amber-750 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center gap-1 transition-colors"
+                  >
+                    <UserCheck size={13} /> تحويل إلى عملاء CRM
+                  </button>
+                </div>
+              )}
+
               {/* Customer + Package info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field icon={Hash} label="رقم الحجز" value={`#${booking.id.slice(0, 8)}`} />

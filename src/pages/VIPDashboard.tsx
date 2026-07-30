@@ -265,22 +265,22 @@ export default function VIPDashboard({ onNavigate }: Props) {
             const StageIcon = stage.icon;
 
             return (
-              <div key={stage.key} className="flex flex-col min-w-[240px] bg-gray-50/50 rounded-2xl p-3 border border-gray-100 h-[600px]">
+              <div key={stage.key} className="flex flex-col min-w-[190px] bg-gray-50/50 rounded-xl p-2 border border-gray-100 h-[500px]">
                 {/* Column Header */}
-                <div className={`flex items-center justify-between mb-3 pb-2 border-b border-gray-200/50`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stage.color}`}>
-                      <StageIcon size={16} />
+                <div className={`flex items-center justify-between mb-2 pb-1.5 border-b border-gray-200/50`}>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${stage.color}`}>
+                      <StageIcon size={14} />
                     </div>
-                    <span className="text-xs font-black text-navy-900">{stage.label}</span>
+                    <span className="text-[11px] font-black text-navy-900">{stage.label}</span>
                   </div>
-                  <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-black text-navy-800 border border-gray-200">
+                  <span className="bg-white px-1.5 py-0.5 rounded-full text-[9px] font-black text-navy-800 border border-gray-200">
                     {stageClients.length}
                   </span>
                 </div>
 
                 {/* Column Items */}
-                <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                   {stageClients.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-4">
                       <p className="text-[10px] text-gray-400 font-bold">لا يوجد عملاء هنا</p>
@@ -290,40 +290,40 @@ export default function VIPDashboard({ onNavigate }: Props) {
                       <div
                         key={client.id}
                         onClick={() => onNavigate('vip-details', client.client_code || client.id)}
-                        className="bg-white border border-gray-100 hover:border-amber-300 rounded-xl p-3.5 shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 group relative"
+                        className="bg-white border border-gray-100 hover:border-amber-300 rounded-lg p-2.5 shadow-sm hover:shadow-md cursor-pointer transition-all duration-200 group relative"
                       >
                         <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <ChevronRight size={14} className="text-gold-500 rotate-180" />
+                          <ChevronRight size={12} className="text-gold-500 rotate-180" />
                         </div>
 
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Crown size={12} className="text-amber-500" />
-                          <h4 className="text-xs font-black text-navy-900 group-hover:text-gold-600 truncate max-w-[160px]">{client.name}</h4>
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <Crown size={11} className="text-amber-500" />
+                          <h4 className="text-[11px] font-bold text-navy-900 group-hover:text-gold-600 truncate max-w-[125px]">{client.name}</h4>
                         </div>
 
-                        <div className="space-y-1.5 text-[10px] text-gray-500">
+                        <div className="space-y-1 text-[9px] text-gray-500">
                           {client.client_code && (
                             <div className="flex items-center gap-1">
-                              <Hash size={10} className="text-gray-400" />
+                              <Hash size={9} className="text-gray-400" />
                               <span className="font-mono font-bold text-navy-800">{client.client_code}</span>
                             </div>
                           )}
                           {client.vip_requests?.travel_city && (
                             <div className="flex items-center gap-1">
-                              <MapPin size={10} className="text-gray-400" />
+                              <MapPin size={9} className="text-gray-400" />
                               <span>الوجهة: {client.vip_requests.travel_city}</span>
                             </div>
                           )}
                           {(client.vip_requests?.departure_date || client.vip_requests?.return_date) && (
                             <div className="flex items-center gap-1">
-                              <Calendar size={10} className="text-gray-400" />
+                              <Calendar size={9} className="text-gray-400" />
                               <span>{client.vip_requests?.departure_date || '—'}</span>
                             </div>
                           )}
                           {client.assigned_manager_profile?.name && (
-                            <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100 mt-2">
-                              <User size={10} className="text-gold-500" />
-                              <span className="text-navy-800 font-semibold truncate max-w-[140px]">{client.assigned_manager_profile.name}</span>
+                            <div className="flex items-center gap-1 pt-1 border-t border-gray-100 mt-1.5">
+                              <User size={9} className="text-gold-500" />
+                              <span className="text-navy-800 font-semibold truncate max-w-[110px]">{client.assigned_manager_profile.name}</span>
                             </div>
                           )}
                         </div>

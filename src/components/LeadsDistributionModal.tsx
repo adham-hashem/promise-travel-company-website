@@ -157,7 +157,7 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
       }
 
       // Build insert rows
-      const rows: { name: string; phone: string; governorate: string | null; assigned_employee_id: string; status: string }[] = [];
+      const rows: { name: string; phone: string; governorate: string | null; assigned_employee_id: string; status: string; sales_agent_submitted: boolean; source: string }[] = [];
 
       if (mode === 'auto') {
         // Round-robin assign
@@ -169,6 +169,8 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
             governorate: lead.governorate || null,
             assigned_employee_id: empId,
             status: 'جديد',
+            sales_agent_submitted: false,
+            source: 'مندوب مبيعات',
           });
         });
       } else {
@@ -182,6 +184,8 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
             governorate: lead.governorate || null,
             assigned_employee_id: empId,
             status: 'جديد',
+            sales_agent_submitted: false,
+            source: 'مندوب مبيعات',
           });
         });
 

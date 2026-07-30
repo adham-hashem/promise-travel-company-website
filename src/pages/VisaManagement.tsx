@@ -3,10 +3,11 @@ import {
   Plus, X, Loader2, Search, Plane, FileText,
   Trash2, Download, Upload, Eye, CheckCircle2, AlertCircle,
   Clock, XCircle, FileCheck, Wallet, User,
-  Globe, Undo2,
+  Globe, Undo2, Save, Edit2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Visa, VisaStatus, VisaType, VisaDocument, VisaDocType, Customer, Employee, Page } from '../types';
 
 const visaStatuses: VisaStatus[] = ['لم يبدأ', 'قيد التقديم', 'قيد المراجعة', 'تمت الموافقة', 'مرفوضة', 'منتهية'];
@@ -42,6 +43,17 @@ export default function VisaManagement({ onNavigate }: Props) {
     visa_fee: '', assigned_employee_id: '', notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    visa_type: 'عمرة' as VisaType,
+    country: 'السعودية',
+    application_date: '',
+    issue_date: '',
+    expiry_date: '',
+    visa_fee: '',
+    assigned_employee_id: '',
+    notes: '',
+  });
   const [visaDocs, setVisaDocs] = useState<VisaDocument[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -178,6 +190,79 @@ export default function VisaManagement({ onNavigate }: Props) {
     setSelected(null);
   };
 
+  const startEdit = () => {
+    if (!selected) return;
+    setEditForm({
+      visa_type: selected.visa_type,
+      country: selected.country,
+      application_date: selected.application_date || '',
+      issue_date: selected.issue_date || '',
+      expiry_date: selected.expiry_date || '',
+      visa_fee: selected.visa_fee?.toString() || '',
+      assigned_employee_id: selected.assigned_employee_id || '',
+      notes: selected.notes || '',
+    });
+    setIsEditing(true);
+  };
+
+  const saveVisa = async () => {
+    if (!selected) return;
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('visa_management')
+      .update({
+        visa_type: editForm.visa_type,
+        country: editForm.country,
+        application_date: editForm.application_date || null,
+        issue_date: editForm.issue_date || null,
+        expiry_date: editForm.expiry_date || null,
+        visa_fee: parseFloat(editForm.visa_fee) || 0,
+        assigned_employee_id: editForm.assigned_employee_id || null,
+        notes: editForm.notes || null,
+      })
+      .eq('id', selected.id)
+      .select('*, employees(id, name), customers(id, name, phone, client_code)')
+      .single();
+    
+    if (error) {
+      alert('فشل حفظ التعديلات: ' + error.message);
+    } else if (data) {
+      setVisas(visas.map((v) => (v.id === selected.id ? (data as Visa) : v)));
+      setSelected(data as Visa);
+      setIsEditing(false);
+    }
+    setSaving(false);
+  };
+
+  const handleExportExcel = () => {
+    const data = filtered.map(v => ({
+      'الكود': v.customers?.client_code || '—',
+      'الاسم': v.full_name,
+      'الدولة': v.country,
+      'الرسوم': v.visa_fee,
+      'الحالة': v.visa_status,
+      'الموظف المسؤول': v.employees?.name || '—',
+      'نوع التأشيرة': v.visa_type,
+      'تاريخ التقديم': v.application_date ? new Date(v.application_date).toLocaleDateString('ar-EG') : '—',
+    }));
+    exportToExcel(data, 'إدارة_التأشيرات');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['الكود', 'الاسم', 'الدولة', 'الرسوم', 'الحالة', 'الموظف المسؤول', 'نوع التأشيرة', 'تاريخ التقديم'];
+    const rows = filtered.map(v => [
+      v.customers?.client_code || '—',
+      v.full_name,
+      v.country,
+      `${v.visa_fee} ج.م`,
+      v.visa_status,
+      v.employees?.name || '—',
+      v.visa_type,
+      v.application_date ? new Date(v.application_date).toLocaleDateString('ar-EG') : '—',
+    ]);
+    exportToPDF('تقرير إدارة التأشيرات', headers, rows);
+  };
+
   const openVisa = async (v: Visa) => {
     setSelected(v);
     setVisaNumber(v.visa_number || '');
@@ -274,9 +359,17 @@ export default function VisaManagement({ onNavigate }: Props) {
           <h2 className="section-title">إدارة التأشيرات</h2>
           <p className="section-subtitle">متابعة التأشيرات من الاستعلام حتى السفر</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-gold">
-          <Plus size={16} /> ملف تأشيرة جديد
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={() => setShowForm(!showForm)} className="btn-gold">
+            <Plus size={16} /> ملف تأشيرة جديد
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -396,7 +489,10 @@ export default function VisaManagement({ onNavigate }: Props) {
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs">{v.employees?.name || '—'}</td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => openVisa(v)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><Eye size={15} /></button>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => openVisa(v)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500" title="عرض التفاصيل"><Eye size={15} /></button>
+                          <button onClick={() => { if (window.confirm('هل أنت متأكد من حذف ملف التأشيرة هذا؟')) deleteVisa(v.id); }} className="p-1.5 hover:bg-red-50 rounded-lg text-red-500" title="حذف"><Trash2 size={15} /></button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -423,7 +519,12 @@ export default function VisaManagement({ onNavigate }: Props) {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-white/10"><X size={18} /></button>
+                <div className="flex items-center gap-2">
+                  {!isEditing && (
+                    <button onClick={startEdit} className="p-2 rounded-xl hover:bg-white/10 text-white flex items-center gap-1 text-xs" title="تعديل"><Edit2 size={14} /> تعديل</button>
+                  )}
+                  <button onClick={() => { setSelected(null); setIsEditing(false); }} className="p-1 rounded-lg hover:bg-white/10"><X size={18} /></button>
+                </div>
               </div>
             </div>
 
@@ -446,26 +547,82 @@ export default function VisaManagement({ onNavigate }: Props) {
                 })}
               </div>
 
-              {/* Details */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[
-                  { label: 'نوع التأشيرة', value: selected.visa_type },
-                  { label: 'الدولة', value: selected.country },
-                  { label: 'نوع الخدمة', value: selected.service_type },
-                  { label: 'تاريخ التقديم', value: selected.application_date ? new Date(selected.application_date).toLocaleDateString('ar-EG') : '—' },
-                  { label: 'تاريخ الإصدار', value: selected.issue_date ? new Date(selected.issue_date).toLocaleDateString('ar-EG') : '—' },
-                  { label: 'تاريخ الانتهاء', value: selected.expiry_date ? new Date(selected.expiry_date).toLocaleDateString('ar-EG') : '—' },
-                  { label: 'رسوم التأشيرة', value: `${fmt(selected.visa_fee)} ج.م` },
-                  { label: 'الموظف', value: selected.employees?.name || '—' },
-                ].map((r) => (
-                  <div key={r.label} className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-400 mb-0.5">{r.label}</p>
-                    <p className="text-sm font-semibold text-navy-900">{r.value}</p>
+              {isEditing ? (
+                <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                    <span className="text-sm font-bold text-navy-800 flex items-center gap-2">📝 تعديل بيانات الملف</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={saveVisa} disabled={saving} className="btn-gold text-xs py-1.5 px-3 flex items-center gap-1">
+                        {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} حفظ التعديلات
+                      </button>
+                      <button onClick={() => setIsEditing(false)} className="btn-outline text-xs py-1.5 px-3">
+                        إلغاء
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="form-label">نوع التأشيرة</label>
+                      <select value={editForm.visa_type} onChange={e => setEditForm({ ...editForm, visa_type: e.target.value as VisaType })} className="form-input text-xs py-1.5">
+                        {visaTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">الدولة</label>
+                      <input value={editForm.country} onChange={e => setEditForm({ ...editForm, country: e.target.value })} className="form-input text-xs py-1.5" />
+                    </div>
+                    <div>
+                      <label className="form-label">تاريخ التقديم</label>
+                      <input type="date" value={editForm.application_date} onChange={e => setEditForm({ ...editForm, application_date: e.target.value })} className="form-input text-xs py-1.5" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="form-label">تاريخ الإصدار</label>
+                      <input type="date" value={editForm.issue_date} onChange={e => setEditForm({ ...editForm, issue_date: e.target.value })} className="form-input text-xs py-1.5" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="form-label">تاريخ الانتهاء</label>
+                      <input type="date" value={editForm.expiry_date} onChange={e => setEditForm({ ...editForm, expiry_date: e.target.value })} className="form-input text-xs py-1.5" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="form-label">رسوم التأشيرة (ج.م)</label>
+                      <input type="number" value={editForm.visa_fee} onChange={e => setEditForm({ ...editForm, visa_fee: e.target.value })} className="form-input text-xs py-1.5" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="form-label">الموظف المسؤول</label>
+                      <select value={editForm.assigned_employee_id} onChange={e => setEditForm({ ...editForm, assigned_employee_id: e.target.value })} className="form-input text-xs py-1.5">
+                        <option value="">— غير محدد —</option>
+                        {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="form-label">ملاحظات</label>
+                      <textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} rows={2} className="form-input text-xs py-1.5 resize-none" />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                      { label: 'نوع التأشيرة', value: selected.visa_type },
+                      { label: 'الدولة', value: selected.country },
+                      { label: 'نوع الخدمة', value: selected.service_type },
+                      { label: 'تاريخ التقديم', value: selected.application_date ? new Date(selected.application_date).toLocaleDateString('ar-EG') : '—' },
+                      { label: 'تاريخ الإصدار', value: selected.issue_date ? new Date(selected.issue_date).toLocaleDateString('ar-EG') : '—' },
+                      { label: 'تاريخ الانتهاء', value: selected.expiry_date ? new Date(selected.expiry_date).toLocaleDateString('ar-EG') : '—' },
+                      { label: 'رسوم التأشيرة', value: `${fmt(selected.visa_fee)} ج.م` },
+                      { label: 'الموظف', value: selected.employees?.name || '—' },
+                    ].map((r) => (
+                      <div key={r.label} className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xs text-gray-400 mb-0.5">{r.label}</p>
+                        <p className="text-sm font-semibold text-navy-900">{r.value}</p>
+                      </div>
+                    ))}
+                  </div>
 
-              {selected.notes && <div className="bg-gray-50 rounded-xl p-3"><p className="text-xs text-gray-400 mb-1">ملاحظات</p><p className="text-sm text-gray-700">{selected.notes}</p></div>}
+                  {selected.notes && <div className="bg-gray-50 rounded-xl p-3"><p className="text-xs text-gray-400 mb-1">ملاحظات</p><p className="text-sm text-gray-700">{selected.notes}</p></div>}
+                </>
+              )}
 
               {/* Visa fee payment button */}
               <button

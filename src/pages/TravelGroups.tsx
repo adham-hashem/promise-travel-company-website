@@ -109,13 +109,44 @@ export default function TravelGroups({}: Props) {
   };
 
   const loadAvailableCustomers = async (_groupId?: string) => {
-    // all active customers NOT already in this group
     const currentIds = members.map(m => m.customer_id);
-    const { data } = await supabase
+    
+    // Load main CRM customers
+    const { data: cData } = await supabase
       .from('customers')
       .select('id, name, phone, client_code, national_id, passport_number, service_type')
       .order('name');
-    const filtered = ((data || []) as Customer[]).filter(c => !currentIds.includes(c.id));
+    
+    let candidates = (cData || []) as (Customer & { isInternalCustomer?: boolean; originalInternalId?: string })[];
+
+    // If it's an internal trip group, also fetch internal customers
+    if (detailGroup?.internal_trip_id) {
+      const { data: icData } = await supabase
+        .from('internal_customers')
+        .select('id, name, phone');
+      
+      if (icData) {
+        icData.forEach(ic => {
+          // Check if phone number is not already in candidates list
+          const exists = candidates.some(c => c.phone === ic.phone);
+          if (!exists) {
+            candidates.push({
+              id: ic.id,
+              name: ic.name,
+              phone: ic.phone || '',
+              client_code: 'طلب داخلي',
+              national_id: null,
+              passport_number: null,
+              service_type: 'سياحة داخلية',
+              isInternalCustomer: true,
+              originalInternalId: ic.id
+            } as any);
+          }
+        });
+      }
+    }
+
+    const filtered = candidates.filter(c => !currentIds.includes(c.id));
     setCustomers(filtered);
   };
 
@@ -222,11 +253,56 @@ export default function TravelGroups({}: Props) {
   const addMembers = async () => {
     if (!detailGroup || selected.length === 0) return;
     setAddingMembers(true);
-    const rows = selected.map(cid => ({ group_id: detailGroup.id, customer_id: cid }));
-    await supabase.from('travel_group_members').insert(rows);
+
+    const rows: { group_id: string; customer_id: string }[] = [];
+
+    for (const cid of selected) {
+      const cand = customers.find(c => c.id === cid);
+      if (cand && (cand as any).isInternalCustomer) {
+        // Find if they exist in customers table by phone
+        const { data: existing } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('phone', cand.phone)
+          .maybeSingle();
+
+        if (existing) {
+          rows.push({ group_id: detailGroup.id, customer_id: existing.id });
+        } else {
+          // Insert new customer into main customers table
+          const { data: newCust, error } = await supabase
+            .from('customers')
+            .insert({
+              name: cand.name,
+              phone: cand.phone,
+              service_type: 'سياحة داخلية',
+              status: 'جديد',
+              sales_agent_submitted: true,
+            })
+            .select('id')
+            .single();
+          
+          if (newCust) {
+            rows.push({ group_id: detailGroup.id, customer_id: newCust.id });
+          } else {
+            console.error('Error auto-creating customer for internal group:', error);
+          }
+        }
+      } else {
+        rows.push({ group_id: detailGroup.id, customer_id: cid });
+      }
+    }
+
+    if (rows.length > 0) {
+      const { error: insErr } = await supabase.from('travel_group_members').insert(rows);
+      if (insErr) {
+        alert('فشل إضافة الأعضاء للفوج: ' + insErr.message);
+      }
+    }
+    
     await loadMembers(detailGroup.id);
     setGroups(prev => prev.map(g =>
-      g.id === detailGroup.id ? { ...g, member_count: (g.member_count || 0) + selected.length } : g
+      g.id === detailGroup.id ? { ...g, member_count: (g.member_count || 0) + rows.length } : g
     ));
     setShowAddModal(false);
     setSelected([]);

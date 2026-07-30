@@ -156,8 +156,15 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
         const { data: tasksData } = await query;
         if (!tasksData) return;
         
-        // 1. Check if there are any new tasks (status === 'جديدة')
-        const hasNewTask = tasksData.some(t => t.status === 'جديدة');
+        // Load seen tasks from local storage
+        let seenTasks: string[] = [];
+        try {
+          const savedSeen = localStorage.getItem('seen_tasks');
+          if (savedSeen) seenTasks = JSON.parse(savedSeen);
+        } catch {}
+
+        // 1. Check if there are any new tasks (status === 'جديدة' and NOT seen)
+        const hasNewTask = tasksData.some(t => t.status === 'جديدة' && !seenTasks.includes(t.id));
         if (hasNewTask) {
           setHasNewTasksOrUpdates(true);
           return;

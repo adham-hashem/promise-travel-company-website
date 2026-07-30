@@ -6,7 +6,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Payment, PaymentMethod, Booking, PaymentProof } from '../types';
-import { exportToExcel } from '../lib/export';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 const emptyForm = {
   booking_id: '',
@@ -301,13 +301,29 @@ export default function Payments() {
     w.print();
   };
 
-  const handleExport = () => {
-    exportToExcel(payments.map((p, i) => ({
+  const handleExportExcel = () => {
+    const data = filtered.map((p, i) => ({
       '#': i + 1, 'العميل': p.customers?.name || '—', 'نوع العملية': p.payment_type || 'دفعة عادية',
       'رقم الحجز': p.booking_id?.slice(0, 8) || '—',
       'المبلغ': p.amount, 'الطريقة': p.payment_method, 'التاريخ': new Date(p.payment_date).toLocaleDateString('ar-EG'),
       'الحالة': p.status, 'الاعتماد': p.approval_status || 'بانتظار الاعتماد',
-    })), 'المدفوعات');
+    }));
+    exportToExcel(data, 'المدفوعات');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['#', 'العميل', 'نوع العملية', 'المبلغ', 'الطريقة', 'التاريخ', 'الحالة', 'الاعتماد'];
+    const rows = filtered.map((p, i) => [
+      i + 1,
+      p.customers?.name || '—',
+      p.payment_type || 'دفعة عادية',
+      `${p.amount} ج.م`,
+      p.payment_method,
+      new Date(p.payment_date).toLocaleDateString('ar-EG'),
+      p.status,
+      p.approval_status || 'بانتظار الاعتماد',
+    ]);
+    exportToPDF('تقرير المدفوعات والحسابات', headers, rows);
   };
 
   const filtered = payments.filter(p => {
@@ -350,7 +366,12 @@ export default function Payments() {
           <p className="section-subtitle">إدارة الدفعات، إثبات الدفع، واعتماد الحسابات</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExport} className="btn-outline">تصدير</button>
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
           <button onClick={openAdd} className="btn-gold"><Plus size={16} /> إضافة دفعة</button>
         </div>
       </div>

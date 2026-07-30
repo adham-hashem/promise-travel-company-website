@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CalendarCheck, Clock, XCircle, Eye, Globe } from 'lucide-react';
+import { CalendarCheck, Clock, XCircle, Eye, Globe, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Booking, BookingStatus } from '../types';
 import BookingDetailsModal from '../components/BookingDetailsModal';
 
@@ -41,6 +42,35 @@ export default function Bookings({ searchValue }: Props) {
     }
     load();
   }, []);
+
+  const handleExportExcel = () => {
+    const data = filtered.map(b => ({
+      'اسم العميل': b.customers?.name || '—',
+      'المصدر': b.source || '—',
+      'الباقة': b.packages?.name || '—',
+      'حالة الحجز': b.status,
+      'حالة الدفع': b.payment_status || 'غير مدفوع',
+      'المبلغ الإجمالي': b.total_amount,
+      'المدفوع': b.paid_amount || 0,
+      'تاريخ الحجز': new Date(b.created_at).toLocaleDateString('ar-EG'),
+    }));
+    exportToExcel(data, 'الحجوزات');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['اسم العميل', 'المصدر', 'الباقة', 'حالة الحجز', 'حالة الدفع', 'المبلغ الإجمالي', 'المدفوع', 'تاريخ الحجز'];
+    const rows = filtered.map(b => [
+      b.customers?.name || '—',
+      b.source || '—',
+      b.packages?.name || '—',
+      b.status,
+      b.payment_status || 'غير مدفوع',
+      `${b.total_amount} ج.م`,
+      `${b.paid_amount || 0} ج.م`,
+      new Date(b.created_at).toLocaleDateString('ar-EG'),
+    ]);
+    exportToPDF('تقرير الحجوزات', headers, rows);
+  };
 
   const filtered = bookings.filter((b) => {
     const matchSearch = !searchValue || b.customers?.name?.includes(searchValue);
@@ -88,7 +118,15 @@ export default function Bookings({ searchValue }: Props) {
               </button>
             ))}
           </div>
-          <p className="text-sm text-gray-500">{filtered.length} حجز</p>
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportExcel} className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+              <Download size={13} /> Excel
+            </button>
+            <button onClick={handleExportPDF} className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1 border-red-200 text-red-700 hover:bg-red-50">
+              <Download size={13} /> PDF
+            </button>
+            <p className="text-sm text-gray-500 font-bold">{filtered.length} حجز</p>
+          </div>
         </div>
 
         {loading ? (
@@ -119,7 +157,14 @@ export default function Bookings({ searchValue }: Props) {
                         <div className="w-8 h-8 rounded-lg bg-gradient-navy flex items-center justify-center text-white font-bold text-xs">
                           {b.customers?.name?.charAt(0)}
                         </div>
-                        <span className="font-semibold text-gray-800">{b.customers?.name}</span>
+                        <div>
+                          <span className="font-semibold text-gray-800 block">{b.customers?.name}</span>
+                          {b.source === 'Website' && (b.customers as any)?.sales_agent_submitted === false && (
+                            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                              طلب موقع معلق ⚡
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>

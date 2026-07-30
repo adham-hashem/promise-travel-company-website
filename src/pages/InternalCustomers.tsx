@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Users, Loader2, X, Pencil, Trash2, MapPin, Search,
+  Plus, Users, Loader2, X, Pencil, Trash2, MapPin, Search, Download,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { InternalCustomer, Employee } from '../types';
 
 interface FormState {
@@ -96,6 +97,31 @@ export default function InternalCustomers() {
     load();
   };
 
+  const handleExportExcel = () => {
+    const data = filtered.map(c => ({
+      'اسم العميل': c.name,
+      'رقم الهاتف': c.phone || '—',
+      'الوجهة المهتم بها': c.interested_destination || '—',
+      'آخر متابعة': c.last_follow_up || '—',
+      'المسؤول': c.employees?.name || '—',
+      'تاريخ الإضافة': new Date(c.created_at || '').toLocaleDateString('ar-EG'),
+    }));
+    exportToExcel(data, 'عملاء_الرحلات_الداخلية');
+  };
+
+  const handleExportPDF = () => {
+    const headers = ['اسم العميل', 'رقم الهاتف', 'الوجهة المهتم بها', 'آخر متابعة', 'المسؤول', 'تاريخ الإضافة'];
+    const rows = filtered.map(c => [
+      c.name,
+      c.phone || '—',
+      c.interested_destination || '—',
+      c.last_follow_up || '—',
+      c.employees?.name || '—',
+      c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—',
+    ]);
+    exportToPDF('تقرير عملاء الرحلات الداخلية', headers, rows);
+  };
+
   const filtered = useMemo(() => {
     return customers.filter((c) =>
       !search || c.name.includes(search) || (c.phone || '').includes(search) || (c.interested_destination || '').includes(search),
@@ -109,9 +135,17 @@ export default function InternalCustomers() {
           <h2 className="section-title">عملاء الرحلات الداخلية</h2>
           <p className="section-subtitle">إدارة عملاء الرحلات الداخلية والمتابعة</p>
         </div>
-        <button onClick={openAdd} className="btn-gold text-sm py-2 px-4">
-          <Plus size={15} />إضافة عميل
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <Download size={14} /> Excel
+          </button>
+          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
+            <Download size={14} /> PDF
+          </button>
+          <button onClick={openAdd} className="btn-gold text-sm py-2 px-4">
+            <Plus size={15} />إضافة عميل
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

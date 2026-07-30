@@ -145,6 +145,9 @@ export default function AddCustomer({ onNavigate }: Props) {
     setError('');
 
     try {
+      const assignedEmp = employees.find(e => e.id === form.assigned_employee_id);
+      const isSalesAgent = assignedEmp?.role === 'مندوب مبيعات' || assignedEmp?.role === 'مدير المبيعات';
+
       const { data: customer, error: custErr } = await supabase
         .from('customers')
         .insert({
@@ -156,7 +159,8 @@ export default function AddCustomer({ onNavigate }: Props) {
           requested_package_id: isVip ? null : (form.requested_package_id || null),
           assigned_employee_id: form.assigned_employee_id || null,
           status: form.status,
-          source: form.source || null,
+          source: form.source || (isSalesAgent ? 'مندوب مبيعات' : null),
+          sales_agent_submitted: isSalesAgent ? false : true,
           notes: form.notes || null,
           passport_number: form.passport_number || null,
           passport_issue_date: form.passport_issue_date || null,

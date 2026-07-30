@@ -126,9 +126,12 @@ export default function SalesAgentPortal() {
       setDrafts(allCustomers.filter(c => (c as any).sales_agent_submitted === false));
       setSubmitted(allCustomers.filter(c => {
         if ((c as any).sales_agent_submitted === false) return false;
-        if (c.source !== 'مندوب مبيعات') return false;
-        const role = c.employees?.role;
-        return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
+        if (isSuperOrAdmin) {
+          if (c.source === 'مندوب مبيعات') return true;
+          const role = c.employees?.role;
+          return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
+        }
+        return true;
       }));
     } catch (e) {
       console.error(e);
