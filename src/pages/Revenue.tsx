@@ -13,17 +13,16 @@ const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
 
 export default function Revenue() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalRevenue: 0, thisMonth: 0, lastMonth: 0, growth: 0 });
+  const [stats, setStats] = useState({ totalRevenue: 0, pendingRevenue: 0, thisMonth: 0, lastMonth: 0, growth: 0 });
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [typeData, setTypeData] = useState<any[]>([]);
 
   useEffect(() => {
     async function load() {
-      // Fetch actual payments that are approved
+      // Fetch all payments to calculate both approved and pending
       const { data: payments, error } = await supabase
         .from('payments')
-        .select('amount, payment_date, payment_type')
-        .eq('approval_status', 'معتمد');
+        .select('amount, payment_date, payment_type, approval_status');
 
       if (error) {
         console.error(error);
@@ -33,27 +32,32 @@ export default function Revenue() {
       const pays = (payments || []).map(p => ({
         amount: Number(p.amount),
         date: new Date(p.payment_date),
-        type: p.payment_type || 'أخرى'
+        type: p.payment_type || 'أخرى',
+        isApproved: p.approval_status === 'معتمد' || !p.approval_status
       }));
 
       // Calculate totals
-      const totalRevenue = pays.reduce((s, p) => s + p.amount, 0);
+      const approvedPays = pays.filter(p => p.isApproved);
+      const pendingPays = pays.filter(p => !p.isApproved && p.approval_status !== 'مرفوض');
+
+      const totalRevenue = approvedPays.reduce((s, p) => s + p.amount, 0);
+      const pendingRevenue = pendingPays.reduce((s, p) => s + p.amount, 0);
       
       const now = new Date();
-      const thisMonthPays = pays.filter(p => p.date.getMonth() === now.getMonth() && p.date.getFullYear() === now.getFullYear());
-      const lastMonthPays = pays.filter(p => p.date.getMonth() === (now.getMonth() === 0 ? 11 : now.getMonth() - 1) && p.date.getFullYear() === (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()));
+      const thisMonthPays = approvedPays.filter(p => p.date.getMonth() === now.getMonth() && p.date.getFullYear() === now.getFullYear());
+      const lastMonthPays = approvedPays.filter(p => p.date.getMonth() === (now.getMonth() === 0 ? 11 : now.getMonth() - 1) && p.date.getFullYear() === (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()));
       
       const thisMonth = thisMonthPays.reduce((s, p) => s + p.amount, 0);
       const lastMonth = lastMonthPays.reduce((s, p) => s + p.amount, 0);
       const growth = lastMonth === 0 ? 100 : ((thisMonth - lastMonth) / lastMonth) * 100;
 
-      setStats({ totalRevenue, thisMonth, lastMonth, growth });
+      setStats({ totalRevenue, pendingRevenue, thisMonth, lastMonth, growth });
 
-      // Monthly Chart Data (last 6 months)
+      // Monthly Chart Data (last 6 months - based on approved payments)
       const mData = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mPays = pays.filter(p => p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear());
+        const mPays = approvedPays.filter(p => p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear());
         mData.push({
           month: monthNames[d.getMonth()],
           الإيرادات: mPays.reduce((s, p) => s + p.amount, 0)
@@ -61,9 +65,9 @@ export default function Revenue() {
       }
       setMonthlyData(mData);
 
-      // Type Chart Data
+      // Type Chart Data (based on approved payments)
       const tMap = new Map<string, number>();
-      pays.forEach(p => tMap.set(p.type, (tMap.get(p.type) || 0) + p.amount));
+      approvedPays.forEach(p => tMap.set(p.type, (tMap.get(p.type) || 0) + p.amount));
       setTypeData(Array.from(tMap.entries()).map(([name, value]) => ({ name, value })));
 
       setLoading(false);
@@ -75,7 +79,7 @@ export default function Revenue() {
     <div className="space-y-6" dir="rtl">
       <div>
         <h2 className="section-title">تحليل الإيرادات</h2>
-        <p className="section-subtitle">نظرة عامة على الإيرادات والتدفقات النقدية الفعلية (المدفوعات المعتمدة)</p>
+        <p className="section-subtitle">نظرة عامة على الإيرادات والتدفقات النقدية الفعلية والمعلقة</p>
       </div>
 
       {loading ? (
@@ -83,31 +87,38 @@ export default function Revenue() {
       ) : (
         <>
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">إجمالي الإيرادات (تراكمي)</p>
-                <p className="text-3xl font-black text-navy-900">{fmt(stats.totalRevenue)} <span className="text-sm font-medium text-gray-500">ج.م</span></p>
+                <p className="text-sm text-gray-500 mb-1">إجمالي الإيرادات المعتمدة</p>
+                <p className="text-2xl font-black text-navy-900">{fmt(stats.totalRevenue)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><Wallet size={28} /></div>
+              <div className="w-12 h-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><Wallet size={24} /></div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">إيرادات الشهر الحالي</p>
-                <p className="text-3xl font-black text-emerald-600">{fmt(stats.thisMonth)} <span className="text-sm font-medium text-gray-500">ج.م</span></p>
+                <p className="text-sm text-gray-500 mb-1">إيرادات معلقة (قيد الاعتماد)</p>
+                <p className="text-2xl font-black text-amber-600">{fmt(stats.pendingRevenue)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><CalendarIcon size={28} /></div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center"><Loader2 className="animate-spin" size={24} /></div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">معدل النمو (عن الشهر السابق)</p>
-                <p className="text-3xl font-black text-navy-900 flex items-center gap-2">
+                <p className="text-sm text-gray-500 mb-1">إيرادات الشهر الحالي (المعتمدة)</p>
+                <p className="text-2xl font-black text-emerald-600">{fmt(stats.thisMonth)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><CalendarIcon size={24} /></div>
+            </div>
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">معدل النمو الشهري</p>
+                <p className="text-2xl font-black text-navy-900 flex items-center gap-2">
                   <span className={stats.growth >= 0 ? 'text-emerald-600' : 'text-red-500'}>
                     {stats.growth > 0 ? '+' : ''}{stats.growth.toFixed(1)}%
                   </span>
                 </p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><TrendingUp size={28} /></div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><TrendingUp size={24} /></div>
             </div>
           </div>
 
