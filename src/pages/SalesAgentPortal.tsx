@@ -122,17 +122,17 @@ export default function SalesAgentPortal() {
       if (pkgData) setPackages(pkgData as Package[]);
       
       const allCustomers = (custData as Customer[]) || [];
+      
+      // Filter only customers added by sales agents (source is 'مندوب مبيعات' or their assigned employee is sales agent/manager)
+      const salesAgentCustomers = allCustomers.filter(c => {
+        if (c.source === 'مندوب مبيعات') return true;
+        const role = c.employees?.role;
+        return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
+      });
+
       // Filter drafts vs submitted
-      setDrafts(allCustomers.filter(c => (c as any).sales_agent_submitted === false));
-      setSubmitted(allCustomers.filter(c => {
-        if ((c as any).sales_agent_submitted === false) return false;
-        if (isSuperOrAdmin) {
-          if (c.source === 'مندوب مبيعات') return true;
-          const role = c.employees?.role;
-          return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
-        }
-        return true;
-      }));
+      setDrafts(salesAgentCustomers.filter(c => (c as any).sales_agent_submitted === false));
+      setSubmitted(salesAgentCustomers.filter(c => (c as any).sales_agent_submitted === true));
     } catch (e) {
       console.error(e);
     } finally {
