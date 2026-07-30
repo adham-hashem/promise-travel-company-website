@@ -42,11 +42,20 @@ const emptyForm = {
 
 export default function SalesAgentPortal() {
   const { profile } = useAuth();
+  const roleStr = (profile?.role as string) || '';
+  const isSuperOrAdmin =
+    roleStr === 'super_admin' ||
+    roleStr === 'superadmin' ||
+    roleStr === 'admin' ||
+    roleStr === 'مالك النظام' ||
+    roleStr === 'مدير النظام';
+
   const [drafts, setDrafts] = useState<Customer[]>([]);
   const [submitted, setSubmitted] = useState<Customer[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'drafts' | 'submitted'>('drafts');
+  const isDrafts = !(isSuperOrAdmin && activeTab === 'submitted');
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -97,13 +106,6 @@ export default function SalesAgentPortal() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const roleStr = (profile?.role as string) || '';
-      const isSuperOrAdmin =
-        roleStr === 'super_admin' ||
-        roleStr === 'superadmin' ||
-        roleStr === 'admin' ||
-        roleStr === 'مالك النظام' ||
-        roleStr === 'مدير النظام';
       let custQuery = supabase
         .from('customers')
         .select('*, packages(*), employees(*)');
@@ -368,23 +370,25 @@ export default function SalesAgentPortal() {
         <button
           onClick={() => setActiveTab('drafts')}
           className={`px-5 py-2.5 font-bold text-xs transition-all border-b-2 ${
-            activeTab === 'drafts'
+            isDrafts
               ? 'border-gold-500 text-gold-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
           العملاء المضافون (مسودات) ({drafts.length})
         </button>
-        <button
-          onClick={() => setActiveTab('submitted')}
-          className={`px-5 py-2.5 font-bold text-xs transition-all border-b-2 ${
-            activeTab === 'submitted'
-              ? 'border-gold-500 text-gold-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          العملاء المرسلون لـ CRM ({submitted.length})
-        </button>
+        {isSuperOrAdmin && (
+          <button
+            onClick={() => setActiveTab('submitted')}
+            className={`px-5 py-2.5 font-bold text-xs transition-all border-b-2 ${
+              !isDrafts
+                ? 'border-gold-500 text-gold-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            العملاء المرسلون لـ CRM ({submitted.length})
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -407,7 +411,7 @@ export default function SalesAgentPortal() {
                 </tr>
               </thead>
               <tbody>
-                {(activeTab === 'drafts' ? drafts : submitted).map((c) => (
+                {(isDrafts ? drafts : submitted).map((c) => (
                   <tr key={c.id} className="hover:bg-navy-50/30 transition-colors">
                     <td>
                       <div className="flex items-center gap-3">
@@ -436,7 +440,7 @@ export default function SalesAgentPortal() {
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
-                        {activeTab === 'drafts' ? (
+                        {isDrafts ? (
                           <>
                             <button
                               onClick={() => setViewCustomer(c)}
@@ -491,7 +495,7 @@ export default function SalesAgentPortal() {
                     </td>
                   </tr>
                 ))}
-                {(activeTab === 'drafts' ? drafts : submitted).length === 0 && (
+                {(isDrafts ? drafts : submitted).length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-16 text-gray-400">
                       <AlertCircle className="mx-auto mb-2 opacity-30" size={32} />

@@ -329,6 +329,17 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
   return pages;
 }
 
+export function getRoleHomePage(role: string): PageKey {
+  if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') return 'dashboard';
+  if (role === 'مندوب مبيعات') return 'sales-portal';
+  if (role === 'مدير المبيعات') return 'inquiries';
+  if (role === 'محاسب') return 'payments';
+  if (role === 'موظف التشغيل') return 'operations';
+  if (role === 'مسؤول طيران') return 'flight-tickets';
+  if (role === 'إضافة عملاء') return 'inquiries';
+  return 'dashboard';
+}
+
 export const PERMISSION_GROUPS = [
   {
     label: 'الاستعلامات',

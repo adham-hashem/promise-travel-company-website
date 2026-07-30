@@ -40,7 +40,7 @@ import VIPDetails from './pages/VIPDetails';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
-import { ALL_PAGES } from './lib/permissions';
+import { ALL_PAGES, getRoleHomePage } from './lib/permissions';
 
 /*
 const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
@@ -121,12 +121,28 @@ function AppInner() {
 
   useEffect(() => {
     if (!profile) return;
+    
+    const homePage = getRoleHomePage(profile.role);
+    const hash = window.location.hash;
+    const isRoot = !hash || hash === '#' || hash === '#/' || hash === '#/admin' || hash === '#/admin/dashboard';
+    
+    if (isRoot && currentPage === 'dashboard' && homePage !== 'dashboard') {
+      if (canAccessPage(homePage)) {
+        setCurrentPage(homePage);
+        return;
+      }
+    }
+
     if (!canAccessPage(currentPage)) {
-      const allowed = ALL_PAGES.find(p => canAccessPage(p.key));
-      if (allowed) {
-        setCurrentPage(allowed.key);
+      if (canAccessPage(homePage)) {
+        setCurrentPage(homePage);
       } else {
-        setCurrentPage('dashboard');
+        const allowed = ALL_PAGES.find(p => canAccessPage(p.key));
+        if (allowed) {
+          setCurrentPage(allowed.key);
+        } else {
+          setCurrentPage('dashboard');
+        }
       }
     }
   }, [profile, currentPage]);
