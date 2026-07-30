@@ -159,7 +159,9 @@ export default function AddCustomer({ onNavigate }: Props) {
           requested_package_id: isVip ? null : (form.requested_package_id || null),
           assigned_employee_id: form.assigned_employee_id || null,
           status: form.status,
-          source: form.source || (isSalesAgent ? 'مندوب مبيعات' : null),
+          source: isSalesAgent 
+            ? (form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات')
+            : (form.source || null),
           sales_agent_submitted: isSalesAgent ? false : true,
           notes: form.notes || null,
           passport_number: form.passport_number || null,

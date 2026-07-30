@@ -253,7 +253,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                           <Globe size={10} /> Website
                         </span>
                       ) : c.source ? (
-                        <span className="badge bg-gray-100 text-gray-600">{c.source}</span>
+                        <span className="badge bg-gray-100 text-gray-600">{c.source.replace(/^مندوب:\s*/, '')}</span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

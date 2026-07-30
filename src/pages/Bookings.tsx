@@ -172,6 +172,8 @@ export default function Bookings({ searchValue }: Props) {
                         <span className="badge bg-gold-100 text-gold-700 flex items-center gap-1 w-fit">
                           <Globe size={10} /> موقع
                         </span>
+                      ) : b.source ? (
+                        <span className="badge bg-gray-100 text-gray-600">{b.source.replace(/^مندوب:\s*/, '')}</span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

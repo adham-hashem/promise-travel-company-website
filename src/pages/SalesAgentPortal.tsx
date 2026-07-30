@@ -123,11 +123,9 @@ export default function SalesAgentPortal() {
       
       const allCustomers = (custData as Customer[]) || [];
       
-      // Filter only customers added by sales agents (source is 'مندوب مبيعات' or their assigned employee is sales agent/manager)
+      // Filter only customers added by sales agents (source is 'مندوب مبيعات' or starts with 'مندوب:')
       const salesAgentCustomers = allCustomers.filter(c => {
-        if (c.source === 'مندوب مبيعات') return true;
-        const role = c.employees?.role;
-        return role === 'مندوب مبيعات' || role === 'مدير المبيعات';
+        return c.source && (c.source === 'مندوب مبيعات' || c.source.startsWith('مندوب:'));
       });
 
       // Filter drafts vs submitted
@@ -158,7 +156,7 @@ export default function SalesAgentPortal() {
       service_type: c.service_type || '',
       requested_package_id: c.requested_package_id || '',
       notes: c.notes || '',
-      source: c.source || 'مندوب مبيعات',
+      source: c.source ? c.source.replace(/^مندوب:\s*/, '') : 'مندوب مبيعات',
     });
     setDocUploads(Object.fromEntries(docTypes.map((d) => [d.id, { type: d.id, file: null, uploaded: false }])));
     setError('');
@@ -184,6 +182,7 @@ export default function SalesAgentPortal() {
     try {
       let customerId = '';
       if (editCustomer) {
+        const formattedSource = form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات';
         const { error: err } = await supabase
           .from('customers')
           .update({
@@ -194,11 +193,13 @@ export default function SalesAgentPortal() {
             service_type: form.service_type || null,
             requested_package_id: form.requested_package_id || null,
             notes: form.notes || null,
+            source: formattedSource,
           })
           .eq('id', editCustomer.id);
         if (err) throw err;
         customerId = editCustomer.id;
       } else {
+        const formattedSource = form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات';
         const { data, error: err } = await supabase
           .from('customers')
           .insert({
@@ -210,7 +211,7 @@ export default function SalesAgentPortal() {
             requested_package_id: form.requested_package_id || null,
             assigned_employee_id: profile?.id,
             status: 'جديد',
-            source: form.source || 'مندوب مبيعات',
+            source: formattedSource,
             notes: form.notes || null,
             sales_agent_submitted: false,
           })
