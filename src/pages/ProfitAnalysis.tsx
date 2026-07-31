@@ -30,21 +30,23 @@ export default function ProfitAnalysis() {
   const load = async () => {
     setLoading(true);
     const [bookingsRes, expensesRes, packagesRes, employeesRes] = await Promise.all([
-      supabase.from('bookings').select('total_amount, booking_date, package_id, employee_id, package:packages(name, cost_price, price)'),
+      supabase.from('bookings').select('total_amount, booking_date, package_id, employee_id, num_travelers, status, package:packages(name, cost_price, price)'),
       supabase.from('expenses').select('amount, category, expense_date'),
       supabase.from('packages').select('id, name, price, cost_price'),
       supabase.from('employees').select('id, name'),
     ]);
 
-    const bookings = (bookingsRes.data as unknown as Array<{ total_amount: number | null; booking_date: string; package_id: string | null; employee_id: string | null; package: { name: string; cost_price: number | null; price: number } | null }>) || [];
+    const bookings = (bookingsRes.data as unknown as Array<{ total_amount: number | null; booking_date: string; package_id: string | null; employee_id: string | null; num_travelers?: number; status: string; package: { name: string; cost_price: number | null; price: number } | null }>) || [];
     const expenses = (expensesRes.data as Array<{ amount: number; category: string; expense_date: string }>) || [];
     const _packages = (packagesRes.data as Array<{ id: string; name: string; price: number; cost_price: number | null }>) || [];
     const employees = (employeesRes.data as Array<{ id: string; name: string }>) || [];
 
-    const totalSales = bookings.reduce((s, b) => s + Number(b.total_amount || 0), 0);
-    const totalCost = bookings.reduce((s, b) => {
+    const confirmedBookings = bookings.filter((b) => b.status === 'مؤكد');
+
+    const totalSales = confirmedBookings.reduce((s, b) => s + Number(b.total_amount || 0), 0);
+    const totalCost = confirmedBookings.reduce((s, b) => {
       const costPerPerson = Number(b.package?.cost_price || 0);
-      return s + costPerPerson;
+      return s + (costPerPerson * Number(b.num_travelers || 1));
     }, 0);
     const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
     const netProfit = totalSales - totalCost - totalExpenses;
@@ -52,35 +54,35 @@ export default function ProfitAnalysis() {
 
     // By package
     const pkgMap = new Map<string, DataRow>();
-    bookings.forEach((b) => {
+    confirmedBookings.forEach((b) => {
       const pkgName = b.package?.name || 'بدون باقة';
       const row = pkgMap.get(pkgName) || { label: pkgName, sales: 0, cost: 0, profit: 0 };
       row.sales += Number(b.total_amount || 0);
-      row.cost += Number(b.package?.cost_price || 0);
+      row.cost += Number(b.package?.cost_price || 0) * Number(b.num_travelers || 1);
       pkgMap.set(pkgName, row);
     });
     setByPackage(Array.from(pkgMap.values()).map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.profit - a.profit).slice(0, 6));
 
     // By month
     const monthMap = new Map<number, DataRow>();
-    bookings.forEach((b) => {
+    confirmedBookings.forEach((b) => {
       const m = new Date(b.booking_date).getMonth();
       const row = monthMap.get(m) || { label: monthNames[m], sales: 0, cost: 0, profit: 0 };
       row.sales += Number(b.total_amount || 0);
-      row.cost += Number(b.package?.cost_price || 0);
+      row.cost += Number(b.package?.cost_price || 0) * Number(b.num_travelers || 1);
       monthMap.set(m, row);
     });
     setByMonth(Array.from(monthMap.entries()).sort((a, b) => a[0] - b[0]).map(([, r]) => ({ ...r, profit: r.sales - r.cost })));
 
     // By employee
     const empMap = new Map<string, DataRow>();
-    bookings.forEach((b) => {
+    confirmedBookings.forEach((b) => {
       if (!b.employee_id) return;
       const emp = employees.find((e) => e.id === b.employee_id);
       const empName = emp?.name || 'غير معين';
       const row = empMap.get(empName) || { label: empName, sales: 0, cost: 0, profit: 0 };
       row.sales += Number(b.total_amount || 0);
-      row.cost += Number(b.package?.cost_price || 0);
+      row.cost += Number(b.package?.cost_price || 0) * Number(b.num_travelers || 1);
       empMap.set(empName, row);
     });
     setByEmployee(Array.from(empMap.values()).map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.profit - a.profit));
