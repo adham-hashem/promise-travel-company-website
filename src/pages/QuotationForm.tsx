@@ -77,7 +77,89 @@ export default function QuotationForm() {
   };
 
   const handlePrint = () => {
-    window.print();
+    const printContent = document.getElementById('quotation-print')?.innerHTML;
+    if (!printContent) return;
+    
+    const win = window.open('', '_blank');
+    if (!win) {
+       alert('يرجى السماح بالنوافذ المنبثقة (Pop-ups) للطباعة');
+       return;
+    }
+    
+    const html = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>عرض سعر برنامج سياحي</title>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+        <style>
+          body { 
+            font-family: 'Cairo', sans-serif; 
+            margin: 0; 
+            padding: 10mm; 
+            direction: rtl; 
+            background: white; 
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+          .print-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0; }
+          .print-subtitle { font-size: 13px; color: #64748b; margin-top: 5px; font-weight: bold; }
+          .print-section { margin-bottom: 25px; page-break-inside: avoid; }
+          .print-section-title { font-size: 18px; font-weight: bold; color: #b48600; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+          .print-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
+          .print-table th, .print-table td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
+          .print-table th { background-color: #f8fafc; color: #0f172a; font-weight: bold; width: 25%; }
+          .print-table td { background-color: #ffffff; color: #334155; }
+          .print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+          .print-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #f8fafc; }
+          .print-box-title { font-weight: bold; color: #0f172a; margin-bottom: 8px; font-size: 14px; }
+          .print-text { font-size: 13px; color: #475569; line-height: 1.8; white-space: pre-wrap; }
+          .print-total-box { margin-top: 15px; background: #0f172a; color: white; padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+          .print-total-label { font-size: 18px; font-weight: bold; color: #e2e8f0; }
+          .print-total-value { font-size: 24px; font-weight: bold; color: #fbbf24; }
+          .print-footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; page-break-inside: avoid; }
+          .signature-area { display: flex; justify-content: space-around; margin-top: 40px; margin-bottom: 30px; }
+          .signature-box { text-align: center; width: 30%; }
+          .signature-line { border-top: 1px solid #cbd5e1; margin-top: 50px; padding-top: 5px; font-weight: bold; color: #0f172a; }
+          
+          /* Utility Classes used in JSX */
+          .text-left { text-align: left; }
+          .text-center { text-align: center; }
+          .font-bold { font-weight: bold; }
+          .text-sm { font-size: 0.875rem; }
+          .text-xs { font-size: 0.75rem; }
+          .text-base { font-size: 1rem; }
+          .text-gray-800 { color: #1f2937; }
+          .text-gray-500 { color: #6b7280; }
+          .text-gray-400 { color: #9ca3af; }
+          .text-gray-600 { color: #4b5563; }
+          .text-red-600 { color: #dc2626; }
+          .text-navy-900 { color: #0f172a; }
+          .mt-1 { margin-top: 0.25rem; }
+          .mt-2 { margin-top: 0.5rem; }
+          .ml-2 { margin-left: 0.5rem; }
+          .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+          
+          @media print {
+             @page { margin: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        ${printContent}
+      </body>
+      </html>
+    `;
+    
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 500);
   };
 
   const handleReset = () => {
@@ -364,86 +446,10 @@ export default function QuotationForm() {
 
       {/* 
         ================================================================================
-        PRINT TEMPLATE (Visible only when printing)
+        PRINT TEMPLATE (Hidden from normal view, used for string extraction)
         ================================================================================
       */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @media print {
-          /* 1. Hide all non-printable elements */
-          .no-print, aside, header, nav, button, [role="navigation"] {
-            display: none !important;
-          }
-          
-          /* 2. Reset margins, paddings, and layout constraints on all parent containers */
-          html, body, #root, #root > div, main, main > div, .space-y-6 {
-            margin: 0 !important;
-            padding: 0 !important;
-            margin-right: 0 !important;
-            padding-right: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: 100% !important;
-            position: static !important;
-            transform: none !important;
-            animation: none !important;
-            background: white !important;
-            box-shadow: none !important;
-            border: none !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* 3. Ensure body visibility rules work properly */
-          body * {
-            visibility: hidden;
-          }
-          
-          /* 4. Display the print template in the normal flow */
-          #quotation-print, #quotation-print * {
-            visibility: visible !important;
-          }
-          
-          #quotation-print {
-            display: block !important;
-            position: static !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 12mm !important;
-            box-sizing: border-box !important;
-            background: white !important;
-            direction: rtl !important;
-          }
-          .no-print { display: none !important; }
-          .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-          .print-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0; }
-          .print-subtitle { font-size: 13px; color: #64748b; margin-top: 5px; }
-          .print-section { margin-bottom: 25px; page-break-inside: avoid; }
-          .print-section-title { font-size: 18px; font-weight: bold; color: #b48600; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; display: flex; align-items: center; gap: 8px; }
-          .print-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
-          .print-table th, .print-table td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
-          .print-table th { background-color: #f8fafc; color: #0f172a; font-weight: bold; width: 25%; }
-          .print-table td { background-color: #ffffff; color: #334155; }
-          
-          .print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-          .print-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #f8fafc; }
-          .print-box-title { font-weight: bold; color: #0f172a; margin-bottom: 8px; font-size: 14px; }
-          .print-text { font-size: 13px; color: #475569; line-height: 1.8; white-space: pre-wrap; }
-          
-          .print-total-box { margin-top: 15px; background: #0f172a; color: white; padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-          .print-total-label { font-size: 18px; font-weight: bold; color: #e2e8f0; }
-          .print-total-value { font-size: 24px; font-weight: bold; color: #fbbf24; }
-          
-          .print-footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; page-break-inside: avoid; }
-          .signature-area { display: flex; justify-content: space-around; margin-top: 40px; margin-bottom: 30px; }
-          .signature-box { text-align: center; width: 30%; }
-          .signature-line { border-top: 1px solid #cbd5e1; margin-top: 50px; padding-top: 5px; font-weight: bold; color: #0f172a; }
-          
-          @page { margin: 0; }
-        }
-      `}}/>
-
-      <div id="quotation-print" className="hidden print:block bg-white text-right">
+      <div id="quotation-print" className="hidden">
         {/* Header */}
         <div className="print-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
