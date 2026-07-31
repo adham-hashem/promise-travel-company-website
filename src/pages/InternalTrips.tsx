@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Plane, Pencil, Trash2, Loader2, X, MapPin,
+  Plus, Bus, Pencil, Trash2, Loader2, X, MapPin,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { InternalTrip, InternalTripStatus } from '../types';
@@ -162,7 +162,7 @@ export default function InternalTrips() {
             className={`stat-card text-right hover:ring-2 hover:ring-navy-300 transition-all cursor-pointer ${statusFilter === s ? 'ring-2 ring-navy-400' : ''}`}
           >
             <div className="flex items-center justify-between mb-2">
-              <Plane size={18} className="text-navy-600" />
+              <Bus size={18} className="text-navy-600" />
               <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${statusColors[s]}`}>{s}</span>
             </div>
             <p className="text-2xl font-black text-navy-900">{counts[s]}</p>
@@ -199,7 +199,7 @@ export default function InternalTrips() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <Plane size={40} className="mx-auto mb-3 opacity-30" />
+            <Bus size={40} className="mx-auto mb-3 opacity-30" />
             <p className="font-medium">لا توجد رحلات</p>
             <p className="text-sm mt-1">أضف أول رحلة داخلية</p>
           </div>

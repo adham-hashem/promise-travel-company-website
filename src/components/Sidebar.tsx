@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, CalendarCheck, Package,
   Tag, UserCog, BarChart3, Settings, LogOut,
-  Plane, ClipboardList, FileBarChart,
+  Plane, ClipboardList, FileBarChart, Bus,
   TrendingUp, Wallet, CalendarClock, Receipt, Calculator,
   FileCheck, Building2, FileText, MessageSquare, Zap,
   ChevronDown, ShoppingBag, DollarSign, MapPin,
@@ -100,7 +100,7 @@ const NAV_SECTIONS: NavSection[] = [
     icon: MapPin,
     anyPermission: ['reports_view'],
     items: [
-      { id: 'internal-trips', label: 'الرحلات', icon: Plane, permissionKey: 'reports_view' },
+      { id: 'internal-trips', label: 'الرحلات', icon: Bus, permissionKey: 'reports_view' },
       { id: 'internal-groups', label: 'المجموعات الداخلية', icon: Layers, alwaysVisible: true },
       { id: 'internal-bookings', label: 'الحجوزات الداخلية', icon: ClipboardList, permissionKey: 'reports_view' },
       { id: 'internal-customers', label: 'عملاء الرحلات', icon: Users, permissionKey: 'reports_view' },
