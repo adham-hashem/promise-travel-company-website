@@ -1,4 +1,4 @@
-import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe } from 'lucide-react';
+import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -70,9 +70,10 @@ interface Props {
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   onNavigate?: (page: Page) => void;
+  onToggleSidebar?: () => void;
 }
 
-export default function Header({ currentPage, searchValue, onSearchChange, onNavigate }: Props) {
+export default function Header({ currentPage, searchValue, onSearchChange, onNavigate, onToggleSidebar }: Props) {
   const { profile } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -189,9 +190,18 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-6 gap-4 fixed top-0 left-0 right-64 z-20 shadow-sm">
-      <div className="flex-1">
-        <h2 className="text-lg font-bold text-navy-900">{pageNames[currentPage] || 'لوحة التحكم'}</h2>
+    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-3 md:gap-4 fixed top-0 left-0 right-0 md:right-64 z-20 shadow-sm">
+      {onToggleSidebar && (
+        <button
+          onClick={onToggleSidebar}
+          className="p-2 rounded-xl hover:bg-gray-100 text-gray-600 md:hidden flex-shrink-0 transition-colors"
+          title="القائمة"
+        >
+          <Menu size={20} />
+        </button>
+      )}
+      <div className="flex-1 min-w-0">
+        <h2 className="text-sm md:text-lg font-bold text-navy-900 truncate">{pageNames[currentPage] || 'لوحة التحكم'}</h2>
       </div>
 
       {onSearchChange && (

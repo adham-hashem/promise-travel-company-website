@@ -146,9 +146,11 @@ interface Props {
   currentPage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
+export default function Sidebar({ currentPage, onNavigate, onLogout, isOpen, onClose }: Props) {
   const { profile, can, canAccessPage } = useAuth();
   const isSuper = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
 
@@ -253,9 +255,20 @@ export default function Sidebar({ currentPage, onNavigate, onLogout }: Props) {
   };
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-navy-950 to-navy-900 flex flex-col h-screen fixed right-0 top-0 z-30 shadow-2xl">
+    <aside className={`w-64 bg-gradient-to-b from-navy-950 to-navy-900 flex flex-col h-screen fixed right-0 top-0 z-30 shadow-2xl transition-transform duration-300 ${
+      isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+    }`}>
       {/* Logo */}
-      <div className="flex flex-col items-center justify-center py-5 px-4 border-b border-white/10">
+      <div className="flex flex-col items-center justify-center py-5 px-4 border-b border-white/10 relative">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute left-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg hover:bg-white/10 text-white md:hidden transition-colors"
+            title="إغلاق"
+          >
+            <X size={18} />
+          </button>
+        )}
         <img
           src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg"
           alt="Promise Logo"
