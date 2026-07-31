@@ -43,15 +43,12 @@ export default function Revenue() {
       setPaymentsData(pays);
 
       // Calculate totals
-      const approvedPays = pays.filter(p => p.isApproved);
-      const pendingPays = pays.filter(p => !p.isApproved && p.approval_status !== 'مرفوض');
-
-      const totalRevenue = approvedPays.reduce((s, p) => s + p.amount, 0);
-      const pendingRevenue = pendingPays.reduce((s, p) => s + p.amount, 0);
+      const totalRevenue = pays.reduce((s, p) => s + p.amount, 0);
+      const pendingRevenue = 0; // Removed from UI
       
       const now = new Date();
-      const thisMonthPays = approvedPays.filter(p => p.date.getMonth() === now.getMonth() && p.date.getFullYear() === now.getFullYear());
-      const lastMonthPays = approvedPays.filter(p => p.date.getMonth() === (now.getMonth() === 0 ? 11 : now.getMonth() - 1) && p.date.getFullYear() === (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()));
+      const thisMonthPays = pays.filter(p => p.date.getMonth() === now.getMonth() && p.date.getFullYear() === now.getFullYear());
+      const lastMonthPays = pays.filter(p => p.date.getMonth() === (now.getMonth() === 0 ? 11 : now.getMonth() - 1) && p.date.getFullYear() === (now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()));
       
       const thisMonth = thisMonthPays.reduce((s, p) => s + p.amount, 0);
       const lastMonth = lastMonthPays.reduce((s, p) => s + p.amount, 0);
@@ -59,11 +56,11 @@ export default function Revenue() {
 
       setStats({ totalRevenue, pendingRevenue, thisMonth, lastMonth, growth });
 
-      // Monthly Chart Data (last 6 months - based on approved payments)
+      // Monthly Chart Data (last 6 months - based on all payments)
       const mData = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mPays = approvedPays.filter(p => p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear());
+        const mPays = pays.filter(p => p.date.getMonth() === d.getMonth() && p.date.getFullYear() === d.getFullYear());
         mData.push({
           month: monthNames[d.getMonth()],
           الإيرادات: mPays.reduce((s, p) => s + p.amount, 0)
@@ -71,9 +68,9 @@ export default function Revenue() {
       }
       setMonthlyData(mData);
 
-      // Type Chart Data (based on approved payments)
+      // Type Chart Data (based on all payments)
       const tMap = new Map<string, number>();
-      approvedPays.forEach(p => tMap.set(p.type, (tMap.get(p.type) || 0) + p.amount));
+      pays.forEach(p => tMap.set(p.type, (tMap.get(p.type) || 0) + p.amount));
       setTypeData(Array.from(tMap.entries()).map(([name, value]) => ({ name, value })));
 
       setLoading(false);
@@ -99,12 +96,11 @@ export default function Revenue() {
       'نوع الدفع': p.type,
       'التاريخ': p.date.toLocaleDateString('ar-EG'),
       'تفاصيل / ملاحظات': p.notes,
-      'الحالة': p.isApproved ? 'معتمد' : p.approval_status
     })), 'تقرير_الإيرادات');
   };
 
   const handleExportPDF = () => {
-    const headers = ['#', 'اسم العميل', 'المبلغ', 'نوع الدفع', 'التاريخ', 'تفاصيل', 'الحالة'];
+    const headers = ['#', 'اسم العميل', 'المبلغ', 'نوع الدفع', 'التاريخ', 'تفاصيل'];
     const rows = paymentsData.map((p, i) => [
       i + 1,
       p.customerName,
@@ -112,7 +108,6 @@ export default function Revenue() {
       p.type,
       p.date.toLocaleDateString('ar-EG'),
       p.notes,
-      p.isApproved ? 'معتمد' : p.approval_status
     ]);
     exportToPDF('تقرير الإيرادات', headers, rows);
   };
@@ -122,7 +117,7 @@ export default function Revenue() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="section-title">تحليل الإيرادات</h2>
-          <p className="section-subtitle">نظرة عامة على الإيرادات والتدفقات النقدية الفعلية والمعلقة</p>
+          <p className="section-subtitle">نظرة عامة على الإيرادات والتدفقات النقدية الفعلية</p>
         </div>
         <div className="flex gap-2">
           <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">Excel</button>
@@ -135,24 +130,17 @@ export default function Revenue() {
       ) : (
         <>
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">إجمالي الإيرادات المعتمدة</p>
+                <p className="text-sm text-gray-500 mb-1">إجمالي الإيرادات</p>
                 <p className="text-2xl font-black text-navy-900">{fmt(stats.totalRevenue)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-gold-50 text-gold-600 flex items-center justify-center"><Wallet size={24} /></div>
             </div>
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500 mb-1">إيرادات معلقة (قيد الاعتماد)</p>
-                <p className="text-2xl font-black text-amber-600">{fmt(stats.pendingRevenue)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center"><Loader2 className="animate-spin" size={24} /></div>
-            </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">إيرادات الشهر الحالي (المعتمدة)</p>
+                <p className="text-sm text-gray-500 mb-1">إيرادات الشهر الحالي</p>
                 <p className="text-2xl font-black text-emerald-600">{fmt(stats.thisMonth)} <span className="text-xs font-medium text-gray-500">ج.م</span></p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><CalendarIcon size={24} /></div>

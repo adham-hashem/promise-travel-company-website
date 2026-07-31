@@ -70,8 +70,9 @@ function InvoiceModal({ invoice, customers, hotels, onClose, onSave }: InvoiceMo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const { client_code, ...restForm } = form;
     const payload = {
-      ...form,
+      ...restForm,
       invoice_number: subCode || form.invoice_number,
       payment_status: paymentStatus,
       customer_id: form.customer_id || null,

@@ -802,7 +802,11 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           )}
 
           {/* Documents */}
-          <DocumentsSection customerId={customer.id} customerName={customer.name} />
+          <DocumentsSection 
+            customerId={customer.id} 
+            customerName={customer.name} 
+            onDocsChange={setDocs} 
+          />
         </div>
       </div>
 

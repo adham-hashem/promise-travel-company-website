@@ -11,6 +11,7 @@ interface Props {
   customerId?: string;
   bookingId?: string;
   customerName?: string;
+  onDocsChange?: (docs: DocumentRecord[]) => void;
 }
 
 const docTypes: { id: DocType; label: string; icon: typeof FileText }[] = [
@@ -49,7 +50,9 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
       if (customerId) query = query.eq('customer_id', customerId);
       else if (bookingId) query = query.eq('booking_id', bookingId);
       const { data } = await query.order('created_at', { ascending: false });
-      setDocs((data as DocumentRecord[]) || []);
+      const loadedDocs = (data as DocumentRecord[]) || [];
+      setDocs(loadedDocs);
+      if (onDocsChange) onDocsChange(loadedDocs);
       setLoading(false);
     })();
   }, [customerId, bookingId]);
@@ -95,7 +98,9 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
 
     if (insertErr) { alert('فشل حفظ المستند: ' + insertErr.message); setUploading(false); return; }
     if (data) {
-      setDocs([data as DocumentRecord, ...docs]);
+      const newDocs = [data as DocumentRecord, ...docs];
+      setDocs(newDocs);
+      if (onDocsChange) onDocsChange(newDocs);
       // Notify operations employees
       await notifyOperationsStaff(data as DocumentRecord);
     }
@@ -130,7 +135,11 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
       reviewed_by: profile?.id || null,
       reviewed_at: new Date().toISOString(),
     }).eq('id', doc.id).select('*, customers(*), bookings(*)').single();
-    if (data) setDocs(docs.map(d => d.id === doc.id ? (data as DocumentRecord) : d));
+    if (data) {
+      const updatedDocs = docs.map(d => d.id === doc.id ? (data as DocumentRecord) : d);
+      setDocs(updatedDocs);
+      if (onDocsChange) onDocsChange(updatedDocs);
+    }
     setReviewingId(null);
     setReviewNotes('');
   };
