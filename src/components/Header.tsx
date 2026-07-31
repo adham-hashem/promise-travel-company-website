@@ -251,6 +251,15 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
         </button>
       )}
 
+      <a
+        href="/"
+        title="الذهاب للموقع الرئيسي"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-gold-200 bg-gold-50 text-gold-700 hover:bg-gold-100 transition-all transition-colors"
+      >
+        <Globe size={15} />
+        <span className="hidden md:inline">الموقع الرئيسي</span>
+      </a>
+
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setShowDropdown((v) => !v)}
