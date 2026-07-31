@@ -369,32 +369,50 @@ export default function QuotationForm() {
       */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
-          html, body {
+          /* 1. Hide all non-printable elements */
+          .no-print, aside, header, nav, button, [role="navigation"] {
+            display: none !important;
+          }
+          
+          /* 2. Reset margins, paddings, and layout constraints on all parent containers */
+          html, body, #root, #root > div, main, main > div, .space-y-6 {
             margin: 0 !important;
             padding: 0 !important;
+            margin-right: 0 !important;
+            padding-right: 0 !important;
             width: 100% !important;
-            overflow: visible !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            position: static !important;
+            transform: none !important;
+            animation: none !important;
             background: white !important;
+            box-shadow: none !important;
+            border: none !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          /* Hide everything */
-          body * { visibility: hidden; }
-          /* Show only the print area */
-          #quotation-print, #quotation-print * { visibility: visible; }
-          /* Position fixed = relative to viewport, ignores ALL parent margins/paddings */
+
+          /* 3. Ensure body visibility rules work properly */
+          body * {
+            visibility: hidden;
+          }
+          
+          /* 4. Display the print template in the normal flow */
+          #quotation-print, #quotation-print * {
+            visibility: visible !important;
+          }
+          
           #quotation-print {
-            position: fixed;
-            top: 0;
-            right: 0;
-            left: 0;
+            display: block !important;
+            position: static !important;
             width: 100% !important;
-            padding: 10mm;
-            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            direction: rtl;
-            background: white;
-            box-sizing: border-box;
-            z-index: 99999;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 12mm !important;
+            box-sizing: border-box !important;
+            background: white !important;
+            direction: rtl !important;
           }
           .no-print { display: none !important; }
           .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
