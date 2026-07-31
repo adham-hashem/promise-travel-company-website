@@ -130,9 +130,11 @@ export default function BookingPage({ preset, onDone }: Props) {
       }
 
       // 3. Upload optional documents
+      let hasDocs = false;
       for (const docType of optionalDocs) {
         const file = docFiles[docType.id];
         if (!file) continue;
+        hasDocs = true;
         const ext = file.name.split('.').pop();
         const filePath = `${customerId}/${Date.now()}_${docType.id}.${ext}`;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
@@ -190,22 +192,6 @@ export default function BookingPage({ preset, onDone }: Props) {
           travel_date: form.travel_date || null,
           notes: 'تم الإنشاء تلقائياً من حجز الموقع',
         });
-
-        // 6. Create notifications for admins
-        const { data: admins } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .in('role', ['super_admin', 'مالك النظام', 'مدير النظام']);
-          
-        if (admins && admins.length > 0) {
-          const notifications = admins.map(a => ({
-            employee_id: a.id,
-            type: 'new_booking',
-            title: 'حجز جديد من الموقع',
-            body: `حجز جديد باسم ${form.name}`,
-          }));
-          await supabase.from('notifications').insert(notifications);
-        }
       }
 
       setCreatedCode(clientCode);
@@ -243,21 +229,38 @@ export default function BookingPage({ preset, onDone }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[35vh] min-h-[280px] overflow-hidden">
-        <img src="/سفر.webp" alt="احجز الآن" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
+        <img src="https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="احجز الآن" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-3">
+          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-3 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <Globe size={12} /> حجز من الموقع
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-2">احجز رحلتك</h1>
-          <p className="text-white/80 text-lg">ابدأ رحلتك المباركة الآن — املأ النموذج وسنتواصل معك فوراً</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">احجز رحلتك</h1>
+          <p className="text-white text-lg drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">ابدأ رحلتك المباركة الآن — املأ النموذج وسنتواصل معك فوراً</p>
         </div>
       </section>
 
       {/* Form */}
       <section className="py-16">
         <div className="max-w-2xl mx-auto px-4">
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+<div className="mb-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-gold text-navy-900">
+                  <Phone size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-navy-900">تواصل معنا لحجزك</h3>
+                  <p className="mt-1 text-sm text-gray-600">لأي استفسار أو حجز، يمكنكم التواصل على الرقمين التاليين:</p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <a href="tel:01011106989" dir="ltr" className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-navy-800 transition-colors hover:border-gold-400 hover:text-gold-600">01011106989</a>
+                    <a href="tel:01055503857" dir="ltr" className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-navy-800 transition-colors hover:border-gold-400 hover:text-gold-600">01055503857</a>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-[#D4A017]">نخدم عملاءنا في جميع محافظات مصر.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
             <div className="bg-gradient-navy p-6">
               <h2 className="text-white font-black text-lg">نموذج الحجز</h2>
               <p className="text-white/60 text-sm mt-1">الحقول المطلوبة مشار إليها بعلامة <span className="text-red-400">*</span> — المستندات اختيارية</p>

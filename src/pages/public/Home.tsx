@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   Plane, Moon, MapPin, Star, Clock, Hotel as HotelIcon, ArrowLeft,
   ShieldCheck, Award, Users, Headphones, Plus, Minus, Tag,
-  CheckCircle2, Quote, Sparkles,
+  CheckCircle2, Quote, Sparkles, CalendarDays, UtensilsCrossed,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { Package, Offer, Hotel } from '../../types';
-import type { PublicPage } from '../../components/public/WebsiteRouter';
+import type { Package, Offer, Hotel, InternalTrip } from '../../types';
+import type { PublicPage, NavigateProps } from '../../components/public/WebsiteRouter';
 
 interface Props {
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, hotelId?: string) => void;
@@ -14,19 +14,25 @@ interface Props {
 
 const heroSlides = [
   {
-    img: '/prom1.webp',
+    img: 'سفر.webp',
+    place: 'رحلات لا تُنسى حول العالم',
+    title: 'العالم ينتظرك',
+    subtitle: 'أفضل الوجهات العالمية بأسعار تنافسية وخدمات احترافية',
+  },
+  {
+    img: 'كعبة.webp',
     place: 'مكة المكرمة',
     title: 'ابدأ رحلتك الإيمانية معنا',
     subtitle: 'رحلات حج وعمرة وسياحة داخلية بأعلى جودة',
   },
   {
-    img: '/المسجد.webp',
+    img: 'المسجد.webp',
     place: 'المدينة المنورة',
     title: 'زيارة المسجد النبوي الشريف',
     subtitle: 'أياماً من الطمأنينة والسكينة في رحاب الحبيب',
   },
   {
-    img: '/الداخلية.webp',
+    img: 'p1 (1).webp',
     place: 'شرم الشيخ',
     title: 'استمتع بشواطئ البحر الأحمر',
     subtitle: 'رحلات داخلية فاخرة إلى أجمل الوجهات المصرية',
@@ -39,28 +45,28 @@ const services = [
     icon: Moon,
     title: 'الحج',
     desc: 'برامج حج متكاملة مع نخبة من الشركات المعتمدة، إقامة فاخرة قرب المشاعر المقدسة، وإشراف متخصص طوال الرحلة.',
-    img: '/hegi.webp',
+    img: 'hegi.webp',
   },
   {
     id: 'umrah' as const,
     icon: Plane,
     title: 'العمرة',
     desc: 'عمرة مريحة على مدار العام بأفضل الفنادق القريبة من الحرم، وأسعار تنافسية، وخدمات نقل راقية من وإلى المطار.',
-    img: '/العمرة1.webp',
+    img: 'maka.webp',
   },
   {
     id: 'internal' as const,
     icon: MapPin,
     title: 'الرحلات الداخلية',
     desc: 'اكتشف جمال مصر من شرم الشيخ والغردقة والأقصر وأسوان، برامج سياحية مصممة بعناية لراحتك وإمتاعك.',
-    img: '/الداخلية.webp',
+    img: 'prom1.webp',
   },
   {
     id: 'hotels' as const,
     icon: HotelIcon,
     title: 'الفنادق',
     desc: 'نخبة من الفنادق المصنّفة قرب الحرم الشريف وأجمل الوجهات السياحية، باقات إقامة فاخرة بأسعار مناسبة.',
-    img: '/الفنادق1.webp',
+    img: 'الفنادق1.webp',
   },
 ];
 
@@ -107,6 +113,7 @@ export default function Home({ onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [offers, setOffers] = useState<(Offer & { packages?: Package })[]>([]);
   const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [internalTrips, setInternalTrips] = useState<InternalTrip[]>([]);
 
   useEffect(() => {
     const t = setInterval(() => setSlide((s) => (s + 1) % heroSlides.length), 5500);
@@ -138,6 +145,14 @@ export default function Home({ onNavigate }: Props) {
         .order('stars', { ascending: false })
         .limit(4);
       setHotels((htl as Hotel[]) || []);
+
+      const { data: trips } = await supabase
+        .from('internal_trips')
+        .select('*')
+        .eq('status', 'متاحة')
+        .order('created_at', { ascending: false })
+        .limit(3);
+      setInternalTrips((trips as InternalTrip[]) || []);
     })();
   }, []);
 
@@ -156,7 +171,6 @@ export default function Home({ onNavigate }: Props) {
             className={`absolute inset-0 transition-opacity duration-1000 ${i === slide ? 'opacity-100' : 'opacity-0'}`}
           >
             <img src={s.img} alt={s.place} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
           </div>
         ))}
 
@@ -165,7 +179,10 @@ export default function Home({ onNavigate }: Props) {
             <Sparkles size={12} />
             {heroSlides[slide].place}
           </span>
-          <h1 className="text-3xl md:text-6xl font-black mb-4 leading-tight max-w-4xl animate-fadeIn">
+          <h1
+            className="text-3xl md:text-6xl font-black mb-4 leading-tight max-w-4xl animate-fadeIn"
+            style={{ textShadow: '1px 0 0 rgba(0,0,0,0.7), -1px 0 0 rgba(0,0,0,0.7), 0 1px 0 rgba(0,0,0,0.7), 0 -1px 0 rgba(0,0,0,0.7), 1px 1px 0 rgba(0,0,0,0.5), -1px -1px 0 rgba(0,0,0,0.5)' }}
+          >
             {heroSlides[slide].title}
           </h1>
           <p className="text-white/80 text-base md:text-xl mb-8 max-w-2xl animate-fadeIn">
@@ -213,6 +230,10 @@ export default function Home({ onNavigate }: Props) {
             <p className="text-gray-600 leading-relaxed mb-6">
               نعمل بشفافية كاملة، ونهتم برضا عملائنا قبل أي شيء آخر. فريقنا متاح على مدار الساعة لخدمتك في كل خطوة من رحلتك.
             </p>
+            <div className="rounded-2xl border border-[#D4A017]/20 bg-[#F8F9FB] p-4 text-sm text-[#0B1F44]/70 mb-6">
+              <p className="font-semibold text-[#D4A017]">نخدم عملاءنا في جميع محافظات مصر.</p>
+              <p className="mt-1">نحن جاهزون لتقديم الاستشارات والحجوزات من أي محافظة في مصر.</p>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               {[
                 { num: '15+', label: 'سنوات خبرة' },
@@ -228,7 +249,7 @@ export default function Home({ onNavigate }: Props) {
           </div>
           <div className="relative">
             <img
-              src="/سفر.webp"
+              src="clook.webp"
               alt="Promise Travel"
               className="rounded-3xl shadow-2xl w-full h-[420px] object-cover"
             />
@@ -242,42 +263,65 @@ export default function Home({ onNavigate }: Props) {
       </section>
 
       {/* ===== Services ===== */}
-      <section className="py-20">
+      <section className="py-20 bg-[#F8F8FC]">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <span className="text-gold-600 font-bold text-sm">خدماتنا</span>
-            <h2 className="text-3xl md:text-4xl font-black text-navy-900 mt-2">
+            <span className="inline-flex items-center rounded-full border border-[#D4A017]/30 bg-[#D4A017]/10 px-4 py-1 text-sm font-bold text-[#D4A017]">
+              خدماتنا
+            </span>
+            <h2 className="text-3xl md:text-4xl font-black text-[#0B1F44] mt-4">
               باقة متكاملة من الخدمات السياحية
             </h2>
-            <p className="text-gray-500 mt-3 max-w-2xl mx-auto">
+            <p className="text-[#0B1F44]/60 mt-3 max-w-2xl mx-auto">
               نقدم لك كل ما تحتاجه لرحلة مريحة ومباركة، من تأشيرات الحج والعمرة إلى الرحلات السياحية الداخلية
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
             {services.map((s) => {
               const Icon = s.icon;
               return (
-                <div
+                <article
                   key={s.id}
                   onClick={() => onNavigate(s.id)}
-                  className="group bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer"
+                  className="group flex h-full cursor-pointer flex-col rounded-[24px] border border-[#0B1F44]/10 bg-white shadow-[0_20px_60px_-22px_rgba(11,31,68,0.28)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_30px_80px_-18px_rgba(11,31,68,0.35)]"
                 >
-                  <div className="relative h-48 overflow-hidden">
-                    <img src={s.img} alt={s.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-navy-950/80 to-transparent" />
-                    <div className="absolute bottom-4 right-4 w-12 h-12 rounded-2xl bg-gradient-gold flex items-center justify-center shadow-lg">
-                      <Icon size={22} className="text-navy-900" />
+                  <div className="relative m-3 mb-0 aspect-[16/9] overflow-hidden rounded-[24px]">
+                    <img
+                      src={s.img}
+                      alt={s.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute left-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#D4A017] backdrop-blur-sm">
+                      <Icon size={18} />
                     </div>
-                    <h3 className="absolute bottom-5 left-5 text-white font-black text-lg">{s.title}</h3>
                   </div>
-                  <div className="p-5">
-                    <p className="text-gray-600 text-xs leading-relaxed mb-4">{s.desc}</p>
-                    <span className="inline-flex items-center gap-1 text-gold-600 font-bold text-sm group-hover:gap-2 transition-all">
-                      اعرف المزيد <ArrowLeft size={14} />
-                    </span>
+
+                  <div className="flex flex-1 flex-col p-5 pt-4">
+                    <h3 className="text-lg font-black text-[#0B1F44]">{s.title}</h3>
+                    <p className="mt-3 text-sm leading-7 text-[#0B1F44]/70 line-clamp-2">{s.desc}</p>
+
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#0B1F44]/10 pt-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[#D4A017]">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#D4A017]/10">
+                          <Icon size={16} />
+                        </span>
+                        <span>خدمة مخصصة</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate(s.id);
+                        }}
+                        className="rounded-full bg-[#D4A017] px-4 py-2 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
+                      >
+                        اعرف المزيد
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
@@ -285,63 +329,212 @@ export default function Home({ onNavigate }: Props) {
       </section>
 
       {/* ===== Featured Packages ===== */}
-      <section className="py-20 bg-navy-950 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'url(https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1500)', backgroundSize: 'cover' }} />
-        <div className="max-w-7xl mx-auto px-4 relative">
-          <div className="text-center mb-12">
-            <span className="text-gold-400 font-bold text-sm">باقات مميزة</span>
-            <h2 className="text-3xl md:text-4xl font-black mt-2">استكشف باقاتنا الأكثر طلباً</h2>
+      <section className="relative overflow-hidden bg-[#F8F9FB] py-20">
+        <div className="absolute inset-0 opacity-80" style={{ background: 'radial-gradient(circle at top right, rgba(212, 160, 23, 0.12), transparent 36%)' }} />
+        <div className="relative mx-auto max-w-7xl px-4">
+          <div className="mb-12 text-center">
+            <span className="inline-flex items-center rounded-full border border-[#D4A017]/30 bg-[#D4A017]/10 px-4 py-1 text-sm font-bold text-[#D4A017]">
+              باقات مميزة
+            </span>
+            <h2 className="mt-4 text-3xl font-black text-[#0B1F44] md:text-4xl">استكشف باقاتنا الأكثر طلباً</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-[#0B1F44]/60">
+              برامج سفر مصممة بعناية لتجمع بين الراحة والرفاهية والتميز في كل التفاصيل.
+            </p>
           </div>
 
           {display.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-white/60">ستتوفر الباقات قريباً بإذن الله</p>
+            <div className="rounded-[24px] border border-[#0B1F44]/10 bg-white py-12 text-center shadow-[0_20px_60px_-22px_rgba(11,31,68,0.18)]">
+              <p className="text-[#0B1F44]/60">ستتوفر الباقات قريباً بإذن الله</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {display.map((p) => (
-                <div key={p.id} className="bg-white rounded-3xl overflow-hidden shadow-lg group hover:scale-[1.02] transition-all">
-                  <div className="relative h-52 overflow-hidden">
-                    <img
-                      src={p.image_url || 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800'}
-                      alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    {p.featured && (
-                      <span className="absolute top-3 right-3 bg-gradient-gold text-navy-900 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                        <Star size={10} fill="currentColor" /> مميزة
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <h3 className="font-black text-navy-900 text-lg mb-3">{p.name}</h3>
-                    <div className="space-y-2 text-xs text-gray-600 mb-4">
-                      {p.duration_days && (
-                        <div className="flex items-center gap-2"><Clock size={13} className="text-gold-600" /> {p.duration_days} يوم</div>
-                      )}
-                      {p.hotel && (
-                        <div className="flex items-center gap-2"><HotelIcon size={13} className="text-gold-600" /> {p.hotel}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div>
-                        <p className="text-xs text-gray-400">ابتداءً من</p>
-                        <p className="font-black text-navy-900 text-lg">{Number(p.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {display.map((p) => {
+                const destination = (p as Package & { destination?: string; city?: string; location?: string }).destination
+                  || (p as Package & { destination?: string; city?: string; location?: string }).city
+                  || (p as Package & { destination?: string; city?: string; location?: string }).location;
+                const mealPlan = (p as Package & { meal_plan?: string }).meal_plan;
+                const badgeText = p.featured ? 'الأكثر طلباً' : (p.hotel ? 'فاخرة' : undefined);
+
+                return (
+                  <article
+                    key={p.id}
+                    className="group mx-auto flex h-full w-full max-w-[340px] flex-col overflow-hidden rounded-[20px] border border-[#0B1F44]/10 bg-white shadow-[0_16px_45px_-22px_rgba(11,31,68,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-20px_rgba(11,31,68,0.35)]"
+                  >
+                    <div className="relative aspect-[5/3] overflow-hidden">
+                      <img
+                        src={p.image_url || 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800'}
+                        alt={p.name}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F44]/95 via-[#0B1F44]/20 to-transparent" />
+                      {badgeText ? (
+                        <span className="absolute right-3 top-3 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-black text-[#0B1F44] shadow-lg">
+                          {badgeText}
+                        </span>
+                      ) : null}
+                      <div className="absolute inset-x-0 bottom-0 p-4">
+                        <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                          {p.type}
+                        </span>
+                        <h3 className="mt-2 text-lg font-black text-white">{p.name}</h3>
                       </div>
+                    </div>
+
+                    <div className="flex flex-1 flex-col p-4">
+                      <div className="space-y-2.5 text-sm text-[#0B1F44]/70">
+                        {p.duration_days ? (
+                          <div className="flex items-center gap-2">
+                            <Clock size={13} className="text-[#D4A017]" />
+                            <span>{p.duration_days} يوم</span>
+                          </div>
+                        ) : null}
+                        {p.hotel ? (
+                          <div className="flex items-center gap-2">
+                            <HotelIcon size={13} className="text-[#D4A017]" />
+                            <span>{p.hotel}</span>
+                          </div>
+                        ) : null}
+                        {p.airline ? (
+                          <div className="flex items-center gap-2">
+                            <Plane size={13} className="text-[#D4A017]" />
+                            <span>{p.airline}</span>
+                          </div>
+                        ) : null}
+                        {destination ? (
+                          <div className="flex items-center gap-2">
+                            <MapPin size={13} className="text-[#D4A017]" />
+                            <span>{destination}</span>
+                          </div>
+                        ) : null}
+                        {mealPlan ? (
+                          <div className="flex items-center gap-2">
+                            <UtensilsCrossed size={13} className="text-[#D4A017]" />
+                            <span>{mealPlan}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {p.description ? (
+                        <p className="mt-3 text-sm leading-7 text-[#0B1F44]/60">{p.description}</p>
+                      ) : null}
+
+                      <div className="mt-4 rounded-[16px] border border-[#0B1F44]/10 bg-[#F8F9FB] p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#0B1F44]/45">ابتداءً من</p>
+                        <p className="mt-1 text-xl font-black text-[#D4A017]">
+                          {Number(p.price).toLocaleString('ar-EG')}
+                          <span className="ml-1 text-sm font-semibold text-[#0B1F44]/75">ج.م</span>
+                        </p>
+                      </div>
+
                       <button
+                        type="button"
                         onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })}
-                        className="bg-gradient-gold text-navy-900 font-bold text-xs px-4 py-2 rounded-xl hover:shadow-lg transition-all"
+                        className="mt-4 w-full rounded-full bg-[#D4A017] px-3 py-2.5 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
                       >
                         احجز الآن
                       </button>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>
       </section>
+
+      {/* ===== Internal Trips ===== */}
+      {internalTrips.length > 0 && (
+        <section className="py-20 bg-[#F8F8FC]">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-12">
+              <span className="inline-flex items-center rounded-full border border-[#D4A017]/30 bg-[#D4A017]/10 px-4 py-1 text-sm font-bold text-[#D4A017]">
+                رحلات داخلية مميزة
+              </span>
+              <h2 className="text-3xl md:text-4xl font-black text-[#0B2345] mt-4">اكتشف أحدث الوجهات الداخلية برفاهية استثنائية</h2>
+              <p className="text-[#0B2345]/60 mt-3 max-w-2xl mx-auto">
+                برامج مصممة لتمنحك تجربة سفر فاخرة تجمع بين الراحة والتميز في كل محطة.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+              {internalTrips.map((trip) => {
+                const durationDays = trip.duration
+                  ? trip.duration.replace(/[^0-9]/g, '')
+                  : (() => {
+                      const start = new Date(trip.start_date);
+                      const end = new Date(trip.end_date);
+                      const diff = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                      return diff.toString();
+                    })();
+
+                return (
+                  <article key={trip.id} className="group flex h-full flex-col rounded-[24px] border border-[#0B2345]/10 bg-white shadow-[0_20px_60px_-22px_rgba(11,35,69,0.28)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_30px_80px_-18px_rgba(11,35,69,0.35)]">
+                    <div className="relative m-3 mb-0 aspect-[16/9] overflow-hidden rounded-[24px]">
+                      <img
+                        src="https://images.pexels.com/photos/1450360/pexels-photo-1450360.jpeg?auto=compress&cs=tinysrgb&w=1200"
+                        alt={trip.destination}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0B2345]/95 via-[#0B2345]/20 to-transparent" />
+                      <div className="absolute left-4 top-4 rounded-full bg-[#D4A017] px-3 py-1 text-[11px] font-black text-[#0B2345]">
+                        {trip.destination}
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 p-5">
+                        <h3 className="text-lg font-black text-white">{trip.destination}</h3>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-1 flex-col p-5 pt-4">
+                      <h4 className="text-lg font-black text-[#0B2345]">{trip.name}</h4>
+                      <p className="mt-2 text-sm leading-relaxed text-[#0B2345]/65 line-clamp-2">
+                        {trip.hotel ? `رحلة فاخرة تشمل الإقامة في ${trip.hotel}` : 'رحلة داخلية مميزة مصممة لتمنحك تجربة سفر راقية ومريحة.'}
+                      </p>
+
+                      <div className="mt-4 space-y-2 text-sm text-[#0B2345]/70">
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-[#D4A017]" />
+                          <span>{durationDays} أيام</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin size={14} className="text-[#D4A017]" />
+                          <span>{trip.destination}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex items-end justify-between gap-3 border-t border-[#0B2345]/10 pt-4">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#0B2345]/45">ابتداءً من</p>
+                          <p className="mt-1 text-2xl font-black text-[#D4A017]">
+                            {Number(trip.price).toLocaleString('ar-EG')}
+                            <span className="ml-1 text-sm font-semibold text-[#0B2345]/70">ج.م</span>
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('booking')}
+                          className="rounded-full bg-[#D4A017] px-4 py-2 text-sm font-black text-[#0B2345] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
+                        >
+                          احجز الآن
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="text-center mt-8">
+              <button
+                onClick={() => onNavigate('internal')}
+                className="text-[#D4A017] font-bold text-sm transition-colors duration-300 hover:text-[#C08F0F]"
+              >
+                عرض جميع الرحلات الداخلية
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ===== Offers ===== */}
       {validOffers.length > 0 && (
@@ -351,40 +544,91 @@ export default function Home({ onNavigate }: Props) {
               <span className="text-gold-600 font-bold text-sm">أحدث العروض</span>
               <h2 className="text-3xl md:text-4xl font-black text-navy-900 mt-2">عروض حصرية لفترة محدودة</h2>
             </div>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
               {validOffers.map((o) => {
                 const disc = o.discounted_price ?? (o.packages ? Math.round(Number(o.packages.price) * (1 - o.discount_percentage / 100)) : null);
                 const img = o.image_url || o.packages?.image_url;
+                const destination = (o as Offer & { destination?: string; city?: string; location?: string }).destination
+                  || (o as Offer & { destination?: string; city?: string; location?: string }).city
+                  || (o as Offer & { destination?: string; city?: string; location?: string }).location;
+                const validUntil = o.end_date ? new Date(o.end_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+
                 return (
-                  <div key={o.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 group hover:shadow-xl hover:-translate-y-1 transition-all relative">
-                    <div className="absolute top-4 right-4 z-10 bg-gradient-to-l from-red-600 to-red-500 text-white font-black px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-sm">
-                      <Tag size={13} />
-                      {o.discount_percentage}%
-                    </div>
-                    <div className="relative h-44 overflow-hidden bg-gradient-navy flex items-center justify-center">
+                  <article key={o.id} className="group flex h-full flex-col rounded-[24px] border border-[#0B1F44]/10 bg-white shadow-[0_20px_60px_-22px_rgba(11,31,68,0.28)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_30px_80px_-18px_rgba(11,31,68,0.35)]">
+                    <div className="relative m-3 mb-0 aspect-[16/9] overflow-hidden rounded-[24px]">
                       {img ? (
-                        <img src={img} alt={o.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <img src={img} alt={o.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
                       ) : (
-                        <Tag size={48} className="text-gold-400/40" />
+                        <img
+                          src="https://images.pexels.com/photos/1450360/pexels-photo-1450360.jpeg?auto=compress&cs=tinysrgb&w=1200"
+                          alt={o.name}
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        />
                       )}
-                    </div>
-                    <div className="p-5">
-                      <h3 className="font-black text-navy-900 text-lg mb-2">{o.name}</h3>
-                      {o.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{o.description}</p>}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <div>
-                          {o.original_price != null && <p className="text-xs text-gray-400 line-through">{Number(o.original_price).toLocaleString('ar-EG')} ج.م</p>}
-                          {disc != null && <p className="font-black text-red-600 text-lg">{Number(disc).toLocaleString('ar-EG')} ج.م</p>}
-                        </div>
-                        <button
-                          onClick={() => onNavigate('booking', { packageId: o.packages?.id, type: o.type || o.packages?.type })}
-                          className="bg-gradient-gold text-navy-900 font-bold text-xs px-4 py-2 rounded-xl hover:shadow-lg transition-all"
-                        >
-                          احصل على العرض
-                        </button>
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F44]/95 via-[#0B1F44]/20 to-transparent" />
+                      <div className="absolute left-4 top-4 rounded-full bg-[#D4A017] px-3 py-1 text-[11px] font-black text-[#0B1F44] shadow-lg">
+                        {o.discount_percentage}%
+                      </div>
+                      <div className="absolute right-4 top-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+                        عرض لفترة محدودة
+                      </div>
+                      <div className="absolute inset-x-0 bottom-0 p-5">
+                        <h3 className="text-lg font-black text-white">{o.name}</h3>
                       </div>
                     </div>
-                  </div>
+
+                    <div className="flex flex-1 flex-col p-5 pt-4">
+                      {o.description && <p className="text-sm leading-relaxed text-[#0B1F44]/65">{o.description}</p>}
+
+                      <div className="mt-4 space-y-2 text-sm text-[#0B1F44]/70">
+                        {validUntil ? (
+                          <div className="flex items-center gap-2">
+                            <CalendarDays size={14} className="text-[#D4A017]" />
+                            <span>حتى {validUntil}</span>
+                          </div>
+                        ) : null}
+                        {destination ? (
+                          <div className="flex items-center gap-2">
+                            <MapPin size={14} className="text-[#D4A017]" />
+                            <span>{destination}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-5 border-t border-[#0B1F44]/10 pt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            {o.original_price != null && (
+                              <p className="text-sm text-[#0B1F44]/45 line-through">{Number(o.original_price).toLocaleString('ar-EG')} ج.م</p>
+                            )}
+                            {disc != null && (
+                              <p className="mt-1 text-2xl font-black text-[#D4A017]">
+                                {Number(disc).toLocaleString('ar-EG')}
+                                <span className="ml-1 text-sm font-semibold text-[#0B1F44]/70">ج.م</span>
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onNavigate('booking', { packageId: o.packages?.id, type: o.type || o.packages?.type })}
+                              className="rounded-full bg-[#D4A017] px-4 py-2 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
+                            >
+                              احصل على العرض
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onNavigate('booking', { packageId: o.packages?.id, type: o.type || o.packages?.type })}
+                              className="text-sm font-semibold text-[#0B1F44]/65 transition-colors duration-300 hover:text-[#D4A017]"
+                            >
+                              التفاصيل
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
                 );
               })}
             </div>

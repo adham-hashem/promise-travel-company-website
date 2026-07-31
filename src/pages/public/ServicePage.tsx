@@ -1,137 +1,148 @@
 import { useEffect, useState } from 'react';
-import { Clock, Hotel, Plane, Star, ArrowLeft, Loader2, MapPin } from 'lucide-react';
+import { Clock, Hotel, Plane, ArrowLeft, Loader2, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
 
 interface Props {
-  type: 'حج' | 'عمرة';
+  type?: 'حج' | 'عمرة';
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }) => void;
 }
 
 const heroByType = {
-  'حج': {
-    img: '/hegi.webp',
-    title: 'برامج الحج المتكاملة',
-    subtitle: 'فريضة العمر بأيدٍ أمينة، إقامة مريحة وإشراف متخصص',
+  حج: {
+    img: 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    title: 'باقات الحج',
+    subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
   },
-  'عمرة': {
-    img: '/العمرة1.webp',
-    title: 'برامج العمرة على مدار العام',
-    subtitle: 'عمرة مريحة بأفضل الفنادق وأقربها للحرم الشريف',
+  عمرة: {
+    img: 'https://images.pexels.com/photos/934879/pexels-photo-934879.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    title: 'باقات العمرة',
+    subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
   },
 };
 
 export default function ServicePage({ type, onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
-  const hero = heroByType[type];
+  const hero = heroByType[type || 'حج'];
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('packages')
-        .select('*')
-        .eq('is_active', true)
-        .eq('type', type)
-        .order('created_at', { ascending: false });
+      const query = supabase.from('packages').select('*').eq('is_active', true).order('created_at', { ascending: false });
+
+      const { data } = type ? await query.eq('type', type) : await query.in('type', ['حج', 'عمرة']);
+
       setPackages((data as Package[]) || []);
       setLoading(false);
     })();
   }, [type]);
 
-  const features =
-    type === 'حج'
-      ? ['إقامة قرب المشاعر المقدسة', 'مرشد ديني متخصص', 'نقل مكيف بين المشاعر', 'وجبات إفطار وسحور']
-      : ['فنادق قريبة من الحرم', 'تأشيرة عمرة معتمدة', 'تذاكر طيران ذهاب وعودة', 'نقل من وإلى المطار'];
+  const visiblePackages = packages;
 
   return (
     <div>
       {/* Hero */}
       <section className="relative h-[60vh] min-h-[420px] overflow-hidden">
         <img src={hero.img} alt={hero.title} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-16 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4">
+          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <MapPin size={12} /> {type === 'حج' ? 'مكة المكرمة والمشاعر' : 'مكة المكرمة والمدينة'}
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3">{hero.title}</h1>
-          <p className="text-white/80 text-lg max-w-2xl">{hero.subtitle}</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-3 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">{hero.title}</h1>
+          <p className="text-white text-lg max-w-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">{hero.subtitle}</p>
         </div>
       </section>
 
-      {/* Features strip */}
-      <section className="bg-navy-50 py-6 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {features.map((f) => (
-            <div key={f} className="flex items-center gap-2 text-navy-800">
-              <div className="w-8 h-8 rounded-lg bg-gradient-gold flex items-center justify-center text-navy-900 flex-shrink-0">
-                <Star size={14} fill="currentColor" />
-              </div>
-              <span className="text-xs font-semibold">{f}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Packages */}
-      <section className="py-16">
+      <section className="bg-[#F8F9FB] py-10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-2xl md:text-3xl font-black text-navy-900">باقات {type} المتاحة</h2>
-              <p className="text-gray-500 text-sm mt-1">اختر الباقة المناسبة لك وابدأ رحلتك المباركة</p>
+              <h2 className="text-2xl md:text-3xl font-black text-[#0B1F44]">{hero.title}</h2>
+              <p className="mt-1 text-sm text-[#0B1F44]/60">{hero.subtitle}</p>
             </div>
             <button
               onClick={() => onNavigate('offers')}
-              className="text-gold-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all"
+              className="flex items-center gap-1 text-sm font-bold text-[#D4A017] transition-all hover:gap-2"
             >
               عرض العروض <ArrowLeft size={14} />
             </button>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-navy-700" /></div>
-          ) : packages.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <Plane size={48} className="mx-auto mb-3 opacity-30" />
-              <p className="font-medium">لا توجد باقات متاحة حالياً</p>
-              <p className="text-sm mt-1"> سيتم إضافته قريباً بإذن الله</p>
+            <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-[#0B1F44]" /></div>
+          ) : visiblePackages.length === 0 ? (
+            <div className="rounded-[24px] border border-[#0B1F44]/10 bg-white py-16 text-center shadow-[0_20px_60px_-22px_rgba(11,31,68,0.18)]">
+              <Plane size={48} className="mx-auto mb-3 opacity-30 text-[#0B1F44]" />
+              <p className="font-medium text-[#0B1F44]">لا توجد باقات متاحة حالياً</p>
+              <p className="mt-1 text-sm text-[#0B1F44]/60">سيتم إضافتها قريباً بإذن الله</p>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {packages.map((p) => (
-                <div key={p.id} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100 group hover:shadow-xl hover:-translate-y-1 transition-all">
-                  <div className="relative h-52 overflow-hidden">
-                    <img src={p.image_url || 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    {p.featured && (
-                      <span className="absolute top-3 right-3 bg-gradient-gold text-navy-900 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                        <Star size={10} fill="currentColor" /> مميزة
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {visiblePackages.map((p) => (
+                <article
+                  key={p.id}
+                  className="group flex h-full flex-col overflow-hidden rounded-[20px] border border-[#0B1F44]/10 bg-white shadow-[0_16px_45px_-22px_rgba(11,31,68,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-20px_rgba(11,31,68,0.35)]"
+                >
+                  <div className="relative h-[220px] overflow-hidden">
+                    <img
+                      src={p.image_url || 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800'}
+                      alt={p.name}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F44]/90 via-[#0B1F44]/15 to-transparent" />
+                    {p.featured ? (
+                      <span className="absolute right-3 top-3 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-black text-[#0B1F44] shadow-lg">
+                        مميزة
                       </span>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    <h3 className="font-black text-navy-900 text-lg mb-3">{p.name}</h3>
-                    {p.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>}
-                    <div className="space-y-2 text-xs text-gray-600 mb-4">
-                      {p.duration_days && <div className="flex items-center gap-2"><Clock size={13} className="text-gold-600" /> {p.duration_days} يوم</div>}
-                      {p.hotel && <div className="flex items-center gap-2"><Hotel size={13} className="text-gold-600" /> {p.hotel}</div>}
-                      {p.airline && <div className="flex items-center gap-2"><Plane size={13} className="text-gold-600" /> {p.airline}</div>}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div>
-                        <p className="text-xs text-gray-400">يبدأ من</p>
-                        <p className="font-black text-navy-900 text-lg">{Number(p.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p>
-                      </div>
-                      <button
-                        onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })}
-                        className="bg-gradient-gold text-navy-900 font-bold text-xs px-4 py-2 rounded-xl hover:shadow-lg transition-all"
-                      >
-                        احجز الآن
-                      </button>
+                    ) : null}
+                    <div className="absolute inset-x-0 bottom-0 p-4">
+                      <h3 className="text-lg font-black text-white">{p.name}</h3>
                     </div>
                   </div>
-                </div>
+
+                  <div className="flex flex-1 flex-col p-4">
+                    {p.description ? <p className="text-sm leading-7 text-[#0B1F44]/60">{p.description}</p> : null}
+
+                    <div className="mt-3 space-y-2.5 text-sm text-[#0B1F44]/70">
+                      {p.duration_days ? (
+                        <div className="flex items-center gap-2">
+                          <Clock size={13} className="text-[#D4A017]" />
+                          <span>{p.duration_days} يوم</span>
+                        </div>
+                      ) : null}
+                      {p.hotel ? (
+                        <div className="flex items-center gap-2">
+                          <Hotel size={13} className="text-[#D4A017]" />
+                          <span>{p.hotel}</span>
+                        </div>
+                      ) : null}
+                      {p.airline ? (
+                        <div className="flex items-center gap-2">
+                          <Plane size={13} className="text-[#D4A017]" />
+                          <span>{p.airline}</span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 rounded-[16px] border border-[#0B1F44]/10 bg-[#F8F9FB] p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#0B1F44]/45">ابتداءً من</p>
+                      <p className="mt-1 text-xl font-black text-[#D4A017]">
+                        {Number(p.price).toLocaleString('ar-EG')}
+                        <span className="ml-1 text-sm font-semibold text-[#0B1F44]/75">ج.م</span>
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })}
+                      className="mt-4 w-full rounded-full bg-[#D4A017] px-3 py-2.5 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
+                    >
+                      احجز الآن
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           )}

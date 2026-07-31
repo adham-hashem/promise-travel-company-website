@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Hotel, Users, Loader2, Bus, Calendar } from 'lucide-react';
+import { MapPin, Hotel, Users, Loader2, Plane, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { InternalTrip } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
@@ -28,14 +28,14 @@ export default function InternalPage({ onNavigate }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[55vh] min-h-[400px] overflow-hidden">
-        <img src="/الداخلية.webp" alt="الرحلات الداخلية" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
+        <img src="https://images.pexels.com/photos/1287460/pexels-photo-1287460.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="الرحلات الداخلية" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-16 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4">
-            <Bus size={12} /> سياحة داخلية
+          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
+            <Plane size={12} /> سياحة داخلية
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3">الرحلات الداخلية</h1>
-          <p className="text-white/80 text-lg max-w-2xl">اكتشف جمال مصر — شرم الشيخ، الغردقة، الأقصر وأسوان برامج سياحية متكاملة</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-3 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">الرحلات الداخلية</h1>
+          <p className="text-white text-lg max-w-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">اكتشف جمال مصر — شرم الشيخ، الغردقة، الأقصر وأسوان برامج سياحية متكاملة</p>
         </div>
       </section>
 

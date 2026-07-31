@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Star, MapPin, CheckCircle2, Loader2, Hotel as HotelIcon, ArrowRight, Clock, Plane } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Hotel, Package } from '../../types';
-import type { PublicPage } from '../../components/public/WebsiteRouter';
+import type { PublicPage, NavigateProps } from '../../components/public/WebsiteRouter';
 
 interface Props {
   hotelId: string;
@@ -52,7 +52,7 @@ export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
     );
   }
 
-  const images = hotel.images?.length ? hotel.images : ['/الفنادق1.webp'];
+  const images = hotel.images?.length ? hotel.images : ['https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=1200'];
 
   return (
     <div>

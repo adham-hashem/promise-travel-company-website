@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Clock, MessageCircle } from 'lucide-react';
+import { Phone, MapPin, Clock, MessageCircle, Facebook } from 'lucide-react';
 
 export default function ContactPage() {
   const contacts = [
@@ -6,22 +6,19 @@ export default function ContactPage() {
       icon: Phone,
       title: 'أرقام الهاتف',
       items: [
-        { label: 'الخط الأول', value: '+20 100 123 4567' },
-        { label: 'الخط الثاني', value: '+20 101 234 5678' },
+        { label: 'الخط الأول', value: '01011106989', href: 'tel:01011106989' },
+        { label: 'الخط الثاني', value: '01055503857', href: 'tel:01055503857' },
       ],
+    },
+    {
+      icon: Facebook,
+      title: 'فيسبوك',
+      items: [{ label: 'صفحة الشركة', value: 'facebook.com/Promisetravil', href: 'https://www.facebook.com/Promisetravil' }],
     },
     {
       icon: MessageCircle,
-      title: 'واتساب',
-      items: [{ label: 'تواصل فوري', value: '+20 100 123 4567' }],
-    },
-    {
-      icon: Mail,
-      title: 'البريد الإلكتروني',
-      items: [
-        { label: 'استفسارات', value: 'info@promisetravel.com' },
-        { label: 'حجوزات', value: 'bookings@promisetravel.com' },
-      ],
+      title: 'الرسائل',
+      items: [{ label: 'تواصل سريع', value: 'Promise Travel', href: 'https://www.facebook.com/Promisetravil' }],
     },
   ];
 
@@ -29,11 +26,11 @@ export default function ContactPage() {
     <div>
       {/* Hero */}
       <section className="relative h-[40vh] min-h-[300px] overflow-hidden">
-        <img src="/سفر.webp" alt="تواصل معنا" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
+        <img src="maka.webp" alt="تواصل معنا" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
-          <h1 className="text-3xl md:text-5xl font-black mb-2">تواصل معنا</h1>
-          <p className="text-white/80 text-lg">نحن هنا لمساعدتك — تواصل معنا في أي وقت</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">تواصل معنا</h1>
+          <p className="text-white text-lg drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">نحن هنا لمساعدتك — تواصل معنا في أي وقت</p>
         </div>
       </section>
 
@@ -44,6 +41,7 @@ export default function ContactPage() {
             <span className="text-gold-600 font-bold text-sm">معلومات التواصل</span>
             <h2 className="text-2xl md:text-3xl font-black text-navy-900 mt-2">طرق التواصل المتاحة</h2>
             <p className="text-gray-500 text-sm mt-3 max-w-xl mx-auto">فريقنا متاح لمساعدتك على مدار الأسبوع. اختر الطريقة الأنسب لك للتواصل معنا.</p>
+            <p className="mt-3 text-sm font-semibold text-[#D4A017]">نخدم عملاءنا في جميع محافظات مصر.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-10">
@@ -59,7 +57,13 @@ export default function ContactPage() {
                     {c.items.map((it) => (
                       <div key={it.value}>
                         <p className="text-xs text-gray-400">{it.label}</p>
-                        <p className="text-navy-800 font-bold text-sm" dir="ltr">{it.value}</p>
+                        {it.href ? (
+                          <a href={it.href} target={it.href.startsWith('http') ? '_blank' : undefined} rel={it.href.startsWith('http') ? 'noopener noreferrer' : undefined} className="block text-navy-800 font-bold text-sm transition-colors hover:text-gold-600" dir="ltr">
+                            {it.value}
+                          </a>
+                        ) : (
+                          <p className="text-navy-800 font-bold text-sm" dir="ltr">{it.value}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -77,8 +81,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-lg mb-2">العنوان / الموقع</h3>
-                  <p className="text-white/80 text-sm leading-relaxed">القاهرة، جمهورية مصر العربية</p>
-                  <p className="text-white/60 text-xs mt-2">يمكنك زيارتنا في مقرنا الرئيسي خلال ساعات العمل</p>
+                  <p className="text-white/80 text-sm leading-relaxed">دمياط الجديدة، المنطقة المركزية، بجوار مطعم عالفحم، جمهورية مصر العربية</p>
+                  <p className="text-white/60 text-xs mt-2">نخدم عملاءنا في جميع محافظات مصر.</p>
                 </div>
               </div>
             </div>

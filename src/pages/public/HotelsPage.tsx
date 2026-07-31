@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Star, MapPin, Search, Loader2, Hotel as HotelIcon, SlidersHorizontal, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Hotel } from '../../types';
-import type { PublicPage } from '../../components/public/WebsiteRouter';
+import type { PublicPage, NavigateProps } from '../../components/public/WebsiteRouter';
 
 interface Props {
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, hotelId?: string) => void;
@@ -49,17 +49,17 @@ export default function HotelsPage({ onNavigate }: Props) {
       {/* Banner */}
       <section className="relative h-[52vh] min-h-[380px] overflow-hidden">
         <img
-          src="/الفنادق1.webp"
+          src="https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=1920"
           alt="الفنادق"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/20" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-16 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4">
+          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <HotelIcon size={12} /> إقامة فاخرة
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3">الفنادق</h1>
-          <p className="text-white/80 text-lg max-w-2xl">اختر من نخبة الفنادق المصنّفة قرب الحرم الشريف وأجمل الوجهات السياحية</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-3 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">الفنادق</h1>
+          <p className="text-white text-lg max-w-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">اختر من نخبة الفنادق المصنّفة قرب الحرم الشريف وأجمل الوجهات السياحية</p>
         </div>
       </section>
 
@@ -117,12 +117,14 @@ export default function HotelsPage({ onNavigate }: Props) {
       </section>
 
       {/* Hotels grid */}
-      <section className="py-12 bg-gray-50 min-h-[40vh]">
+      <section className="py-12 bg-[#F8F9FB] min-h-[40vh]">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-black text-navy-900">
-              {filtered.length} فندق متاح
-            </h2>
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-black text-[#0B1F44]">الفنادق المتاحة</h2>
+              <p className="mt-1 text-sm text-[#0B1F44]/60">اختر إقامة فاخرة تناسب رحلتك مع أعلى معايير الراحة والرفاهية.</p>
+            </div>
+            <p className="text-sm font-semibold text-[#0B1F44]/60">{filtered.length} فندق متاح</p>
           </div>
 
           {loading ? (
@@ -134,65 +136,65 @@ export default function HotelsPage({ onNavigate }: Props) {
               <p className="text-sm mt-1">جرّب تعديل الفلاتر أو امسحها لعرض الكل</p>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
               {filtered.map((hotel) => (
-                <div
+                <article
                   key={hotel.id}
-                  className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                  className="group flex h-full flex-col overflow-hidden rounded-[20px] border border-[#0B1F44]/10 bg-white shadow-[0_16px_45px_-22px_rgba(11,31,68,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-20px_rgba(11,31,68,0.35)]"
                 >
-                  <div className="relative h-52 overflow-hidden bg-navy-100">
+                  <div className="relative h-[220px] overflow-hidden bg-[#F3F4F8]">
                     {hotel.images?.[0] ? (
-                      <img src={hotel.images[0]} alt={hotel.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <img src={hotel.images[0]} alt={hotel.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-navy">
-                        <HotelIcon size={48} className="text-gold-400/40" />
+                      <div className="flex h-full w-full items-center justify-center bg-[#0B1F44]">
+                        <HotelIcon size={48} className="text-[#D4A017]/40" />
                       </div>
                     )}
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 shadow-sm backdrop-blur">
                       {Array.from({ length: hotel.stars }).map((_, i) => (
-                        <Star key={i} size={11} className="text-gold-500" fill="currentColor" />
+                        <Star key={i} size={11} className="text-[#D4A017]" fill="currentColor" />
                       ))}
                     </div>
                     {hotel.category === 'VIP' && (
-                      <span className="absolute top-3 left-3 bg-gradient-gold text-navy-900 text-xs font-black px-2.5 py-1 rounded-full shadow-md">VIP</span>
+                      <span className="absolute left-3 top-3 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-black text-[#0B1F44] shadow-lg">VIP</span>
                     )}
                   </div>
 
-                  <div className="p-5 flex-1 flex flex-col">
-                    <h3 className="font-black text-navy-900 text-lg mb-2">{hotel.name}</h3>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
-                      <MapPin size={13} className="text-gold-600" />
-                      {hotel.city}، {hotel.country}
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="text-lg font-black text-[#0B1F44]">{hotel.name}</h3>
+                    <div className="mt-2 flex items-center gap-1.5 text-sm text-[#0B1F44]/70">
+                      <MapPin size={13} className="text-[#D4A017]" />
+                      <span>{hotel.city}، {hotel.country}</span>
                     </div>
 
                     {hotel.services?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-4">
+                      <div className="mt-3 flex flex-wrap gap-1.5">
                         {hotel.services.slice(0, 4).map((s) => (
-                          <span key={s} className="bg-navy-50 text-navy-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">{s}</span>
+                          <span key={s} className="rounded-md bg-[#F8F9FB] px-2 py-0.5 text-[10px] font-semibold text-[#0B1F44]/70">{s}</span>
                         ))}
                         {hotel.services.length > 4 && (
-                          <span className="text-[10px] text-gray-400 font-medium py-0.5">+{hotel.services.length - 4}</span>
+                          <span className="py-0.5 text-[10px] font-medium text-[#0B1F44]/45">+{hotel.services.length - 4}</span>
                         )}
                       </div>
                     )}
 
-                    <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div>
-                        <p className="text-[10px] text-gray-400">يبدأ من / لليلة</p>
-                        <p className="font-black text-navy-900 text-lg">
-                          {Number(hotel.price_per_night).toLocaleString('ar-EG')}
-                          <span className="text-xs font-medium mr-1">ج.م</span>
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => onNavigate('hotel-details', undefined, hotel.id)}
-                        className="bg-navy-800 hover:bg-navy-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all hover:shadow-lg"
-                      >
-                        عرض التفاصيل
-                      </button>
+                    <div className="mt-4 rounded-[16px] border border-[#0B1F44]/10 bg-[#F8F9FB] p-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#0B1F44]/45">يبدأ من / لليلة</p>
+                      <p className="mt-1 text-xl font-black text-[#D4A017]">
+                        {Number(hotel.price_per_night).toLocaleString('ar-EG')}
+                        <span className="ml-1 text-sm font-semibold text-[#0B1F44]/75">ج.م</span>
+                      </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('hotel-details', undefined, hotel.id)}
+                      className="mt-4 w-full rounded-full bg-[#D4A017] px-3 py-2.5 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
+                    >
+                      عرض التفاصيل
+                    </button>
                   </div>
-                </div>
+                </article>
               ))}
             </div>
           )}

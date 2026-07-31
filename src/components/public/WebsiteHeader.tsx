@@ -19,18 +19,6 @@ const navItems: { id: PublicPage; label: string }[] = [
   { id: 'contact', label: 'تواصل معنا' },
 ];
 
-const PAGE_URLS: Record<PublicPage, string> = {
-  home: '/',
-  hajj: '/hajj',
-  umrah: '/umrah',
-  internal: '/internal',
-  hotels: '/hotels',
-  'hotel-details': '/hotels',
-  offers: '/offers',
-  booking: '/booking',
-  contact: '/contact',
-};
-
 export default function WebsiteHeader({ currentPage, onNavigate }: Props) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -66,13 +54,19 @@ export default function WebsiteHeader({ currentPage, onNavigate }: Props) {
   return (
     <>
       {/* Top bar */}
-      <div className="bg-navy-950 text-white/70 text-xs py-2 px-4 hidden md:block">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <Phone size={12} className="text-gold-400" />
-            <span dir="ltr">+20 100 123 4567</span>
-          </span>
-          <span className="text-gold-300 font-semibold tracking-wide">رحلتك المباركة تبدأ من Promise</span>
+      <div className="bg-navy-950 text-white/75 text-xs py-2 px-4 hidden md:block">
+        <div className="max-w-7xl mx-auto flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <a href="tel:01011106989" dir="ltr" className="flex items-center gap-2 transition-colors hover:text-gold-300">
+              <Phone size={12} className="text-gold-400" />
+              <span>01011106989</span>
+            </a>
+            <a href="tel:01055503857" dir="ltr" className="flex items-center gap-2 transition-colors hover:text-gold-300">
+              <Phone size={12} className="text-gold-400" />
+              <span>01055503857</span>
+            </a>
+          </div>
+          <span className="text-gold-300 font-semibold tracking-wide">نخدم عملاءنا في جميع محافظات مصر.</span>
         </div>
       </div>
 
@@ -86,25 +80,25 @@ export default function WebsiteHeader({ currentPage, onNavigate }: Props) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-20">
           {/* Logo — right side in RTL */}
-          <a href="/" onClick={(e) => { e.preventDefault(); handleNavigate('home'); }} className="flex-shrink-0 flex items-center gap-2.5 group">
+          <button onClick={() => handleNavigate('home')} className="flex-shrink-0 flex items-center gap-2 sm:gap-3 group">
             <img
               src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg"
               alt="Promise Travel"
-              className="w-12 h-12 rounded-xl object-cover shadow-md ring-1 ring-gold-200/40 group-hover:ring-gold-400 transition-all"
+              className="object-contain bg-transparent rounded-none shadow-none ring-0"
+              style={{ width: '78px', height: '78px' }}
             />
-            <div className="leading-tight text-right hidden sm:block">
-              <p className="font-black text-lg text-navy-900">Promise</p>
-              <p className="text-[10px] font-semibold tracking-wide text-gold-600">بروميس للسياحة والسفر</p>
+            <div className="leading-none text-right flex flex-col justify-center">
+              <p className="font-black text-base sm:text-lg text-navy-900">Promise</p>
+              <p className="hidden sm:block text-[10px] font-semibold tracking-wide text-gold-600">بروميس للسياحة والسفر</p>
             </div>
-          </a>
+          </button>
 
           {/* Desktop nav — centered */}
           <nav className="hidden lg:flex items-center gap-0.5 mx-auto">
             {navItems.map((item) => (
-              <a
+              <button
                 key={item.id}
-                href={PAGE_URLS[item.id]}
-                onClick={(e) => { e.preventDefault(); handleNavigate(item.id); }}
+                onClick={() => handleNavigate(item.id)}
                 className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-200 relative ${
                   currentPage === item.id
                     ? 'text-gold-600'
@@ -115,19 +109,18 @@ export default function WebsiteHeader({ currentPage, onNavigate }: Props) {
                 {currentPage === item.id && (
                   <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-gradient-gold rounded-full" />
                 )}
-              </a>
+              </button>
             ))}
           </nav>
 
           {/* CTA — left side in RTL (desktop only) */}
           <div className="hidden lg:block flex-shrink-0">
-            <a
-              href="/booking"
-              onClick={(e) => { e.preventDefault(); handleNavigate('booking'); }}
+            <button
+              onClick={() => handleNavigate('booking')}
               className="bg-gradient-gold text-navy-900 font-black text-sm px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg hover:scale-105 transition-all"
             >
               احجز الآن
-            </a>
+            </button>
           </div>
 
           {/* Mobile toggle */}
@@ -149,25 +142,23 @@ export default function WebsiteHeader({ currentPage, onNavigate }: Props) {
         >
           <nav className="flex flex-col p-3 gap-1">
             {navItems.map((item) => (
-              <a
+              <button
                 key={item.id}
-                href={PAGE_URLS[item.id]}
-                onClick={(e) => { e.preventDefault(); handleNavigate(item.id); }}
+                onClick={() => handleNavigate(item.id)}
                 className={`px-4 py-3.5 rounded-xl text-right text-sm font-bold transition-all flex items-center justify-between ${
                   currentPage === item.id ? 'bg-navy-800 text-white' : 'text-navy-800 hover:bg-navy-50'
                 }`}
               >
                 {item.label}
                 <ChevronLeft size={16} className="opacity-40" />
-              </a>
+              </button>
             ))}
-            <a
-              href="/booking"
-              onClick={(e) => { e.preventDefault(); handleNavigate('booking'); }}
+            <button
+              onClick={() => handleNavigate('booking')}
               className="mt-2 bg-gradient-gold text-navy-900 font-black text-sm px-5 py-3.5 rounded-xl text-center shadow-md"
             >
               احجز الآن
-            </a>
+            </button>
           </nav>
         </div>
       </header>

@@ -36,14 +36,15 @@ export default function OffersPage({ onNavigate }: Props) {
   return (
     <div>
       {/* Hero */}
-      <section className="relative h-[45vh] min-h-[340px] overflow-hidden bg-gradient-navy">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(/prom1.webp)', backgroundSize: 'cover' }} />
+      <section className="relative h-[45vh] min-h-[340px] overflow-hidden">
+        <img src="https://images.pexels.com/photos/3278215/pexels-photo-3278215.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="عروض حصرية" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-center text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4">
+          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <Tag size={12} /> عروض حصرية
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3">عروض وتخفيضات مميزة</h1>
-          <p className="text-white/80 text-lg max-w-2xl">استمتع بأفضل العروض على باقات الحج والعمرة والرحلات الداخلية لفترة محدودة</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-3 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">عروض وتخفيضات مميزة</h1>
+          <p className="text-white text-lg max-w-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">استمتع بأفضل العروض على باقات الحج والعمرة والرحلات الداخلية لفترة محدودة</p>
         </div>
       </section>
 
