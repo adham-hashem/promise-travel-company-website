@@ -49,7 +49,7 @@ export default function HotelsPage({ onNavigate }: Props) {
       {/* Banner */}
       <section className="relative h-[52vh] min-h-[380px] overflow-hidden">
         <img
-          src="https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=1920"
+          src="/الفنادق1.webp"
           alt="الفنادق"
           className="w-full h-full object-cover"
         />

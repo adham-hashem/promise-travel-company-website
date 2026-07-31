@@ -52,7 +52,7 @@ export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
     );
   }
 
-  const images = hotel.images?.length ? hotel.images : ['https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=1200'];
+  const images = hotel.images?.length ? hotel.images : ['/الفنادق1.webp'];
 
   return (
     <div>

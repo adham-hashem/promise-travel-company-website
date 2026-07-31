@@ -29,7 +29,7 @@ export default function ContactPage() {
     <div>
       {/* Hero */}
       <section className="relative h-[40vh] min-h-[300px] overflow-hidden">
-        <img src="https://images.pexels.com/photos/2382904/pexels-photo-2382904.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="تواصل معنا" className="w-full h-full object-cover" />
+        <img src="/سفر.webp" alt="تواصل معنا" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/70 to-navy-900/30" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
           <h1 className="text-3xl md:text-5xl font-black mb-2">تواصل معنا</h1>

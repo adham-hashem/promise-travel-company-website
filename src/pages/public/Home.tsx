@@ -14,19 +14,19 @@ interface Props {
 
 const heroSlides = [
   {
-    img: 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/prom1.webp',
     place: 'مكة المكرمة',
     title: 'ابدأ رحلتك الإيمانية معنا',
     subtitle: 'رحلات حج وعمرة وسياحة داخلية بأعلى جودة',
   },
   {
-    img: 'https://images.pexels.com/photos/934879/pexels-photo-934879.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/المسجد.webp',
     place: 'المدينة المنورة',
     title: 'زيارة المسجد النبوي الشريف',
     subtitle: 'أياماً من الطمأنينة والسكينة في رحاب الحبيب',
   },
   {
-    img: 'https://images.pexels.com/photos/1287460/pexels-photo-1287460.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/الداخلية.webp',
     place: 'شرم الشيخ',
     title: 'استمتع بشواطئ البحر الأحمر',
     subtitle: 'رحلات داخلية فاخرة إلى أجمل الوجهات المصرية',
@@ -39,28 +39,28 @@ const services = [
     icon: Moon,
     title: 'الحج',
     desc: 'برامج حج متكاملة مع نخبة من الشركات المعتمدة، إقامة فاخرة قرب المشاعر المقدسة، وإشراف متخصص طوال الرحلة.',
-    img: 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800',
+    img: '/hegi.webp',
   },
   {
     id: 'umrah' as const,
     icon: Plane,
     title: 'العمرة',
     desc: 'عمرة مريحة على مدار العام بأفضل الفنادق القريبة من الحرم، وأسعار تنافسية، وخدمات نقل راقية من وإلى المطار.',
-    img: 'https://images.pexels.com/photos/934879/pexels-photo-934879.jpeg?auto=compress&cs=tinysrgb&w=800',
+    img: '/العمرة1.webp',
   },
   {
     id: 'internal' as const,
     icon: MapPin,
     title: 'الرحلات الداخلية',
     desc: 'اكتشف جمال مصر من شرم الشيخ والغردقة والأقصر وأسوان، برامج سياحية مصممة بعناية لراحتك وإمتاعك.',
-    img: 'https://images.pexels.com/photos/1287460/pexels-photo-1287460.jpeg?auto=compress&cs=tinysrgb&w=800',
+    img: '/الداخلية.webp',
   },
   {
     id: 'hotels' as const,
     icon: HotelIcon,
     title: 'الفنادق',
     desc: 'نخبة من الفنادق المصنّفة قرب الحرم الشريف وأجمل الوجهات السياحية، باقات إقامة فاخرة بأسعار مناسبة.',
-    img: 'https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=800',
+    img: '/الفنادق1.webp',
   },
 ];
 
@@ -228,7 +228,7 @@ export default function Home({ onNavigate }: Props) {
           </div>
           <div className="relative">
             <img
-              src="https://images.pexels.com/photos/2382904/pexels-photo-2382904.jpeg?auto=compress&cs=tinysrgb&w=1000"
+              src="/سفر.webp"
               alt="Promise Travel"
               className="rounded-3xl shadow-2xl w-full h-[420px] object-cover"
             />

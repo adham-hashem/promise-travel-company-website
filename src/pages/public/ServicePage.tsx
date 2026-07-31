@@ -11,12 +11,12 @@ interface Props {
 
 const heroByType = {
   'حج': {
-    img: 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/hegi.webp',
     title: 'برامج الحج المتكاملة',
     subtitle: 'فريضة العمر بأيدٍ أمينة، إقامة مريحة وإشراف متخصص',
   },
   'عمرة': {
-    img: 'https://images.pexels.com/photos/934879/pexels-photo-934879.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/العمرة1.webp',
     title: 'برامج العمرة على مدار العام',
     subtitle: 'عمرة مريحة بأفضل الفنادق وأقربها للحرم الشريف',
   },

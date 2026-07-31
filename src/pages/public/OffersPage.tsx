@@ -37,7 +37,7 @@ export default function OffersPage({ onNavigate }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[45vh] min-h-[340px] overflow-hidden bg-gradient-navy">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(https://images.pexels.com/photos/3278215/pexels-photo-3278215.jpeg?auto=compress&cs=tinysrgb&w=1920)', backgroundSize: 'cover' }} />
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(/prom1.webp)', backgroundSize: 'cover' }} />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-center text-white">
           <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4">
             <Tag size={12} /> عروض حصرية
