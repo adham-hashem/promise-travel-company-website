@@ -373,35 +373,28 @@ export default function QuotationForm() {
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            min-width: 100% !important;
+            overflow: visible !important;
             background: white !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          /* Reset main dashboard sidebar margin (mr-64) and paddings */
-          main, .mr-64, .pt-16, .p-6, #root > div {
-            margin: 0 !important;
-            padding: 0 !important;
-            margin-right: 0 !important;
-            padding-right: 0 !important;
-            width: 100% !important;
-            min-height: auto !important;
-          }
-          aside, header, nav, .no-print {
-            display: none !important;
-          }
+          /* Hide everything */
           body * { visibility: hidden; }
+          /* Show only the print area */
           #quotation-print, #quotation-print * { visibility: visible; }
+          /* Position fixed = relative to viewport, ignores ALL parent margins/paddings */
           #quotation-print {
-            position: absolute;
-            right: 8mm;
-            left: 8mm;
-            top: 8mm;
-            width: calc(100% - 16mm) !important;
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            width: 100% !important;
+            padding: 10mm;
             font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             direction: rtl;
             background: white;
             box-sizing: border-box;
+            z-index: 99999;
           }
           .no-print { display: none !important; }
           .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -428,7 +421,7 @@ export default function QuotationForm() {
           .signature-box { text-align: center; width: 30%; }
           .signature-line { border-top: 1px solid #cbd5e1; margin-top: 50px; padding-top: 5px; font-weight: bold; color: #0f172a; }
           
-          @page { margin: 8mm; }
+          @page { margin: 0; }
         }
       `}}/>
 
