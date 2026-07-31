@@ -5,5 +5,5 @@ Disallow: /admin
 Disallow: /dashboard
 
 # Host and Sitemap Locations
-Host: https://promise-travel.com
-Sitemap: https://promise-travel.com/sitemap.xml
+Host: https://promisetravelgroup.com
+Sitemap: https://promisetravelgroup.com/sitemap.xml

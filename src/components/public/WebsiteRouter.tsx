@@ -123,7 +123,7 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
     provider: {
       '@type': 'TravelAgency',
       name: 'Promise Travel | بروميس للسياحة والسفر',
-      url: 'https://promise-travel.com',
+      url: 'https://promisetravelgroup.com',
     },
   },
   umrah: {
@@ -135,7 +135,7 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
     provider: {
       '@type': 'TravelAgency',
       name: 'Promise Travel | بروميس للسياحة والسفر',
-      url: 'https://promise-travel.com',
+      url: 'https://promisetravelgroup.com',
     },
   },
   contact: {
@@ -144,7 +144,7 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
     name: 'Promise Travel | بروميس للسياحة والسفر',
     telephone: '+201001234567',
     email: 'info@promisetravel.com',
-    url: 'https://promise-travel.com/contact',
+    url: 'https://promisetravelgroup.com/contact',
     address: {
       '@type': 'PostalAddress',
       addressLocality: 'القاهرة',

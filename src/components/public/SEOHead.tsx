@@ -25,7 +25,7 @@ export default function SEOHead({ title, description, path = '', jsonLd = null }
       element.setAttribute('content', content);
     };
 
-    const canonicalUrl = `https://promise-travel.com${path ? `/${path}` : ''}`;
+    const canonicalUrl = `https://promisetravelgroup.com${path ? `/${path}` : ''}`;
 
     setMeta('description', description);
     setMeta('og:title', title, true);
