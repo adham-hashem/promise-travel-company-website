@@ -6,7 +6,7 @@ import {
   TrendingUp, Wallet, CalendarClock, Receipt, Calculator,
   FileCheck, Building2, FileText, MessageSquare, Zap,
   ChevronDown, ShoppingBag, DollarSign, MapPin,
-  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers, Crown, Printer,
+  ListChecks, Calendar as CalIcon, Truck, Ticket as TicketIcon, ShieldAlert, Layers, Crown, Printer, X,
 } from 'lucide-react';
 import type { Page } from '../types';
 import { useAuth } from '../contexts/AuthContext';
