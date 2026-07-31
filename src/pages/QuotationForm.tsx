@@ -369,13 +369,32 @@ export default function QuotationForm() {
       */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            min-width: 100% !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           body * { visibility: hidden; }
           #quotation-print, #quotation-print * { visibility: visible; }
-          #quotation-print { position: absolute; left: 0; top: 0; width: 100%; font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; }
+          #quotation-print {
+            position: absolute;
+            right: 8mm;
+            left: 8mm;
+            top: 8mm;
+            width: calc(100% - 16mm) !important;
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            direction: rtl;
+            background: white;
+            box-sizing: border-box;
+          }
           .no-print { display: none !important; }
           .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-          .print-title { font-size: 28px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; }
-          .print-subtitle { font-size: 14px; color: #64748b; margin-top: 5px; }
+          .print-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0; }
+          .print-subtitle { font-size: 13px; color: #64748b; margin-top: 5px; }
           .print-section { margin-bottom: 25px; page-break-inside: avoid; }
           .print-section-title { font-size: 18px; font-weight: bold; color: #b48600; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; display: flex; align-items: center; gap: 8px; }
           .print-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
@@ -397,16 +416,23 @@ export default function QuotationForm() {
           .signature-box { text-align: center; width: 30%; }
           .signature-line { border-top: 1px solid #cbd5e1; margin-top: 50px; padding-top: 5px; font-weight: bold; color: #0f172a; }
           
-          @page { margin: 15mm; }
+          @page { margin: 8mm; }
         }
       `}}/>
 
       <div id="quotation-print" className="hidden print:block bg-white text-right">
         {/* Header */}
         <div className="print-header">
-          <div>
-            <h1 className="print-title">عرض سعر برنامج سياحي</h1>
-            <p className="print-subtitle">PROMISE TRAVEL & TOURS</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <img
+              src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg"
+              alt="Promise Travel"
+              style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }}
+            />
+            <div>
+              <h1 className="print-title">عرض سعر برنامج سياحي</h1>
+              <p className="print-subtitle" style={{ fontSize: '13px', fontWeight: 'bold', color: '#0c224f' }}>بروميس للسياحة والسفر — PROMISE TRAVEL</p>
+            </div>
           </div>
           <div className="text-left">
             <p className="text-sm font-bold text-gray-800">التاريخ: {new Date(form.quotationDate).toLocaleDateString('ar-EG')}</p>
