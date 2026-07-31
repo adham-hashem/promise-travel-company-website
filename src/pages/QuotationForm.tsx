@@ -378,6 +378,18 @@ export default function QuotationForm() {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
+          /* Reset main dashboard sidebar margin (mr-64) and paddings */
+          main, .mr-64, .pt-16, .p-6, #root > div {
+            margin: 0 !important;
+            padding: 0 !important;
+            margin-right: 0 !important;
+            padding-right: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+          }
+          aside, header, nav, .no-print {
+            display: none !important;
+          }
           body * { visibility: hidden; }
           #quotation-print, #quotation-print * { visibility: visible; }
           #quotation-print {
