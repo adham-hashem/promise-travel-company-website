@@ -271,8 +271,11 @@ export default function Payments() {
         .total{margin-top:20px;padding:15px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:20px;font-weight:900;}
         .foot{margin-top:30px;text-align:center;font-size:11px;color:#999;}
       </style></head><body>
+      <div style="text-align: center; margin-bottom: 10px;">
+        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; display: inline-block;" />
+      </div>
       <div class="logo">PROMISE</div><div class="sub">بروميس للسياحة والسفر</div>
-      <h3 style="text-align:center;margin-bottom:20px;">إيصال استلام دفعة</h3>
+      <h3 style="text-align:center;margin-bottom:20px; margin-top:0;">إيصال استلام دفعة</h3>
       <div class="row"><span class="label">رقم العملية</span><span class="val">#${p.id.slice(0, 8)}</span></div>
       <div class="row"><span class="label">اسم العميل</span><span class="val">${p.customers?.name || '—'}</span></div>
       <div class="row"><span class="label">نوع العملية</span><span class="val">${p.payment_type || 'دفعة عادية'}</span></div>

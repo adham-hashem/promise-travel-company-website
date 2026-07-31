@@ -346,7 +346,10 @@ export default function InternalGroups({}: Props) {
 </style>
 </head>
 <body>
-<h1>كشف مسافري الفوج — Passenger Manifest</h1>
+<div style="text-align: center; margin-bottom: 15px;">
+  <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover; display: inline-block;" />
+</div>
+<h1 style="margin-top: 0;">كشف مسافري الفوج — Passenger Manifest</h1>
 <p class="sub">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
 <div class="info">
   <div><span>اسم الفوج:</span> ${g.name}</div>

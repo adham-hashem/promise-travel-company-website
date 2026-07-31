@@ -344,9 +344,12 @@ export default function Invoices() {
         .status-partial { background: #fef9c3; color: #ca8a04; }
         .status-unpaid { background: #fee2e2; color: #dc2626; }
       </style></head><body>
-      <div class="header">
-        <div class="title">PROMISE - فاتورة</div>
-        <div class="inv-num">${inv.invoice_number} | ${new Date(inv.created_at).toLocaleDateString('ar-EG')}</div>
+      <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover;" />
+        <div style="text-align: right;">
+          <div class="title" style="margin-bottom: 5px;">PROMISE - فاتورة</div>
+          <div class="inv-num" style="margin: 0;">${inv.invoice_number} | ${new Date(inv.created_at).toLocaleDateString('ar-EG')}</div>
+        </div>
       </div>
       ${inv.customers ? `<div class="section"><div class="section-title">بيانات العميل</div>
         ${inv.customers.client_code ? `<div class="row"><span class="label">كود العميل</span><span class="value" style="font-family:monospace;color:#1e3a5f;font-weight:bold">${inv.customers.client_code}</span></div>` : ''}
