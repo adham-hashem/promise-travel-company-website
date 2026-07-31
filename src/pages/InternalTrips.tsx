@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Bus, Pencil, Trash2, Loader2, X, MapPin,
+  Plus, Bus, Pencil, Trash2, Loader2, X, MapPin, Plane,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { InternalTrip, InternalTripStatus } from '../types';
