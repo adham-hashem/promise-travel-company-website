@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Package as PackageIcon } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Plus, Pencil, Trash2, Package as PackageIcon, Upload, X, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Package } from '../types';
-
-
 
 const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', airline: '', duration_days: '', price: '', image_url: '', description: '', featured: false };
 
@@ -14,6 +12,8 @@ export default function Packages() {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.from('packages').select('*').order('created_at').then(({ data }) => {
@@ -48,6 +48,43 @@ export default function Packages() {
     if (!confirm('هل أنت متأكد من حذف هذه الباقة؟')) return;
     await supabase.from('packages').delete().eq('id', id);
     setPackages(packages.filter(p => p.id !== id));
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الصورة كبير جداً. يجب أن يكون أقل من 5 ميجابايت.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+      const filePath = `packages/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        alert('فشل رفع الصورة: ' + uploadError.message);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      setForm(prev => ({ ...prev, image_url: publicUrlData.publicUrl }));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -137,8 +174,54 @@ export default function Packages() {
                   <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="form-input" placeholder="18000" />
                 </div>
                 <div className="col-span-2">
-                  <label className="form-label">رابط صورة الباقة (للموقع)</label>
-                  <input dir="ltr" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="form-input" placeholder="https://..." />
+                  <label className="form-label">صورة الباقة (للموقع)</label>
+                  <div className="mt-1 flex items-center gap-4">
+                    {form.image_url ? (
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
+                        <img src={form.image_url} alt="معاينة" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, image_url: '' })}
+                          className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
+                          title="حذف الصورة"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50/20 flex flex-col items-center justify-center text-gray-400 hover:text-gold-600 transition-all flex-shrink-0"
+                      >
+                        {uploading ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-gold-600" />
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6" />
+                            <span className="text-[10px] mt-1 font-semibold">اختر صورة</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p>صيغ الصور المدعومة: PNG, JPG, JPEG, WEBP.</p>
+                      <p>الحد الأقصى لحجم الملف: 5 ميجابايت.</p>
+                      {form.image_url && (
+                        <p className="text-emerald-600 font-semibold flex items-center gap-1">
+                          ✓ تم رفع الصورة بنجاح
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <label className="form-label">وصف الباقة (للموقع)</label>
