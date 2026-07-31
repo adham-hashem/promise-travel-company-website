@@ -24,7 +24,7 @@ const EMPTY_FORM = {
   name: '', code: '', package_id: '', internal_trip_id: '',
   travel_date: '', return_date: '',
   airline: '', flight_number: '',
-  hotel_mecca: '', hotel_medina: '',
+  hotel_mecca: '',
   supervisor: '', max_capacity: 45,
   status: 'تجميع' as TravelGroupStatus, notes: '',
 };
@@ -166,7 +166,7 @@ export default function InternalGroups({}: Props) {
       name: g.name, code: g.code, package_id: g.package_id || '', internal_trip_id: g.internal_trip_id || '',
       travel_date: g.travel_date || '', return_date: g.return_date || '',
       airline: g.airline || '', flight_number: g.flight_number || '',
-      hotel_mecca: g.hotel_mecca || '', hotel_medina: g.hotel_medina || '',
+      hotel_mecca: g.hotel_mecca || '',
       supervisor: g.supervisor || '', max_capacity: g.max_capacity,
       status: g.status, notes: g.notes || '',
     });
@@ -190,7 +190,7 @@ export default function InternalGroups({}: Props) {
       airline: form.airline || null,
       flight_number: form.flight_number || null,
       hotel_mecca: form.hotel_mecca || null,
-      hotel_medina: form.hotel_medina || null,
+      hotel_medina: null,
       supervisor: form.supervisor || null,
       max_capacity: Number(form.max_capacity),
       status: form.status,
@@ -356,8 +356,7 @@ export default function InternalGroups({}: Props) {
   <div><span>تاريخ العودة:</span> ${fmt(g.return_date)}</div>
   <div><span>شركة الطيران:</span> ${g.airline || '—'}</div>
   <div><span>رقم الرحلة:</span> ${g.flight_number || '—'}</div>
-  <div><span>فندق مكة:</span> ${g.hotel_mecca || '—'}</div>
-  <div><span>فندق المدينة:</span> ${g.hotel_medina || '—'}</div>
+  <div><span>فندق الإقامة:</span> ${g.hotel_mecca || '—'}</div>
   <div><span>المشرف:</span> ${g.supervisor || '—'}</div>
   <div><span>عدد المسافرين:</span> ${members.length} / ${g.max_capacity}</div>
   <div><span>الحالة:</span> ${g.status}</div>
@@ -555,12 +554,6 @@ export default function InternalGroups({}: Props) {
                         {g.hotel_mecca}
                       </span>
                     )}
-                    {g.hotel_medina && (
-                      <span className="flex items-center gap-1">
-                        <Building2 size={11} className="text-rose-500" />
-                        {g.hotel_medina}
-                      </span>
-                    )}
                   </div>
 
                   {/* Capacity bar */}
@@ -665,18 +658,11 @@ export default function InternalGroups({}: Props) {
                 </div>
               </div>
 
-              {/* Hotels */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">الفندق في مكة المكرمة</label>
-                  <input value={form.hotel_mecca} onChange={e => setForm(f => ({ ...f, hotel_mecca: e.target.value }))}
-                    className="form-input" placeholder="اسم الفندق" />
-                </div>
-                <div>
-                  <label className="form-label">الفندق في المدينة المنورة</label>
-                  <input value={form.hotel_medina} onChange={e => setForm(f => ({ ...f, hotel_medina: e.target.value }))}
-                    className="form-input" placeholder="اسم الفندق" />
-                </div>
+              {/* Hotel */}
+              <div>
+                <label className="form-label">فندق الإقامة</label>
+                <input value={form.hotel_mecca} onChange={e => setForm(f => ({ ...f, hotel_mecca: e.target.value }))}
+                  className="form-input" placeholder="اسم الفندق" />
               </div>
 
               {/* Supervisor + Capacity + Status */}
