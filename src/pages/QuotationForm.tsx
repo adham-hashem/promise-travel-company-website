@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { 
   FileText, User, Calendar, Plane, Building2, Utensils, 
   Map, Bus, Users, DollarSign, FileCheck, Printer, RefreshCw,
-  Info
+  Info, Wallet
 } from 'lucide-react';
 
 export default function QuotationForm() {

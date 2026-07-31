@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { name, email, password, phone, role, status, permissions } = body;
+    const { name, email, password, phone, role, status, permissions, page_permissions } = body;
 
     if (!name || !email || !password) {
       return new Response(JSON.stringify({ error: "name, email, password are required" }), {
@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
       role: role || "مندوب مبيعات",
       status: status || "نشط",
       permissions: permissions || {},
+      page_permissions: page_permissions || {},
     });
 
     if (profileError) {

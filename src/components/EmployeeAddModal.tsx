@@ -79,10 +79,12 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         .maybeSingle()
         .then(({ data }) => {
           if (data) {
+            const hasCustomPerms = data.permissions && Object.keys(data.permissions).length > 0;
+            const hasCustomPages = data.page_permissions && Object.keys(data.page_permissions).length > 0;
             setForm(prev => ({
               ...prev,
-              permissions: data.permissions || prev.permissions,
-              page_permissions: data.page_permissions || prev.page_permissions,
+              permissions: hasCustomPerms ? data.permissions : prev.permissions,
+              page_permissions: hasCustomPages ? data.page_permissions : prev.page_permissions,
             }));
           }
         });
@@ -229,16 +231,25 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
 
       const newId = createdAuthId || crypto.randomUUID();
 
-      await supabase.from('user_profiles').upsert({
-        id: newId,
-        name: form.name,
-        email: form.email,
-        phone: form.phone || null,
-        role: form.role,
-        status: form.status,
-        permissions: form.permissions,
-        page_permissions: form.page_permissions,
-      });
+      const { error: e2 } = await supabase
+        .from('user_profiles')
+        .update({
+          name: form.name,
+          email: form.email,
+          phone: form.phone || null,
+          role: form.role,
+          status: form.status,
+          permissions: form.permissions,
+          page_permissions: form.page_permissions,
+        })
+        .eq('id', newId);
+
+      if (e2) {
+        console.error('User profile update failed:', e2.message);
+        setError(e2.message);
+        setSaving(false);
+        return;
+      }
 
       const { error: e3 } = await supabase.from('employees').upsert({
         id: newId,
