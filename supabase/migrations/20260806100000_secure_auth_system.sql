@@ -18,7 +18,8 @@ DECLARE
   v_instance_id uuid;
 BEGIN
   -- Verify caller is authorized (Super Admin, System Owner, or Manager)
-  IF NOT EXISTS (
+  -- Skip this check if run directly via SQL Editor (where request.jwt.claims is null)
+  IF current_setting('request.jwt.claims', true) IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.user_profiles
     WHERE id = auth.uid() AND role IN ('super_admin', 'مالك النظام', 'مدير النظام')
   ) AND EXISTS (SELECT 1 FROM public.user_profiles) THEN
@@ -119,10 +120,13 @@ DECLARE
   v_encrypted_password text;
 BEGIN
   -- Verify caller is either the user themselves or an admin
-  IF auth.uid() IS NULL OR (
-    auth.uid() <> p_user_id AND NOT EXISTS (
-      SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role IN ('super_admin', 'مالك النظام', 'مدير النظام')
+  -- Skip this check if run directly via SQL Editor (where request.jwt.claims is null)
+  IF current_setting('request.jwt.claims', true) IS NOT NULL AND (
+    auth.uid() IS NULL OR (
+      auth.uid() <> p_user_id AND NOT EXISTS (
+        SELECT 1 FROM public.user_profiles
+        WHERE id = auth.uid() AND role IN ('super_admin', 'مالك النظام', 'مدير النظام')
+      )
     )
   ) THEN
     RAISE EXCEPTION 'غير مصرح: يمكنك فقط تغيير كلمة مرورك الخاصة، ما لم تكن مديراً للنظام';
