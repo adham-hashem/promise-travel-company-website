@@ -7,7 +7,7 @@ ADD COLUMN IF NOT EXISTS room_type_madinah TEXT,
 ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false;
 
 -- ===== 2. Update VIP Customers Table =====
-ALTER TABLE vip_customers
+ALTER TABLE vip_requests
 ADD COLUMN IF NOT EXISTS hotel_makkah TEXT,
 ADD COLUMN IF NOT EXISTS hotel_madinah TEXT,
 ADD COLUMN IF NOT EXISTS room_type_makkah TEXT,

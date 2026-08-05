@@ -784,7 +784,7 @@ export default function TravelGroups({}: Props) {
                   const cIds = members.map(m => m.customer_id);
                   if (cIds.length > 0) {
                     await supabase.from('customers').update({ is_archived: true }).in('id', cIds);
-                    await supabase.from('vip_customers').update({ is_archived: true }).in('customer_id', cIds);
+                    await supabase.from('vip_requests').update({ is_archived: true }).in('customer_id', cIds);
                     await supabase.from('operation_files').update({ is_archived: true }).in('customer_id', cIds);
                   }
                   await supabase.from('travel_groups').update({ status: 'عاد' }).eq('id', detailGroup.id);
