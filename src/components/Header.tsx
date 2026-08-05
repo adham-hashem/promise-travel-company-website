@@ -1,4 +1,4 @@
-import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe, Menu } from 'lucide-react';
+import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe, Menu, Key, Lock, Eye, EyeOff, User, LogOut, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -74,7 +74,7 @@ interface Props {
 }
 
 export default function Header({ currentPage, searchValue, onSearchChange, onNavigate, onToggleSidebar }: Props) {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -83,6 +83,82 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   const [showSuper, setShowSuper] = useState(false);
   const superRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // User Profile & Change Password State
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess(false);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwdError('يرجى ملء جميع الحقول');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwdError('كلمتا المرور الجديدتان غير متطابقتين');
+      return;
+    }
+
+    setPwdLoading(true);
+
+    try {
+      // 1. Verify current password hash
+      const { data: isValid, error: verifyErr } = await supabase.rpc('verify_current_password', {
+        p_password: currentPassword
+      });
+
+      if (verifyErr || !isValid) {
+        setPwdError('كلمة المرور الحالية غير صحيحة');
+        setPwdLoading(false);
+        return;
+      }
+
+      // 2. Update password hash in database
+      const { error: changeErr } = await supabase.rpc('change_user_password', {
+        p_user_id: profile?.id,
+        p_new_password: newPassword
+      });
+
+      if (changeErr) {
+        setPwdError(changeErr.message);
+        setPwdLoading(false);
+        return;
+      }
+
+      setPwdSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setShowPwdModal(false);
+        setPwdSuccess(false);
+      }, 2000);
+    } catch (err: any) {
+      setPwdError(err.message || 'حدث خطأ أثناء تغيير كلمة المرور');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    setShowProfileMenu(false);
+    window.location.hash = '/admin'; // Redirect to admin login area
+  };
 
   // Load employee record matching this user's email, then their notifications
   useEffect(() => {
@@ -122,6 +198,9 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
       }
       if (superRef.current && !superRef.current.contains(e.target as Node)) {
         setShowSuper(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -314,15 +393,146 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
 
       <div className="w-px h-8 bg-gray-200" />
 
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <p className="text-sm font-semibold text-navy-900 leading-tight">{profile?.name || 'مستخدم'}</p>
-          <p className="text-xs text-gold-600 font-medium leading-tight">{profile?.role || ''}</p>
-        </div>
-        <div className="w-9 h-9 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm shadow-md">
-          {profile?.name?.charAt(0) || 'م'}
-        </div>
+      <div className="relative" ref={profileMenuRef}>
+        <button
+          onClick={() => setShowProfileMenu(v => !v)}
+          className="flex items-center gap-3 hover:bg-gray-50 p-1.5 rounded-xl transition-all"
+        >
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-semibold text-navy-900 leading-tight">{profile?.name || 'مستخدم'}</p>
+            <p className="text-xs text-gold-600 font-medium leading-tight">{profile?.role || ''}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm shadow-md">
+            {profile?.name?.charAt(0) || 'م'}
+          </div>
+        </button>
+
+        {showProfileMenu && (
+          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
+            <button
+              onClick={() => { setShowPwdModal(true); setShowProfileMenu(false); }}
+              className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-right"
+            >
+              <Key size={14} className="text-gold-500" />
+              <span>تغيير كلمة المرور</span>
+            </button>
+            <div className="h-px bg-gray-100 mx-3" />
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-right"
+            >
+              <LogOut size={14} />
+              <span>تسجيل الخروج</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Change Password Modal */}
+      {showPwdModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPwdModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-navy-900 flex items-center gap-2">
+                <Key size={18} className="text-gold-500" />
+                تغيير كلمة المرور الخاصة بك
+              </h3>
+              <button onClick={() => setShowPwdModal(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordChange}>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="form-label">كلمة المرور الحالية <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPwd ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      className="form-input pl-9 text-left"
+                      placeholder="••••••••"
+                      dir="ltr"
+                      required
+                    />
+                    <button type="button" onClick={() => setShowCurrentPwd(!showCurrentPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
+                      {showCurrentPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">كلمة المرور الجديدة <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showNewPwd ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="form-input pl-9 text-left"
+                      placeholder="••••••••"
+                      dir="ltr"
+                      required
+                    />
+                    <button type="button" onClick={() => setShowNewPwd(!showNewPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
+                      {showNewPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">تأكيد كلمة المرور الجديدة <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPwd ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className="form-input pl-9 text-left"
+                      placeholder="••••••••"
+                      dir="ltr"
+                      required
+                    />
+                    <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
+                      {showConfirmPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-gray-400 leading-normal">
+                  * يجب أن تتكون كلمة المرور من 8 أحرف على الأقل، وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص (مثل !@#$%^&*).
+                </p>
+
+                {pwdError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
+                    {pwdError}
+                  </div>
+                )}
+
+                {pwdSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-2.5 text-sm">
+                    تم تغيير كلمة المرور بنجاح! سيتم إغلاق النافذة...
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowPwdModal(false)} className="btn-outline">إلغاء</button>
+                <button type="submit" disabled={pwdLoading || pwdSuccess} className="btn-gold">
+                  {pwdLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      جارٍ الحفظ...
+                    </span>
+                  ) : 'حفظ كلمة المرور'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

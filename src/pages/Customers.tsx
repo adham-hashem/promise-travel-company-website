@@ -81,6 +81,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
 
 
   const filtered = customers.filter((c) => {
+    if (c.is_archived && !searchValue) return false;
     const matchSearch = !searchValue || c.name.includes(searchValue) || c.phone.includes(searchValue) || (c.client_code && c.client_code.includes(searchValue));
     const matchStatus = statusFilter === 'الكل' || c.status === statusFilter;
     return matchSearch && matchStatus;

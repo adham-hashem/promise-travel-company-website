@@ -15,6 +15,7 @@ interface VIPClient {
   client_code: string | null;
   status: string;
   created_at: string;
+  is_archived?: boolean;
   vip_requests: {
     id: string;
     travel_city: string | null;
@@ -64,7 +65,7 @@ export default function VIPDashboard({ onNavigate }: Props) {
         supabase
           .from('customers')
           .select(`
-            id, name, phone, client_code, status, created_at,
+            id, name, phone, client_code, status, created_at, is_archived,
             vip_requests!inner (
               id, travel_city, departure_date, return_date, travelers_count, current_stage, assigned_vip_manager
             )
@@ -100,6 +101,7 @@ export default function VIPDashboard({ onNavigate }: Props) {
               client_code: c.client_code,
               status: c.status,
               created_at: c.created_at,
+              is_archived: c.is_archived,
               vip_requests: c.vip_requests,
               assigned_manager_profile: managerProfile,
             };
@@ -115,6 +117,8 @@ export default function VIPDashboard({ onNavigate }: Props) {
   };
 
   const filteredClients = clients.filter((c) => {
+    if (c.is_archived && !search) return false;
+    
     const matchSearch =
       !search ||
       c.name.includes(search) ||

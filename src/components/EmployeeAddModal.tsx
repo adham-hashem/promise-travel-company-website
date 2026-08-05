@@ -159,94 +159,36 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         .eq('id', editEmployee.id);
 
       if (e2) console.warn('Profile update skipped:', e2.message);
+
+      // If password field is filled, update password via RPC
+      if (form.password) {
+        const { error: pwdErr } = await supabase.rpc('change_user_password', {
+          p_user_id: editEmployee.id,
+          p_new_password: form.password
+        });
+        if (pwdErr) { setError(pwdErr.message); setSaving(false); return; }
+      }
+
       setSaving(false);
       onSaved();
       onClose();
       return;
     }
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const fnUrl = `${supabaseUrl}/functions/v1/create-user`;
-    let createdAuthId: string | null = null;
-
     try {
-      const resp = await fetch(fnUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token || ''}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          phone: form.phone,
-          role: form.role,
-          status: form.status,
-          permissions: form.permissions,
-          page_permissions: form.page_permissions,
-        }),
+      const { data: newId, error: rpcError } = await supabase.rpc('create_app_user', {
+        p_email: form.email,
+        p_password: form.password,
+        p_name: form.name,
+        p_role: form.role,
+        p_phone: form.phone || null,
+        p_status: form.status,
+        p_permissions: form.permissions,
+        p_page_permissions: form.page_permissions
       });
-      if (resp.ok) {
-        const data = await resp.json();
-        createdAuthId = data?.user?.id || data?.id || null;
-      }
-    } catch (fnErr) {
-      console.warn('Edge function unavailable or failed, falling back to direct auth/DB creation:', fnErr);
-    }
 
-    try {
-      if (!createdAuthId) {
-        const tempSupabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-          {
-            auth: {
-              persistSession: false,
-              autoRefreshToken: false,
-              detectSessionInUrl: false,
-            },
-          }
-        );
-        const { data: signUpData, error: signUpError } = await tempSupabase.auth.signUp({
-          email: form.email,
-          password: form.password,
-          options: {
-            data: {
-              name: form.name,
-              role: form.role,
-            },
-          },
-        });
-        if (signUpError) {
-          setError('خطأ في إنشاء حساب Auth: ' + signUpError.message);
-          setSaving(false);
-          return;
-        }
-        if (signUpData?.user?.id) {
-          createdAuthId = signUpData.user.id;
-        }
-      }
-
-      const newId = createdAuthId || crypto.randomUUID();
-
-      const { error: e2 } = await supabase
-        .from('user_profiles')
-        .update({
-          name: form.name,
-          email: form.email,
-          phone: form.phone || null,
-          role: form.role,
-          status: form.status,
-          permissions: form.permissions,
-          page_permissions: form.page_permissions,
-        })
-        .eq('id', newId);
-
-      if (e2) {
-        console.error('User profile update failed:', e2.message);
-        setError(e2.message);
+      if (rpcError) {
+        setError(rpcError.message);
         setSaving(false);
         return;
       }
@@ -336,7 +278,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
               </div>
               <div>
                 <label className="form-label">
-                  كلمة المرور {!isEdit && <span className="text-red-500">*</span>}
+                  {isEdit ? 'تغيير كلمة المرور (اختياري)' : 'كلمة المرور'} {!isEdit && <span className="text-red-500">*</span>}
                 </label>
                 <input
                   type="password"
@@ -345,7 +287,6 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   className="form-input"
                   placeholder={isEdit ? 'اتركها فارغة للإبقاء عليها' : '••••••••'}
-                  disabled={isEdit}
                   autoComplete="new-password"
                 />
               </div>

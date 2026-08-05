@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { TravelGroup, TravelGroupMember, TravelGroupStatus, Package, Customer, Page } from '../types';
+import GroupRooming from '../components/GroupRooming';
 
 // ─── constants ──────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ export default function TravelGroups({}: Props) {
 
   // ── group detail panel ──
   const [detailGroup, setDetailGroup] = useState<TravelGroup | null>(null);
+  const [detailTab, setDetailTab] = useState<'members' | 'rooming'>('members');
   const [members, setMembers] = useState<TravelGroupMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
@@ -224,6 +226,7 @@ export default function TravelGroups({}: Props) {
 
   const openDetail = async (g: TravelGroup) => {
     setDetailGroup(g);
+    setDetailTab('members');
     setMemberSearch('');
     await loadMembers(g.id);
   };
@@ -776,6 +779,22 @@ export default function TravelGroups({}: Props) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={async () => {
+                  if (!confirm('هل أنت متأكد من أرشفة هذا الفوج بجميع عملائه؟ (سيتم إخفاؤهم من قائمة العملاء النشطين)')) return;
+                  const cIds = members.map(m => m.customer_id);
+                  if (cIds.length > 0) {
+                    await supabase.from('customers').update({ is_archived: true }).in('id', cIds);
+                    await supabase.from('vip_customers').update({ is_archived: true }).in('customer_id', cIds);
+                    await supabase.from('operation_files').update({ is_archived: true }).in('customer_id', cIds);
+                  }
+                  await supabase.from('travel_groups').update({ status: 'عاد' }).eq('id', detailGroup.id);
+                  setGroups(groups.map(g => g.id === detailGroup.id ? { ...g, status: 'عاد' } : g));
+                  setDetailGroup({ ...detailGroup, status: 'عاد' });
+                  alert('تمت الأرشفة بنجاح.');
+                }} title="أرشفة الفوج"
+                  className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1.5 text-navy-200 border-navy-700 hover:bg-navy-800">
+                  أرشفة الفوج
+                </button>
                 <button onClick={exportCSV} title="تصدير Excel/CSV"
                   className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white">
                   <Download size={16} />
@@ -818,21 +837,39 @@ export default function TravelGroups({}: Props) {
               </span>
             </div>
 
-            {/* Toolbar: search + add */}
-            <div className="px-6 py-3 flex items-center gap-3 border-b border-gray-100">
-              <div className="relative flex-1">
-                <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
-                  placeholder="بحث بالاسم أو الكود..."
-                  className="form-input text-xs pr-8 py-1.5" />
-              </div>
-              <button onClick={openAddModal}
-                className="btn-gold text-xs py-1.5 px-4 flex items-center gap-1.5">
-                <UserPlus size={14} /> إضافة عملاء
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 px-6 mt-2">
+              <button
+                onClick={() => setDetailTab('members')}
+                className={`py-3 px-4 font-bold text-sm border-b-2 transition-colors ${detailTab === 'members' ? 'border-gold-500 text-gold-600' : 'border-transparent text-gray-500 hover:text-navy-700'}`}
+              >
+                الأعضاء ({members.length})
+              </button>
+              <button
+                onClick={() => setDetailTab('rooming')}
+                className={`py-3 px-4 font-bold text-sm border-b-2 transition-colors ${detailTab === 'rooming' ? 'border-gold-500 text-gold-600' : 'border-transparent text-gray-500 hover:text-navy-700'}`}
+              >
+                نظام التسكين (Rooming)
               </button>
             </div>
 
-            {/* Members table */}
+            {detailTab === 'members' ? (
+              <>
+                {/* Toolbar: search + add */}
+                <div className="px-6 py-3 flex items-center gap-3 border-b border-gray-100">
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                      placeholder="بحث بالاسم أو الكود..."
+                      className="form-input text-xs pr-8 py-1.5" />
+                  </div>
+                  <button onClick={openAddModal}
+                    className="btn-gold text-xs py-1.5 px-4 flex items-center gap-1.5">
+                    <UserPlus size={14} /> إضافة عملاء
+                  </button>
+                </div>
+
+                {/* Members table */}
             <div className="flex-1 overflow-y-auto">
               {loadingMembers ? (
                 <div className="flex items-center justify-center py-12">
@@ -880,11 +917,17 @@ export default function TravelGroups({}: Props) {
               )}
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
-              <span>إجمالي الظاهرين: {filteredMembers.length}</span>
-              <span>المتبقي في الفوج: {detailGroup.max_capacity - members.length} مقعد</span>
-            </div>
+                {/* Footer */}
+                <div className="px-6 py-3 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
+                  <span>إجمالي الظاهرين: {filteredMembers.length}</span>
+                  <span>المتبقي في الفوج: {detailGroup.max_capacity - members.length} مقعد</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 overflow-hidden relative">
+                <GroupRooming groupId={detailGroup.id} members={members} onUpdate={() => loadMembers(detailGroup.id)} />
+              </div>
+            )}
           </div>
         </div>
       )}

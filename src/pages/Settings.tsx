@@ -210,17 +210,30 @@ export default function Settings() {
         name: form.name, phone: form.phone || null, role: form.role, status: form.status, permissions,
       }).eq('id', editUser.id);
       if (error) { setModalError(error.message); setSaving(false); return; }
+
+      // If password field is filled, update password via RPC
+      if (form.password) {
+        const { error: pwdErr } = await supabase.rpc('change_user_password', {
+          p_user_id: editUser.id,
+          p_new_password: form.password
+        });
+        if (pwdErr) { setModalError(pwdErr.message); setSaving(false); return; }
+      }
+
       await loadUsers();
       if (editUser.id === currentProfile?.id) await refreshProfile();
     } else {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password, phone: form.phone, role: form.role, status: form.status, permissions }),
+      const { data: newUserId, error: rpcError } = await supabase.rpc('create_app_user', {
+        p_email: form.email,
+        p_password: form.password,
+        p_name: form.name,
+        p_role: form.role,
+        p_phone: form.phone || null,
+        p_status: form.status,
+        p_permissions: permissions,
+        p_page_permissions: getDefaultPagePermissions(form.role)
       });
-      const result = await res.json();
-      if (!res.ok) { setModalError(result.error || 'حدث خطأ'); setSaving(false); return; }
+      if (rpcError) { setModalError(rpcError.message); setSaving(false); return; }
       await loadUsers();
     }
     setSaving(false);
@@ -588,19 +601,19 @@ export default function Settings() {
                       placeholder="user@promise.com" dir="ltr" disabled={!!editUser} />
                     {editUser && <p className="text-[10px] text-gray-400 mt-1">لا يمكن تعديل البريد الإلكتروني</p>}
                   </div>
-                  {!editUser && (
-                    <div>
-                      <label className="form-label">كلمة المرور <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <input type={showPassword ? 'text' : 'password'} value={form.password}
-                          onChange={e => setForm({ ...form, password: e.target.value })}
-                          className="form-input pl-9" placeholder="••••••••" dir="ltr" />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
-                          {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
-                      </div>
+                  <div>
+                    <label className="form-label">
+                      {editUser ? 'تغيير كلمة المرور (اختياري)' : 'كلمة المرور'} {!editUser && <span className="text-red-500">*</span>}
+                    </label>
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} value={form.password}
+                        onChange={e => setForm({ ...form, password: e.target.value })}
+                        className="form-input pl-9" placeholder={editUser ? 'اتركها فارغة لعدم التغيير' : '••••••••'} dir="ltr" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
                     </div>
-                  )}
+                  </div>
                   <div>
                     <label className="form-label">رقم الهاتف</label>
                     <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="form-input" placeholder="01xxxxxxxxx" dir="ltr" />

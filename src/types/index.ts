@@ -175,6 +175,11 @@ export interface Customer {
   country?: string;
   documents_status?: 'مكتمل' | 'ناقص مستندات';
   visa_requirement?: VisaRequirement;
+  hotel_makkah?: string;
+  hotel_madinah?: string;
+  room_type_makkah?: string;
+  room_type_madinah?: string;
+  is_archived?: boolean;
   created_at: string;
   packages?: Package;
   employees?: Employee;
@@ -189,9 +194,13 @@ export interface VipRequest {
   return_date?: string;
   airline_preference?: string;
   flight_class?: string;
-  hotel_preference?: string;
+  hotel_preference?: string; // Keep for legacy
+  hotel_makkah?: string;
+  hotel_madinah?: string;
   hotel_stars?: string;
-  room_type?: string;
+  room_type?: string; // Keep for legacy
+  room_type_makkah?: string;
+  room_type_madinah?: string;
   meal_plan?: string;
   view_preference?: string;
   transportation_method?: string;
@@ -202,6 +211,7 @@ export interface VipRequest {
   special_notes?: string;
   assigned_vip_manager?: string;
   current_stage: 'accounts' | 'operations' | 'bookings' | 'flights' | 'hotels' | 'housing' | 'visas' | 'ready';
+  is_archived?: boolean;
   created_at: string;
   updated_at: string;
   customers?: Customer;
@@ -579,6 +589,7 @@ export interface OperationFile {
   notes?: string;
   financially_approved: boolean;
   workflow_stage?: 'new' | 'accounts' | 'operations' | 'visa' | 'flight' | 'ready' | 'completed';
+  is_archived?: boolean;
   created_at: string;
   updated_at: string;
   customers?: Customer;
@@ -655,6 +666,10 @@ export interface TravelGroupMember {
   customer_id: string;
   added_at: string;
   notes?: string;
+  rooming_type?: 'منفرد' | 'عائلة';
+  family_id?: string;
+  room_id?: string;
+  gender?: 'ذكر' | 'أنثى';
   customers: {
     id: string;
     name: string;
@@ -664,5 +679,24 @@ export interface TravelGroupMember {
     passport_number?: string;
     service_type?: string;
     email?: string;
+    gender?: string;
   };
+}
+
+export interface GroupFamily {
+  id: string;
+  group_id: string;
+  family_name: string;
+  created_at: string;
+}
+
+export interface GroupRoom {
+  id: string;
+  group_id: string;
+  room_number?: string;
+  room_type: 'ثنائي' | 'ثلاثي' | 'رباعي';
+  is_family: boolean;
+  family_id?: string;
+  gender?: 'رجال' | 'نساء' | 'عائلة';
+  created_at: string;
 }

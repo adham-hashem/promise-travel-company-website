@@ -68,9 +68,11 @@ export default function AddCustomer({ onNavigate }: Props) {
     return_date: '',
     airline_preference: '',
     flight_class: 'Economy',
-    hotel_preference: '',
+    hotel_makkah: '',
+    hotel_madinah: '',
     hotel_stars: '',
-    room_type: '',
+    room_type_makkah: '',
+    room_type_madinah: '',
     meal_plan: '',
     view_preference: '',
     transportation_method: '',
@@ -90,6 +92,8 @@ export default function AddCustomer({ onNavigate }: Props) {
     passport_number: '', passport_issue_date: '', passport_expiry_date: '',
     nationality: '', birth_date: '', gender: '' as '' | 'ذكر' | 'أنثى',
     city: '', country: 'مصر',
+    hotel_makkah: '', hotel_madinah: '',
+    room_type_makkah: '', room_type_madinah: '',
   });
 
   const [docUploads, setDocUploads] = useState<Record<string, DocUpload>>(
@@ -172,6 +176,10 @@ export default function AddCustomer({ onNavigate }: Props) {
           gender: form.gender || null,
           city: form.city || null,
           country: form.country || null,
+          hotel_makkah: form.hotel_makkah || null,
+          hotel_madinah: form.hotel_madinah || null,
+          room_type_makkah: form.room_type_makkah || null,
+          room_type_madinah: form.room_type_madinah || null,
           is_vip: isVip,
         })
         .select('id, client_code')
@@ -193,9 +201,11 @@ export default function AddCustomer({ onNavigate }: Props) {
             return_date: vipForm.return_date || null,
             airline_preference: vipForm.airline_preference || null,
             flight_class: vipForm.flight_class || null,
-            hotel_preference: vipForm.hotel_preference || null,
+            hotel_makkah: vipForm.hotel_makkah || null,
+            hotel_madinah: vipForm.hotel_madinah || null,
             hotel_stars: vipForm.hotel_stars || null,
-            room_type: vipForm.room_type || null,
+            room_type_makkah: vipForm.room_type_makkah || null,
+            room_type_madinah: vipForm.room_type_madinah || null,
             meal_plan: vipForm.meal_plan || null,
             view_preference: vipForm.view_preference || null,
             transportation_method: vipForm.transportation_method || null,
@@ -606,6 +616,26 @@ export default function AddCustomer({ onNavigate }: Props) {
               <label className="form-label">الدولة</label>
               <input value={form.country} onChange={(e) => update('country', e.target.value)} className="form-input" placeholder="مصر" />
             </div>
+            {(form.service_type === 'حج' || form.service_type === 'عمرة') && (
+              <>
+                <div>
+                  <label className="form-label">فندق مكة المفضل</label>
+                  <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: سويس أوتيل المقام" />
+                </div>
+                <div>
+                  <label className="form-label">نوع غرفة مكة</label>
+                  <input value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">فندق المدينة المفضل</label>
+                  <input value={form.hotel_madinah} onChange={(e) => update('hotel_madinah', e.target.value)} className="form-input" placeholder="مثال: بولمان زمزم" />
+                </div>
+                <div>
+                  <label className="form-label">نوع غرفة المدينة</label>
+                  <input value={form.room_type_madinah} onChange={(e) => update('room_type_madinah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
+                </div>
+              </>
+            )}
           </div>
 
           {isVip && (
@@ -643,16 +673,24 @@ export default function AddCustomer({ onNavigate }: Props) {
                   <input type="number" min={1} value={vipForm.travelers_count} onChange={(e) => setVipForm({...vipForm, travelers_count: parseInt(e.target.value) || 1})} className="form-input" />
                 </div>
                 <div>
-                  <label className="form-label">الفندق المفضل</label>
-                  <input value={vipForm.hotel_preference} onChange={(e) => setVipForm({...vipForm, hotel_preference: e.target.value})} className="form-input" placeholder="دار التوحيد، فندق معني، إلخ" />
+                  <label className="form-label">فندق مكة</label>
+                  <input value={vipForm.hotel_makkah} onChange={(e) => setVipForm({...vipForm, hotel_makkah: e.target.value})} className="form-input" placeholder="دار التوحيد، سويس أوتيل، إلخ" />
                 </div>
                 <div>
-                  <label className="form-label">تصنيف الفندق (نجوم)</label>
+                  <label className="form-label">نوع غرفة مكة</label>
+                  <input value={vipForm.room_type_makkah} onChange={(e) => setVipForm({...vipForm, room_type_makkah: e.target.value})} className="form-input" placeholder="مفردة، ثنائية مطلة، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">فندق المدينة</label>
+                  <input value={vipForm.hotel_madinah} onChange={(e) => setVipForm({...vipForm, hotel_madinah: e.target.value})} className="form-input" placeholder="دلة طيبة، دار الإيمان، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">نوع غرفة المدينة</label>
+                  <input value={vipForm.room_type_madinah} onChange={(e) => setVipForm({...vipForm, room_type_madinah: e.target.value})} className="form-input" placeholder="مفردة، ثنائية مطلة، إلخ" />
+                </div>
+                <div>
+                  <label className="form-label">تصنيف الفنادق (نجوم)</label>
                   <input value={vipForm.hotel_stars} onChange={(e) => setVipForm({...vipForm, hotel_stars: e.target.value})} className="form-input" placeholder="5 نجوم، 4 نجوم، إلخ" />
-                </div>
-                <div>
-                  <label className="form-label">نوع الغرفة المطلوبة</label>
-                  <input value={vipForm.room_type} onChange={(e) => setVipForm({...vipForm, room_type: e.target.value})} className="form-input" placeholder="مفردة، ثنائية مطلة، جناح رئيسي" />
                 </div>
                 <div>
                   <label className="form-label">نظام الوجبات</label>

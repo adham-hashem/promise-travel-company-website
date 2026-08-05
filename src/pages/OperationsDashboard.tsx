@@ -251,6 +251,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   };
 
   const filtered = files.filter((f) => {
+    // Hide archived by default unless search is active
+    if ((f as any).is_archived && !search) return false;
+
     if (statusFilter && f.file_status !== statusFilter) return false;
     if (stageFilter && f.workflow_stage !== stageFilter) return false;
     const q = search.toLowerCase();
@@ -654,26 +657,52 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                   })}
                 </div>
                 {/* Send to Aviation Banner */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-50/80 p-3.5 rounded-xl border border-cyan-200 mt-3 gap-2">
-                  <div>
-                    <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
-                      <Plane size={15} className="text-cyan-600" />
-                      تحويل الملف إلى مسؤول قسم الطيران (Aviation Transfer)
-                    </p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      كتابة ملاحظات موظف التشغيل وإرسال الملف مباشرة لمسؤول الطيران لإصدار التذاكر
-                    </p>
+                {(!selected.workflow_stage || ['new', 'accounts', 'operations', 'visa'].includes(selected.workflow_stage)) && selected.file_status !== 'بانتظار استكمال التشغيل' && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-50/80 p-3.5 rounded-xl border border-cyan-200 mt-3 gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
+                        <Plane size={15} className="text-cyan-600" />
+                        تحويل الملف إلى مسؤول قسم الطيران (Aviation Transfer)
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        كتابة ملاحظات موظف التشغيل وإرسال الملف مباشرة لمسؤول الطيران لإصدار التذاكر
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFlightTransferNotes(selected.notes || '');
+                        setShowFlightTransferModal(true);
+                      }}
+                      className="btn-gold text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                    >
+                      <Plane size={14} /> تحويل للطيران + ملاحظات
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setFlightTransferNotes(selected.notes || '');
-                      setShowFlightTransferModal(true);
-                    }}
-                    className="btn-gold text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                  >
-                    <Plane size={14} /> تحويل للطيران + ملاحظات
-                  </button>
-                </div>
+                )}
+                
+                {/* Close file as Ready to Travel (after returning from Aviation) */}
+                {selected.workflow_stage === 'operations' && selected.file_status === 'بانتظار استكمال التشغيل' && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 mt-3 gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <CheckCircle2 size={15} className="text-emerald-600" />
+                        إغلاق الملف كـ (مكتمل وجاهز للسفر)
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        التأكيد على استكمال جميع الإجراءات (تأشيرات، فنادق، طيران) ليكون الملف جاهزاً
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('هل أنت متأكد من إنهاء كافة إجراءات هذا الملف وجعله جاهزاً للسفر؟')) return;
+                        await updateFile({ workflow_stage: 'ready', file_status: 'جاهز للسفر' });
+                      }}
+                      className="btn-gold !bg-emerald-600 hover:!bg-emerald-700 text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                    >
+                      <CheckCircle2 size={14} /> ملف مكتمل وجاهز للسفر
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Customer + Booking info */}

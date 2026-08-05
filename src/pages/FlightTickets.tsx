@@ -89,6 +89,7 @@ export default function FlightTickets({ onNavigate }: Props) {
       hotel_name: o.booking?.hotel?.name || o.booking?.package?.hotel?.name || '—',
       package_name: o.booking?.package?.name || '—',
       notes: o.notes || '',
+      is_archived: o.customer?.is_archived || false,
     }));
     setReadyCustomers(opsData);
     setLoading(false);
@@ -105,7 +106,8 @@ export default function FlightTickets({ onNavigate }: Props) {
     alert('تم حذف العميل بنجاح.');
   };
 
-  const filteredReady = readyCustomers.filter(r => {
+  const filteredReady = readyCustomers.filter((r: any) => {
+    if (r.is_archived && !search) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!r.customer_name.toLowerCase().includes(q) && !r.client_code.toLowerCase().includes(q)) return false;
@@ -114,6 +116,7 @@ export default function FlightTickets({ onNavigate }: Props) {
   });
 
   const filteredTickets = tickets.filter(t => {
+    if (t.customers?.is_archived && !search) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!t.customers?.name?.toLowerCase().includes(q) && !(t.pnr || '').toLowerCase().includes(q)) return false;
@@ -151,6 +154,12 @@ export default function FlightTickets({ onNavigate }: Props) {
         customer_id: form.customer_id,
         booking_id: form.booking_id || null,
         pnr: form.pnr || 'صادرة',
+        airline: form.airline || '',
+        flight_number: form.flight_number || '',
+        departure_airport: form.departure_airport || '',
+        arrival_airport: form.arrival_airport || '',
+        departure_datetime: form.departure_datetime || null,
+        return_datetime: form.return_datetime || null,
         ticket_file_path: filePath,
         ticket_file_name: ticketFile.name,
         issued_by: profile?.id || null,
@@ -163,7 +172,13 @@ export default function FlightTickets({ onNavigate }: Props) {
       alert('خطأ في حفظ التذكرة: ' + error.message);
     } else if (data) {
       setTickets([data as FlightTicket, ...tickets]);
-      setReadyCustomers(readyCustomers.map(r => r.customer_id === form.customer_id ? { ...r, workflow_stage: 'ready' } : r));
+      // Update operation_files to return to operations
+      await supabase.from('operation_files').update({
+        workflow_stage: 'operations',
+        file_status: 'بانتظار استكمال التشغيل'
+      }).eq('customer_id', form.customer_id);
+      
+      setReadyCustomers(readyCustomers.filter(r => r.customer_id !== form.customer_id));
     }
     setForm(emptyForm);
     setTicketFile(null);
@@ -456,9 +471,35 @@ export default function FlightTickets({ onNavigate }: Props) {
                 </div>
               )}
 
-              <div>
-                <label className="form-label">PNR (رمز الحجز)</label>
-                <input value={form.pnr} onChange={(e) => setForm({ ...form, pnr: e.target.value })} className="form-input" placeholder="مثال: ABC123" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">PNR (رمز الحجز)</label>
+                  <input value={form.pnr} onChange={(e) => setForm({ ...form, pnr: e.target.value })} className="form-input" placeholder="مثال: ABC123" />
+                </div>
+                <div>
+                  <label className="form-label">شركة الطيران</label>
+                  <input value={form.airline} onChange={(e) => setForm({ ...form, airline: e.target.value })} className="form-input" placeholder="مثال: EgyptAir" />
+                </div>
+                <div>
+                  <label className="form-label">رقم الرحلة</label>
+                  <input value={form.flight_number} onChange={(e) => setForm({ ...form, flight_number: e.target.value })} className="form-input" placeholder="مثال: MS123" />
+                </div>
+                <div>
+                  <label className="form-label">مطار المغادرة</label>
+                  <input value={form.departure_airport} onChange={(e) => setForm({ ...form, departure_airport: e.target.value })} className="form-input" placeholder="مثال: CAI" />
+                </div>
+                <div>
+                  <label className="form-label">مطار الوصول</label>
+                  <input value={form.arrival_airport} onChange={(e) => setForm({ ...form, arrival_airport: e.target.value })} className="form-input" placeholder="مثال: JED" />
+                </div>
+                <div>
+                  <label className="form-label">تاريخ ووقت المغادرة</label>
+                  <input type="datetime-local" value={form.departure_datetime} onChange={(e) => setForm({ ...form, departure_datetime: e.target.value })} className="form-input" />
+                </div>
+                <div>
+                  <label className="form-label">تاريخ ووقت العودة (اختياري)</label>
+                  <input type="datetime-local" value={form.return_datetime} onChange={(e) => setForm({ ...form, return_datetime: e.target.value })} className="form-input" />
+                </div>
               </div>
 
               {/* Upload Flight Ticket File (Required) */}

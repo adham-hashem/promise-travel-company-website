@@ -402,6 +402,8 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                   { icon: User, label: 'الجنس', value: customer.gender },
                   { icon: Calendar, label: 'إصدار الجواز', value: customer.passport_issue_date ? new Date(customer.passport_issue_date).toLocaleDateString('ar-EG') : '' },
                   { icon: Calendar, label: 'انتهاء الجواز', value: customer.passport_expiry_date ? new Date(customer.passport_expiry_date).toLocaleDateString('ar-EG') : '' },
+                  { icon: HotelIcon, label: 'فندق مكة', value: customer.hotel_makkah ? `${customer.hotel_makkah} (${customer.room_type_makkah || 'غرفة غير محددة'})` : '' },
+                  { icon: HotelIcon, label: 'فندق المدينة', value: customer.hotel_madinah ? `${customer.hotel_madinah} (${customer.room_type_madinah || 'غرفة غير محددة'})` : '' },
                 ].filter((r) => r.value).map((r, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <r.icon size={14} className="text-gray-400 flex-shrink-0" />

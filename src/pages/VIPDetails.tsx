@@ -241,9 +241,11 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
           return_date: reqForm.return_date || null,
           airline_preference: reqForm.airline_preference,
           flight_class: reqForm.flight_class,
-          hotel_preference: reqForm.hotel_preference,
+          hotel_makkah: reqForm.hotel_makkah,
+          hotel_madinah: reqForm.hotel_madinah,
           hotel_stars: reqForm.hotel_stars,
-          room_type: reqForm.room_type,
+          room_type_makkah: reqForm.room_type_makkah,
+          room_type_madinah: reqForm.room_type_madinah,
           meal_plan: reqForm.meal_plan,
           view_preference: reqForm.view_preference,
           transportation_method: reqForm.transportation_method,
@@ -632,16 +634,24 @@ export default function VIPDetails({ customerId, onNavigate }: Props) {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label text-[10px]">الفندق المفضل</label>
-                    <input value={reqForm.hotel_preference || ''} onChange={(e) => setReqForm({...reqForm, hotel_preference: e.target.value})} className="form-input text-xs py-1.5" />
+                    <label className="form-label text-[10px]">فندق مكة</label>
+                    <input value={reqForm.hotel_makkah || ''} onChange={(e) => setReqForm({...reqForm, hotel_makkah: e.target.value})} className="form-input text-xs py-1.5" />
                   </div>
                   <div>
-                    <label className="form-label text-[10px]">تصنيف الفندق</label>
+                    <label className="form-label text-[10px]">نوع غرفة مكة</label>
+                    <input value={reqForm.room_type_makkah || ''} onChange={(e) => setReqForm({...reqForm, room_type_makkah: e.target.value})} className="form-input text-xs py-1.5" />
+                  </div>
+                  <div>
+                    <label className="form-label text-[10px]">فندق المدينة</label>
+                    <input value={reqForm.hotel_madinah || ''} onChange={(e) => setReqForm({...reqForm, hotel_madinah: e.target.value})} className="form-input text-xs py-1.5" />
+                  </div>
+                  <div>
+                    <label className="form-label text-[10px]">نوع غرفة المدينة</label>
+                    <input value={reqForm.room_type_madinah || ''} onChange={(e) => setReqForm({...reqForm, room_type_madinah: e.target.value})} className="form-input text-xs py-1.5" />
+                  </div>
+                  <div>
+                    <label className="form-label text-[10px]">تصنيف الفنادق</label>
                     <input value={reqForm.hotel_stars || ''} onChange={(e) => setReqForm({...reqForm, hotel_stars: e.target.value})} className="form-input text-xs py-1.5" />
-                  </div>
-                  <div>
-                    <label className="form-label text-[10px]">نوع الغرفة</label>
-                    <input value={reqForm.room_type || ''} onChange={(e) => setReqForm({...reqForm, room_type: e.target.value})} className="form-input text-xs py-1.5" />
                   </div>
                   <div>
                     <label className="form-label text-[10px]">الوجبات</label>
