@@ -77,7 +77,11 @@ BEGIN
     raw_user_meta_data,
     is_super_admin,
     created_at,
-    updated_at
+    updated_at,
+    confirmation_token,
+    recovery_token,
+    email_change_token_new,
+    email_change
   ) VALUES (
     v_instance_id,
     gen_random_uuid(),
@@ -90,7 +94,11 @@ BEGIN
     json_build_object('name', p_name, 'role', p_role)::jsonb,
     false,
     now(),
-    now()
+    now(),
+    '',
+    '',
+    '',
+    ''
   ) RETURNING id INTO v_user_id;
 
   -- Insert/Update public.user_profiles
