@@ -3,11 +3,12 @@ import {
   Plus, Search, X, Loader2, Users, CalendarDays, Plane,
   Printer, Edit2, Trash2, UserPlus, UserMinus, CheckCircle2,
   AlertCircle, Building2, User, Download,
-  Package2, ArrowLeft, RefreshCw, Layers,
+  Package2, ArrowLeft, RefreshCw, Layers, FileDown, FolderArchive, FolderDown,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { TravelGroup, TravelGroupMember, TravelGroupStatus, Package, Customer, Page } from '../types';
 import GroupRooming from '../components/GroupRooming';
+import JSZip from 'jszip';
 
 // ─── constants ──────────────────────────────────────────────────────────────
 
@@ -61,8 +62,9 @@ export default function TravelGroups({}: Props) {
 
   // ── group detail panel ──
   const [detailGroup, setDetailGroup] = useState<TravelGroup | null>(null);
-  const [detailTab, setDetailTab] = useState<'members' | 'rooming'>('members');
+  const [detailTab, setDetailTab] = useState<'members' | 'rooming' | 'documents'>('members');
   const [members, setMembers] = useState<TravelGroupMember[]>([]);
+  const [downloadingDocs, setDownloadingDocs] = useState<string | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
 
@@ -108,6 +110,216 @@ export default function TravelGroups({}: Props) {
       .order('added_at', { ascending: true });
     setMembers((data || []) as TravelGroupMember[]);
     setLoadingMembers(false);
+  };
+
+  const downloadGroupDocuments = async (type: 'visas' | 'tickets' | 'passports' | 'photos' | 'all') => {
+    if (members.length === 0) {
+      alert('لا يوجد أعضاء في هذا الفوج لتنزيل مستنداتهم.');
+      return;
+    }
+    setDownloadingDocs(type);
+    try {
+      const zip = new JSZip();
+      const customerIds = members.map(m => m.customer_id);
+
+      // 1. Fetch data from Supabase tables
+      let visas: any[] = [];
+      let tickets: any[] = [];
+      let docs: any[] = [];
+
+      const promises: Promise<any>[] = [];
+
+      if (type === 'visas' || type === 'all') {
+        promises.push(
+          supabase
+            .from('visa_management')
+            .select('customer_id, visa_file_path, visa_file_name')
+            .in('customer_id', customerIds)
+            .then(res => {
+              if (res.error) throw res.error;
+              visas = res.data || [];
+            })
+        );
+      }
+
+      if (type === 'tickets' || type === 'all') {
+        promises.push(
+          supabase
+            .from('flight_tickets')
+            .select('customer_id, ticket_file_path, ticket_file_name, created_at')
+            .in('customer_id', customerIds)
+            .order('created_at', { ascending: false })
+            .then(res => {
+              if (res.error) throw res.error;
+              tickets = res.data || [];
+            })
+        );
+      }
+
+      if (type === 'passports' || type === 'photos' || type === 'all') {
+        promises.push(
+          supabase
+            .from('documents')
+            .select('customer_id, file_path, file_name, document_type, status, created_at')
+            .in('customer_id', customerIds)
+            .then(res => {
+              if (res.error) throw res.error;
+              docs = res.data || [];
+            })
+        );
+      }
+
+      await Promise.all(promises);
+
+      // Helper to match files to customers
+      const missingVisas: string[] = [];
+      const missingTickets: string[] = [];
+      const missingPassports: string[] = [];
+      const missingPhotos: string[] = [];
+
+      const downloadQueue: { path: string; name: string; folder?: string }[] = [];
+
+      members.forEach(member => {
+        const cId = member.customer_id;
+        const cCode = member.customers.client_code || 'بدون_كود';
+        const cName = member.customers.name;
+
+        // Visas
+        if (type === 'visas' || type === 'all') {
+          const visa = visas.find(v => v.customer_id === cId && v.visa_file_path);
+          if (visa) {
+            const ext = visa.visa_file_path.split('.').pop() || 'pdf';
+            downloadQueue.push({
+              path: visa.visa_file_path,
+              name: `${cCode} - ${cName}.${ext}`,
+              folder: type === 'all' ? 'Visas' : undefined
+            });
+          } else {
+            missingVisas.push(cName);
+          }
+        }
+
+        // Tickets
+        if (type === 'tickets' || type === 'all') {
+          // Find latest ticket for customer
+          const ticket = tickets.find(t => t.customer_id === cId && t.ticket_file_path);
+          if (ticket) {
+            const ext = ticket.ticket_file_path.split('.').pop() || 'pdf';
+            downloadQueue.push({
+              path: ticket.ticket_file_path,
+              name: `${cCode} - ${cName}.${ext}`,
+              folder: type === 'all' ? 'Flight Tickets' : undefined
+            });
+          } else {
+            missingTickets.push(cName);
+          }
+        }
+
+        // Passports
+        if (type === 'passports' || type === 'all') {
+          // Find passport document (prefer approved status 'مقبول')
+          const customerDocs = docs.filter(d => d.customer_id === cId && d.document_type === 'جواز سفر' && d.file_path);
+          const passport = customerDocs.find(d => d.status === 'مقبول') || customerDocs[0];
+          if (passport) {
+            const ext = passport.file_path.split('.').pop() || 'pdf';
+            downloadQueue.push({
+              path: passport.file_path,
+              name: `${cCode} - ${cName}.${ext}`,
+              folder: type === 'all' ? 'Passports' : undefined
+            });
+          } else {
+            missingPassports.push(cName);
+          }
+        }
+
+        // Personal Photos
+        if (type === 'photos' || type === 'all') {
+          const customerDocs = docs.filter(d => d.customer_id === cId && d.document_type === 'صورة شخصية' && d.file_path);
+          const photo = customerDocs.find(d => d.status === 'مقبول') || customerDocs[0];
+          if (photo) {
+            const ext = photo.file_path.split('.').pop() || 'jpg';
+            downloadQueue.push({
+              path: photo.file_path,
+              name: `${cCode} - ${cName}.${ext}`,
+              folder: type === 'all' ? 'Personal Photos' : undefined
+            });
+          } else {
+            missingPhotos.push(cName);
+          }
+        }
+      });
+
+      if (downloadQueue.length === 0) {
+        alert('لم يتم العثور على أي ملفات متوفرة لتحميلها.');
+        setDownloadingDocs(null);
+        return;
+      }
+
+      // Download all files in parallel
+      await Promise.all(
+        downloadQueue.map(async item => {
+          try {
+            const { data, error } = await supabase.storage.from('documents').download(item.path);
+            if (error) throw error;
+            if (data) {
+              if (item.folder) {
+                zip.folder(item.folder)?.file(item.name, data);
+              } else {
+                zip.file(item.name, data);
+              }
+            }
+          } catch (err: any) {
+            console.error(`Error downloading file ${item.path}:`, err);
+          }
+        })
+      );
+
+      // Generate and trigger download
+      const content = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(content);
+      
+      let zipName = '';
+      if (type === 'visas') zipName = `تأشيرات فوج - ${detailGroup.name}.zip`;
+      else if (type === 'tickets') zipName = `تذاكر فوج - ${detailGroup.name}.zip`;
+      else if (type === 'passports') zipName = `جوازات فوج - ${detailGroup.name}.zip`;
+      else if (type === 'photos') zipName = `صور فوج - ${detailGroup.name}.zip`;
+      else zipName = `مستندات فوج - ${detailGroup.name}.zip`;
+
+      link.download = zipName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      // Alerts for missing items
+      let alertMsg = '';
+      if (type === 'visas' && missingVisas.length > 0) {
+        alertMsg = `تم تنزيل التأشيرات المتوفرة بنجاح.\n\n⚠️ العملاء الذين ليس لديهم تأشيرة مرفوعة:\n` + missingVisas.map(n => `- ${n}`).join('\n');
+      } else if (type === 'tickets' && missingTickets.length > 0) {
+        alertMsg = `تم تنزيل التذاكر المتوفرة بنجاح.\n\n⚠️ العملاء الذين ليس لديهم تذاكر طيران مرفوعة:\n` + missingTickets.map(n => `- ${n}`).join('\n');
+      } else if (type === 'passports' && missingPassports.length > 0) {
+        alertMsg = `تم تنزيل الجوازات المتوفرة بنجاح.\n\n⚠️ العملاء الذين ليس لديهم جوازات سفر مرفوعة:\n` + missingPassports.map(n => `- ${n}`).join('\n');
+      } else if (type === 'photos' && missingPhotos.length > 0) {
+        alertMsg = `تم تنزيل الصور الشخصية المتوفرة بنجاح.\n\n⚠️ العملاء الذين ليس لديهم صور شخصية مرفوعة:\n` + missingPhotos.map(n => `- ${n}`).join('\n');
+      } else if (type === 'all') {
+        const sections: string[] = [];
+        if (missingVisas.length > 0) sections.push(`تأشيرات ناقصة لـ (${missingVisas.length}) عميل: \n` + missingVisas.map(n => `  - ${n}`).join('\n'));
+        if (missingTickets.length > 0) sections.push(`تذاكر ناقصة لـ (${missingTickets.length}) عميل: \n` + missingTickets.map(n => `  - ${n}`).join('\n'));
+        if (missingPassports.length > 0) sections.push(`جوازات ناقصة لـ (${missingPassports.length}) عميل: \n` + missingPassports.map(n => `  - ${n}`).join('\n'));
+        if (missingPhotos.length > 0) sections.push(`صور شخصية ناقصة لـ (${missingPhotos.length}) عميل: \n` + missingPhotos.map(n => `  - ${n}`).join('\n'));
+        
+        if (sections.length > 0) {
+          alertMsg = `تم تنزيل المجلد الجماعي بنجاح.\n\n⚠️ تنبيه المستندات الناقصة:\n` + sections.join('\n\n');
+        }
+      }
+
+      if (alertMsg) {
+        alert(alertMsg);
+      }
+    } catch (error: any) {
+      alert('حدث خطأ أثناء تجميع المستندات: ' + error.message);
+    } finally {
+      setDownloadingDocs(null);
+    }
   };
 
   const loadAvailableCustomers = async (_groupId?: string) => {
@@ -851,6 +1063,12 @@ export default function TravelGroups({}: Props) {
               >
                 نظام التسكين (Rooming)
               </button>
+              <button
+                onClick={() => setDetailTab('documents')}
+                className={`py-3 px-4 font-bold text-sm border-b-2 transition-colors ${detailTab === 'documents' ? 'border-gold-500 text-gold-600' : 'border-transparent text-gray-500 hover:text-navy-700'}`}
+              >
+                الملفات الجماعية
+              </button>
             </div>
 
             {detailTab === 'members' ? (
@@ -923,9 +1141,164 @@ export default function TravelGroups({}: Props) {
                   <span>المتبقي في الفوج: {detailGroup.max_capacity - members.length} مقعد</span>
                 </div>
               </>
-            ) : (
+            ) : detailTab === 'rooming' ? (
               <div className="flex-1 overflow-hidden relative">
                 <GroupRooming groupId={detailGroup.id} members={members} onUpdate={() => loadMembers(detailGroup.id)} />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="bg-navy-50/50 rounded-2xl p-4 border border-navy-100 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-gold flex items-center justify-center text-white font-bold flex-shrink-0">
+                    <FileDown size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-navy-900 text-sm">قسم الملفات الجماعية للفوج</h4>
+                    <p className="text-xs text-gray-500 mt-0.5 font-medium">يمكنك تنزيل مستندات أفراد الفوج دفعة واحدة كملفات مضغوطة ZIP</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Visas */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <h5 className="font-bold text-navy-800 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+                        تأشيرات الفوج
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal font-medium">
+                        تنزيل جميع تأشيرات أفراد هذا الفوج في مجلد ZIP، ويتم تسمية كل ملف باسم العميل وكوده الموحد (PDF).
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => downloadGroupDocuments('visas')}
+                      disabled={downloadingDocs !== null}
+                      className="btn-outline text-xs py-2.5 px-4 mt-4 w-full flex items-center justify-center gap-1.5 font-semibold"
+                    >
+                      {downloadingDocs === 'visas' ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>جاري التحميل والتجميع...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderDown size={14} />
+                          <span>تحميل مجلد التأشيرات</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Flight Tickets */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <h5 className="font-bold text-navy-800 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-purple-500 rounded-full" />
+                        تذاكر الطيران
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal font-medium">
+                        تنزيل جميع تذاكر الطيران الخاصة بأعضاء الفوج في مجلد ZIP (PDF/Image).
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => downloadGroupDocuments('tickets')}
+                      disabled={downloadingDocs !== null}
+                      className="btn-outline text-xs py-2.5 px-4 mt-4 w-full flex items-center justify-center gap-1.5 font-semibold"
+                    >
+                      {downloadingDocs === 'tickets' ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>جاري التحميل والتجميع...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderDown size={14} />
+                          <span>تحميل مجلد تذاكر الطيران</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Passports */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <h5 className="font-bold text-navy-800 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                        جوازات السفر
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal font-medium">
+                        تنزيل جميع صور أو ملفات جوازات سفر أعضاء الفوج في مجلد ZIP.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => downloadGroupDocuments('passports')}
+                      disabled={downloadingDocs !== null}
+                      className="btn-outline text-xs py-2.5 px-4 mt-4 w-full flex items-center justify-center gap-1.5 font-semibold"
+                    >
+                      {downloadingDocs === 'passports' ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>جاري التحميل والتجميع...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderDown size={14} />
+                          <span>تحميل مجلد الجوازات</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Personal Photos */}
+                  <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <h5 className="font-bold text-navy-800 text-sm flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-gold-500 rounded-full" />
+                        الصور الشخصية
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-1 leading-normal font-medium">
+                        تنزيل جميع الصور الشخصية الخاصة بأعضاء الفوج لاستخدامها في تصريح السفر أو غيرها.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => downloadGroupDocuments('photos')}
+                      disabled={downloadingDocs !== null}
+                      className="btn-outline text-xs py-2.5 px-4 mt-4 w-full flex items-center justify-center gap-1.5 font-semibold"
+                    >
+                      {downloadingDocs === 'photos' ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>جاري التحميل والتجميع...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderDown size={14} />
+                          <span>تحميل مجلد الصور الشخصية</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* All Documents Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => downloadGroupDocuments('all')}
+                    disabled={downloadingDocs !== null}
+                    className="btn-gold py-3 px-6 w-full flex items-center justify-center gap-2 font-bold shadow-md hover:shadow-lg transition-all text-sm rounded-xl"
+                  >
+                    {downloadingDocs === 'all' ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>جاري تجميع وتحميل كافة مستندات الفوج بالكامل...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderArchive size={18} />
+                        <span>تنزيل جميع مستندات الفوج بالكامل (مجلد مجمع منظم)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             )}
           </div>
