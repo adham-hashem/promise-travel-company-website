@@ -44,6 +44,7 @@ import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
 import { ALL_PAGES, getRoleHomePage } from './lib/permissions';
 
+
 /*
 const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   customers: 'customers_view',
