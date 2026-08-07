@@ -162,10 +162,12 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
         .maybeSingle();
       setTravelGroup(tgData ? tgData.travel_groups : null);
 
+      const packagePrice = Number(custRes.data?.packages?.price || 0);
       const totalBookings = (bkRes.data as Booking[])?.reduce((s, b) => s + Number(b.total_amount || 0), 0) || 0;
+      const totalCost = totalBookings > 0 ? totalBookings : packagePrice;
       const totalPaid = (payRes.data as Payment[])?.reduce((s, p) => s + Number(p.amount || 0), 0) || 0;
-      const totalRemaining = Math.max(0, totalBookings - totalPaid);
-      setFin({ totalBookings, totalPaid, totalRemaining, invoiceCount: (invRes.data as Invoice[])?.length || 0 });
+      const totalRemaining = Math.max(0, totalCost - totalPaid);
+      setFin({ totalBookings: totalCost, totalPaid, totalRemaining, invoiceCount: (invRes.data as Invoice[])?.length || 0 });
       setLoading(false);
     }
     load();

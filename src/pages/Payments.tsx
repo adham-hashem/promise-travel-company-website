@@ -89,7 +89,7 @@ export default function Payments() {
       supabase.from('payments').select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
       supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
       supabase.from('operation_files')
-        .select('*, customer:customers(*), booking:bookings(*)')
+        .select('*, customer:customers(*, packages(*)), booking:bookings(*)')
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
       supabase.from('packages').select('*').eq('is_active', true).order('name', { ascending: true }),
@@ -177,6 +177,9 @@ export default function Payments() {
       if (data) {
         setPayments(payments.map(p => p.id === editId ? (data as PayRow) : p));
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
+        if (form.customer_id && form.package_id) {
+          await supabase.from('customers').update({ requested_package_id: form.package_id }).eq('id', form.customer_id);
+        }
       }
     } else {
       const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
@@ -184,6 +187,9 @@ export default function Payments() {
       if (data) {
         setPayments([data as PayRow, ...payments]);
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
+        if (form.customer_id && form.package_id) {
+          await supabase.from('customers').update({ requested_package_id: form.package_id }).eq('id', form.customer_id);
+        }
       }
     }
     setSaving(false);
@@ -427,7 +433,8 @@ export default function Payments() {
               // Compute payment totals from linked payments
               const filePayments: any[] = file.payments || [];
               const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-              const bookingTotal = Number(file.booking?.total_amount || 0);
+              const packagePrice = Number(file.customer?.packages?.price || 0);
+              const bookingTotal = Number(file.booking?.total_amount || 0) || packagePrice;
               const paidPct = bookingTotal > 0 ? Math.min(100, Math.round((totalPaid / bookingTotal) * 100)) : 0;
 
               return (
@@ -459,9 +466,23 @@ export default function Payments() {
                             <span className="text-[10px] text-gray-400">{filePayments.length} دفعة</span>
                           </div>
                           {bookingTotal > 0 && (
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div className="bg-gold-500 h-1.5 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
-                            </div>
+                            <>
+                              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                <div className="bg-gold-500 h-1.5 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] pt-1">
+                                <span className="text-gray-500 font-medium">المتبقي المطلوب:</span>
+                                <span className={bookingTotal - totalPaid > 0 ? "text-red-600 font-bold" : "text-emerald-700 font-bold"}>
+                                  {(bookingTotal - totalPaid).toLocaleString('ar-EG')} ج.م
+                                </span>
+                              </div>
+                              {file.customer?.packages?.name && (
+                                <div className="flex items-center justify-between text-[10px] text-gray-400 pt-0.5">
+                                  <span>الباقة المرتبطة:</span>
+                                  <span className="font-semibold text-navy-800">{file.customer.packages.name}</span>
+                                </div>
+                              )}
+                            </>
                           )}
                           
                           {/* List of payments for this file */}
