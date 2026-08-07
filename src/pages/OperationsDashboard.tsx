@@ -123,8 +123,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       .select(`
         *,
         customer:customers(*),
-        booking:bookings(*),
-        hotel:hotels(*)
+        booking:bookings(*, package:packages(name, type)),
+        hotel:hotels(*),
+        internal_trip:internal_trips(name, destination)
       `)
       .single();
 
@@ -138,7 +139,35 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       const emp = targetFlightEmpId
         ? employees.find((e) => e.id === targetFlightEmpId) || null
         : selected.assigned_employee;
-      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
+      
+      const r = data as any;
+      let packageName = '-';
+      if (r.booking?.package?.name) {
+        packageName = r.booking.package.name;
+      } else if (r.internal_trip?.name) {
+        packageName = r.internal_trip.name;
+      }
+
+      let destination = '-';
+      if (r.booking?.package?.type) {
+        destination = r.booking.package.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
+      } else if (r.internal_trip?.destination) {
+        destination = r.internal_trip.destination;
+      }
+
+      const updated = {
+        ...r,
+        assigned_employee: emp,
+        booking: r.booking ? {
+          ...r.booking,
+          package_name: packageName,
+          destination: destination
+        } : {
+          package_name: packageName,
+          destination: destination
+        }
+      } as unknown as OpFile;
+
       setSelected(updated);
       setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
     }
@@ -178,8 +207,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       .select(`
         *,
         customer:customers(*),
-        booking:bookings(*),
-        hotel:hotels(*)
+        booking:bookings(*, package:packages(name, type)),
+        hotel:hotels(*),
+        internal_trip:internal_trips(name, destination)
       `)
       .order('created_at', { ascending: false });
 
@@ -192,10 +222,34 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     const empMap: Record<string, { id: string; name: string }> = {};
     (empData || []).forEach((e: any) => { empMap[e.id] = e; });
 
-    const rows = ((data as unknown as OpFile[]) || []).map((r: any) => ({
-      ...r,
-      assigned_employee: r.assigned_to ? (empMap[r.assigned_to] || null) : null,
-    }));
+    const rows = ((data as unknown as any[]) || []).map((r: any) => {
+      let packageName = '-';
+      if (r.booking?.package?.name) {
+        packageName = r.booking.package.name;
+      } else if (r.internal_trip?.name) {
+        packageName = r.internal_trip.name;
+      }
+
+      let destination = '-';
+      if (r.booking?.package?.type) {
+        destination = r.booking.package.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
+      } else if (r.internal_trip?.destination) {
+        destination = r.internal_trip.destination;
+      }
+
+      return {
+        ...r,
+        assigned_employee: r.assigned_to ? (empMap[r.assigned_to] || null) : null,
+        booking: r.booking ? {
+          ...r.booking,
+          package_name: packageName,
+          destination: destination
+        } : {
+          package_name: packageName,
+          destination: destination
+        }
+      };
+    });
 
     setFiles(rows);
     setStats({

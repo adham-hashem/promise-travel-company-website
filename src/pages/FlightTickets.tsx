@@ -39,8 +39,9 @@ interface Props {
 export default function FlightTickets({ onNavigate }: Props) {
   const { profile } = useAuth();
   const [tickets, setTickets] = useState<FlightTicket[]>([]);
-  const [readyCustomers, setReadyCustomers] = useState<Array<{ customer_id: string; customer_name: string; client_code: string; booking_id: string; workflow_stage: string; destination: string; travel_date: string; return_date: string; pax_count: number; passport_name: string; visa_id: string; hotel_name: string; package_name: string; notes?: string }>>([]);
+  const [readyCustomers, setReadyCustomers] = useState<Array<{ customer_id: string; customer_name: string; client_code: string; booking_id: string; workflow_stage: string; destination: string; travel_date: string; return_date: string; pax_count: number; passport_name: string; visa_id: string; hotel_name: string; package_name: string; notes?: string; customer?: any; booking?: any }>>([]);
   const [allCustomers, setAllCustomers] = useState<Array<{ id: string; name: string; client_code: string }>>([]);
+  const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -90,6 +91,8 @@ export default function FlightTickets({ onNavigate }: Props) {
       package_name: o.booking?.package?.name || '—',
       notes: o.notes || '',
       is_archived: o.customer?.is_archived || false,
+      customer: o.customer,
+      booking: o.booking
     }));
     setReadyCustomers(opsData);
     setLoading(false);
@@ -324,20 +327,37 @@ export default function FlightTickets({ onNavigate }: Props) {
                 <div key={r.customer_id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center"><Plane size={18} className="text-cyan-600" /></div>
+                      <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center flex-shrink-0"><Plane size={18} className="text-cyan-600" /></div>
                       <div>
-                        <p className="font-bold text-navy-900 text-sm">{r.customer_name}</p>
-                        <p className="text-xs text-gray-400 font-mono">{r.client_code}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-navy-900 text-sm leading-tight">{r.customer_name}</p>
+                          {r.customer && (
+                            <button
+                              onClick={() => setDetailCustomer(r.customer)}
+                              title="عرض تفاصيل العميل بالكامل"
+                              className="p-1 rounded hover:bg-cyan-100 text-cyan-700 transition-colors flex-shrink-0"
+                            >
+                              <Eye size={13} />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 font-mono mt-0.5">{r.client_code}</p>
                       </div>
                     </div>
                     <span className={`badge text-xs ${stage.color}`}>{stage.label}</span>
                   </div>
-                  <div className="space-y-1.5 text-xs">
+                  <div className="space-y-1.5 text-xs border-b border-gray-100 pb-2.5 mb-2.5">
                     <div className="flex justify-between"><span className="text-gray-400">الباقة</span><span className="font-semibold text-navy-700">{r.package_name}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400">الفندق</span><span className="font-semibold text-navy-700">{r.hotel_name}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400">الوجهة</span><span className="font-semibold text-navy-700">{r.destination}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400">تاريخ السفر</span><span className="font-semibold text-navy-700">{r.travel_date !== '—' ? fmtDate(r.travel_date) : '—'}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400">المسافرين</span><span className="font-semibold text-navy-700">{r.pax_count}</span></div>
+                  </div>
+                  <div className="space-y-1.5 text-xs bg-navy-50/50 p-2.5 rounded-xl border border-navy-100/40 mb-2.5">
+                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">الهاتف</span><span className="font-semibold text-navy-800" dir="ltr">{r.customer?.phone || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">رقم الهوية</span><span className="font-mono font-semibold text-navy-800">{r.customer?.national_id || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">رقم الجواز</span><span className="font-mono font-semibold text-navy-800">{r.customer?.passport_number || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{r.customer?.service_type || '—'}</span></div>
                   </div>
                   {r.notes && (
                     <div className="mt-2.5 bg-cyan-50/80 p-2.5 rounded-xl border border-cyan-100 text-[11px] text-navy-800">
@@ -402,8 +422,11 @@ export default function FlightTickets({ onNavigate }: Props) {
                     <td className="font-mono text-xs text-navy-600">{t.e_ticket_number || '—'}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setSelectedTicket(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="عرض"><Eye size={15} /></button>
-                        <button onClick={() => handleDeleteTicket(t)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={15} /></button>
+                        <button onClick={() => setSelectedTicket(t)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500" title="تفاصيل التذكرة"><Eye size={15} /></button>
+                        {t.customers && (
+                          <button onClick={() => setDetailCustomer(t.customers)} className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600" title="بيانات العميل بالكامل"><User size={15} /></button>
+                        )}
+                        <button onClick={() => handleDeleteTicket(t)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف التذكرة"><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
@@ -596,6 +619,89 @@ export default function FlightTickets({ onNavigate }: Props) {
               {selectedTicket.customer_id && (
                 <button onClick={() => onNavigate('customer-details', selectedTicket.customer_id)} className="text-xs text-navy-600 font-semibold hover:underline">عرض ملف العميل ←</button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer details modal */}
+      {detailCustomer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setDetailCustomer(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-navy-900 text-white rounded-t-3xl">
+              <div>
+                <h3 className="text-lg font-bold">{detailCustomer.name}</h3>
+                <p className="text-xs text-navy-200 font-mono mt-0.5">{detailCustomer.client_code || 'بدون كود'}</p>
+              </div>
+              <button onClick={() => setDetailCustomer(null)} className="p-1.5 rounded-xl hover:bg-white/10 text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-right text-xs">
+              {/* Section 1: Personal Info */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <User size={16} className="text-gold-500" /> البيانات الشخصية
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div><span className="text-gray-400 block mb-0.5">الهاتف</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.phone || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">واتساب</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.whatsapp || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">البريد الإلكتروني</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.email || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الجنس</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.gender || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">تاريخ الميلاد</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.birth_date || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الجنسية</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.nationality || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">المحافظة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.governorate || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">المدينة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.city || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الدولة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.country || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 2: Passport & National ID */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-gold-500" /> الهوية وجواز السفر
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم الهوية الوطنية</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.national_id || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم جواز السفر</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.passport_number || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ إصدار جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_issue_date || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ انتهاء جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_expiry_date || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 3: Trip & Housing */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <Plane size={16} className="text-gold-500" /> تفاصيل الرحلة والتسكين
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">فندق مكة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_makkah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">غرفة مكة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_makkah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">فندق المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_madinah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">غرفة المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_madinah || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 4: Notes */}
+              {detailCustomer.notes && (
+                <div>
+                  <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-2">📝 ملاحظات إضافية</h4>
+                  <p className="bg-gray-50 p-3 rounded-2xl text-gray-700 leading-relaxed font-medium">{detailCustomer.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-5 border-t border-gray-100 flex justify-end flex-shrink-0 bg-gray-50 rounded-b-3xl">
+              <button onClick={() => setDetailCustomer(null)} className="btn-navy py-2 px-6 text-sm rounded-xl">
+                إغلاق النافذة
+              </button>
             </div>
           </div>
         </div>

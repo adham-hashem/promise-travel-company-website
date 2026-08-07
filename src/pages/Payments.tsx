@@ -48,12 +48,40 @@ export default function Payments() {
   const [rejectionReason, setRejectionReason] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Balance calculations for the modal
+  const customerPayments = form.customer_id
+    ? payments.filter(p => p.customer_id === form.customer_id && p.id !== editId && p.approval_status !== 'مرفوض')
+    : [];
+  const totalPaidByCustomer = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const selectedPkg = form.package_id ? packages.find(p => p.id === form.package_id) : null;
+  const packagePrice = selectedPkg ? Number(selectedPkg.price || 0) : 0;
+  const remainingBalance = Math.max(0, packagePrice - totalPaidByCustomer);
+
   const [transferredFiles, setTransferredFiles] = useState<any[]>([]);
   const [opsTransferFile, setOpsTransferFile] = useState<any | null>(null);
 
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!form.customer_id || !form.package_id || !form.amount) return;
+    const customerPayments = payments.filter(p => p.customer_id === form.customer_id && p.id !== editId && p.approval_status !== 'مرفوض');
+    const totalPaid = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const pkg = packages.find(p => p.id === form.package_id);
+    const pkgPrice = pkg ? Number(pkg.price || 0) : 0;
+    const currentAmt = parseFloat(form.amount) || 0;
+    
+    if (pkgPrice > 0) {
+      if (totalPaid + currentAmt >= pkgPrice) {
+        setForm(f => f.status !== 'مدفوع بالكامل' ? { ...f, status: 'مدفوع بالكامل' } : f);
+      } else if (totalPaid + currentAmt > 0) {
+        setForm(f => f.status !== 'مدفوع جزئياً' ? { ...f, status: 'مدفوع جزئياً' } : f);
+      } else {
+        setForm(f => f.status !== 'غير مدفوع' ? { ...f, status: 'غير مدفوع' } : f);
+      }
+    }
+  }, [form.customer_id, form.package_id, form.amount, editId, payments, packages]);
 
   const load = async () => {
     setLoading(true);
@@ -473,7 +501,12 @@ export default function Payments() {
                   <div className="flex gap-2 pt-2 border-t border-gray-100 mt-2">
                     <button
                       onClick={() => {
-                        setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '' });
+                        setForm({
+                          ...emptyForm,
+                          customer_id: file.customer_id,
+                          booking_id: file.booking_id || '',
+                          package_id: file.booking?.package_id || ''
+                        });
                         setShowModal(true);
                       }}
                       className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
@@ -602,6 +635,23 @@ export default function Payments() {
                     </option>
                   ))}
                 </select>
+                
+                {form.customer_id && form.package_id && (
+                  <div className="bg-navy-50 border border-navy-100 rounded-xl p-3 text-xs space-y-1.5 mt-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">سعر الباقة:</span>
+                      <span className="font-bold text-navy-900">{packagePrice.toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">إجمالي المدفوع سابقاً:</span>
+                      <span className="font-bold text-emerald-700">{totalPaidByCustomer.toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                    <div className="flex justify-between border-t border-navy-200/50 pt-1.5 mt-1">
+                      <span className="text-navy-700 font-semibold">المتبقي المطلوب سداده:</span>
+                      <span className="font-bold text-red-600">{remainingBalance.toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
