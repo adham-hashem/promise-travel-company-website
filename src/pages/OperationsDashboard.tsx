@@ -336,6 +336,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     // Hide archived by default unless search is active
     if ((f as any).is_archived && !search) return false;
 
+    // By default, do not show 'accounts' stage files in the Operations Dashboard unless stageFilter is set to 'accounts' or search is active
+    if (f.workflow_stage === 'accounts' && stageFilter !== 'accounts' && !search) return false;
+
     if (statusFilter && f.file_status !== statusFilter) return false;
     if (stageFilter && f.workflow_stage !== stageFilter) return false;
     const q = search.toLowerCase();
@@ -417,41 +420,47 @@ export default function OperationsDashboard({ onNavigate }: Props) {
 
   const deleteFile = async () => {
     if (!selected) return;
-    const confirmDelete = window.confirm('هل أنت متأكد من حذف ملف التشغيل هذا نهائياً؟ سيتم إلغاء تقدم الملف في جميع المراحل.');
+    const confirmDelete = window.confirm('هل أنت متأكد من إزالة هذا العميل من قسم التشغيل؟ (سيتم الاحتفاظ بالملف والمدفوعات في قسم الحسابات)');
     if (!confirmDelete) return;
     
     setSaving(true);
     const { error } = await supabase
       .from('operation_files')
-      .delete()
+      .update({ workflow_stage: 'accounts', file_status: 'جديد' })
       .eq('id', selected.id);
       
     if (error) {
-      alert(`فشل حذف الملف: ${error.message}`);
+      alert(`فشل إزالة الملف: ${error.message}`);
       setSaving(false);
       return;
     }
     
-    setFiles(files.filter(f => f.id !== selected.id));
+    setFiles(files.map(f => f.id === selected.id ? { ...f, workflow_stage: 'accounts', file_status: 'جديد' } : f));
     setSelected(null);
     setSaving(false);
+    alert('تمت إزالة العميل من قسم التشغيل وإرجاعه للحسابات بنجاح.');
   };
 
   const handleDeleteFile = async (file: OpFile) => {
     const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', file.customer_id).limit(1);
 
     if (hasFlight && hasFlight.length > 0) {
-      alert("لا يمكن حذف الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
+      alert("لا يمكن إزالة الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
       return;
     }
 
-    if (!confirm('هل أنت متأكد من حذف هذا الملف نهائياً؟')) return;
+    if (!confirm('هل أنت متأكد من إزالة هذا العميل من قسم التشغيل؟ (سيتم الاحتفاظ به في الحسابات)')) return;
     setSaving(true);
-    await supabase.from('operation_files').delete().eq('id', file.id);
-    setFiles(files.filter(f => f.id !== file.id));
+    const { error } = await supabase.from('operation_files').update({ workflow_stage: 'accounts', file_status: 'جديد' }).eq('id', file.id);
+    if (error) {
+      alert(`فشل إزالة الملف: ${error.message}`);
+      setSaving(false);
+      return;
+    }
+    setFiles(files.map(f => f.id === file.id ? { ...f, workflow_stage: 'accounts', file_status: 'جديد' } : f));
     if (selected?.id === file.id) setSelected(null);
     setSaving(false);
-    alert('تم حذف الملف بنجاح.');
+    alert('تمت إزالة العميل من قسم التشغيل بنجاح.');
   };
 
   const uploadOpDoc = async (file: File) => {
@@ -1084,9 +1093,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 <button
                   onClick={deleteFile}
                   disabled={saving}
-                  className="btn-outline !border-red-200 !text-red-600 hover:!bg-red-50 text-xs py-2 px-4 flex items-center gap-1.5 font-bold"
+                  className="btn-outline !border-amber-200 !text-amber-700 hover:!bg-amber-50 text-xs py-2 px-4 flex items-center gap-1.5 font-bold"
                 >
-                  <Trash2 size={14} /> حذف ملف التشغيل نهائياً
+                  <Undo2 size={14} /> إزالة من التشغيل وإرجاع للحسابات
                 </button>
                 {onNavigate && selected.customer?.id && (
                   <button
