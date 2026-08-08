@@ -433,6 +433,24 @@ export default function Inquiries() {
       alert('لا يمكن حذف الاستعلام لأنه تم تحويله ولا يزال موجوداً في مرحلة العملاء (CRM) أو الحسابات. يجب حذفه من المراحل التالية أولاً.');
       return;
     }
+
+    if (inq.phone) {
+      const { data: existingCust } = await supabase
+        .from('customers')
+        .select('id, name, source')
+        .eq('phone', inq.phone)
+        .eq('is_vip', false)
+        .limit(1);
+
+      if (existingCust && existingCust.length > 0) {
+        const c = existingCust[0];
+        if (!c.source || !c.source.startsWith('مسودة:')) {
+          alert(`لا يمكن حذف هذا الاستعلام لأن العميل "${c.name}" موجود بالفعل في قسم العملاء (CRM) بنفس رقم الهاتف. يجب حذفه من قسم العملاء CRM أولاً.`);
+          return;
+        }
+      }
+    }
+
     if (!confirm('هل أنت متأكد من حذف هذا الاستعلام نهائياً؟')) return;
     await supabase.from('inquiries').delete().eq('id', inq.id);
     load();

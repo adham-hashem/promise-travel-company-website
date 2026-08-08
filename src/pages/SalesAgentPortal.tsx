@@ -269,8 +269,14 @@ export default function SalesAgentPortal() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا العميل؟')) return;
     try {
+      const { data: cust } = await supabase.from('customers').select('source, name').eq('id', id).maybeSingle();
+      if (cust && cust.source && !cust.source.startsWith('مسودة:')) {
+        alert(`لا يمكن حذف العميل "${cust.name}" لأنه تم إرساله بالفعل إلى قسم العملاء (CRM). يجب حذفه من قسم العملاء CRM أولاً.`);
+        return;
+      }
+
+      if (!confirm('هل أنت متأكد من حذف هذا العميل؟')) return;
       const { error: err } = await supabase.from('customers').delete().eq('id', id);
       if (err) throw err;
       loadData();
