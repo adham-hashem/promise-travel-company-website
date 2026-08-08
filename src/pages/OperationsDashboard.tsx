@@ -99,6 +99,17 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const [flightTransferring, setFlightTransferring] = useState(false);
   const docFileRef = useRef<HTMLInputElement>(null);
 
+  // Compute financial summary for selected operation file
+  const packagePrice = selected ? Number(selected.customer?.packages?.price || 0) : 0;
+  const bookingTotal = selected ? (Number(selected.booking?.total_amount || 0) || packagePrice) : 0;
+  const totalPaid = selected ? payments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0) : 0;
+  const remaining = Math.max(0, bookingTotal - totalPaid);
+  let payStatus = selected?.booking?.payment_status || 'غير مدفوع';
+  if (selected && !selected.booking?.payment_status && bookingTotal > 0) {
+    if (totalPaid >= bookingTotal) payStatus = 'مدفوع بالكامل';
+    else if (totalPaid > 0) payStatus = 'مدفوع جزئياً';
+  }
+
   useEffect(() => {
     load();
     loadEmployees();
@@ -206,7 +217,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       .from('operation_files')
       .select(`
         *,
-        customer:customers(*),
+        customer:customers(*, packages(*)),
         booking:bookings(*, package:packages(name, type)),
         hotel:hotels(*),
         internal_trip:internal_trips(name, destination)
@@ -226,6 +237,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       let packageName = '-';
       if (r.booking?.package?.name) {
         packageName = r.booking.package.name;
+      } else if (r.customer?.packages?.name) {
+        packageName = r.customer.packages.name;
       } else if (r.internal_trip?.name) {
         packageName = r.internal_trip.name;
       }
@@ -233,6 +246,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       let destination = '-';
       if (r.booking?.package?.type) {
         destination = r.booking.package.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
+      } else if (r.customer?.packages?.type) {
+        destination = r.customer.packages.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
       } else if (r.internal_trip?.destination) {
         destination = r.internal_trip.destination;
       }
@@ -287,21 +302,34 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       setCustomerDocs(custDocs || []);
     }
     // Load payments
-    if (f.booking?.id) {
+    if (f.customer?.id) {
+      const { data: payData } = await supabase
+        .from('payments')
+        .select('*, user_profiles(*)')
+        .eq('customer_id', f.customer.id)
+        .order('payment_date', { ascending: false });
+      setPayments(payData || []);
+    } else if (f.booking?.id) {
       const { data: payData } = await supabase
         .from('payments')
         .select('*, user_profiles(*)')
         .eq('booking_id', f.booking.id)
         .order('payment_date', { ascending: false });
       setPayments(payData || []);
-      // Load invoices
-      const { data: invData } = await supabase
-        .from('invoices')
-        .select('*, hotel:hotels(name)')
-        .eq('customer_id', f.customer?.id)
-        .order('created_at', { ascending: false });
-      setInvoices(invData || []);
+    } else {
+      setPayments([]);
     }
+      // Load invoices
+      if (f.customer?.id) {
+        const { data: invData } = await supabase
+          .from('invoices')
+          .select('*, hotel:hotels(name)')
+          .eq('customer_id', f.customer.id)
+          .order('created_at', { ascending: false });
+        setInvoices(invData || []);
+      } else {
+        setInvoices([]);
+      }
   };
 
   const filtered = files.filter((f) => {
@@ -788,10 +816,10 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Wallet size={15} className="text-gold-500" /> الملخص المالي</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { label: 'إجمالي الحجز', value: fmt(Number(selected.booking?.total_amount || 0)), color: 'text-navy-900' },
-                    { label: 'المدفوع', value: fmt(Number(selected.booking?.paid_amount || 0)), color: 'text-emerald-600' },
-                    { label: 'المتبقي', value: fmt(Math.max(0, Number(selected.booking?.total_amount || 0) - Number(selected.booking?.paid_amount || 0))), color: 'text-red-600' },
-                    { label: 'حالة الدفع', value: selected.booking?.payment_status || '—', color: 'text-navy-700' },
+                    { label: 'إجمالي الحجز', value: fmt(bookingTotal), color: 'text-navy-900' },
+                    { label: 'المدفوع', value: fmt(totalPaid), color: 'text-emerald-600' },
+                    { label: 'المتبقي', value: fmt(remaining), color: 'text-red-600' },
+                    { label: 'حالة الدفع', value: payStatus, color: 'text-navy-700' },
                   ].map((r) => (
                     <div key={r.label} className="bg-gray-50 rounded-xl p-3">
                       <p className="text-xs text-gray-400 mb-1">{r.label}</p>
