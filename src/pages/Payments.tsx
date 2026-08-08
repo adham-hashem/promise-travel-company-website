@@ -220,6 +220,26 @@ export default function Payments() {
     alert('تم حذف الدفعة بنجاح.');
   };
 
+  const handleDeleteFile = async (fileId: string, customerName: string) => {
+    if (!confirm(`هل أنت متأكد من حذف ملف العميل "${customerName}" نهائياً من الحسابات والتشغيل؟`)) return;
+    
+    setSaving(true);
+    const { error } = await supabase
+      .from('operation_files')
+      .delete()
+      .eq('id', fileId);
+      
+    if (error) {
+      alert('فشل الحذف: ' + error.message);
+      setSaving(false);
+      return;
+    }
+    
+    setTransferredFiles(prev => prev.filter(f => f.id !== fileId));
+    setSaving(false);
+    alert('تم حذف الملف بنجاح.');
+  };
+
   const uploadProof = async (file: File) => {
     if (!selectedPayment) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -548,6 +568,13 @@ export default function Payments() {
                         محوّل ✔
                       </span>
                     )}
+                    <button
+                      onClick={() => handleDeleteFile(file.id, file.customer?.name || '—')}
+                      title="حذف الملف نهائياً من الحسابات والتشغيل"
+                      className="p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors flex items-center justify-center flex-shrink-0"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
               );
