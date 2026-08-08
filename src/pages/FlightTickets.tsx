@@ -59,10 +59,10 @@ export default function FlightTickets({ onNavigate }: Props) {
   const load = async () => {
     setLoading(true);
     const [ticketRes, opsRes, custRes] = await Promise.all([
-      supabase.from('flight_tickets').select('*, customers(*), bookings(*), user_profiles(*)').order('created_at', { ascending: false }),
+      supabase.from('flight_tickets').select('*, customers(*, packages(*)), bookings(*), user_profiles(*)').order('created_at', { ascending: false }),
       supabase.from('operation_files').select(`
         *,
-        customer:customers(*),
+        customer:customers(*, packages(*)),
         booking:bookings(*, package:packages(*)),
         hotel:hotels(*)
       `).in('workflow_stage', ['flight', 'ready', 'completed']).order('created_at', { ascending: false }),
@@ -99,14 +99,14 @@ export default function FlightTickets({ onNavigate }: Props) {
   };
 
   const handleDeleteReadyCustomer = async (r: typeof readyCustomers[0]) => {
-    if (!confirm(`هل أنت متأكد من حذف العميل "${r.customer_name}" من قسم الطيران نهائياً؟\nسيتم حذف ملف التشغيل الخاص به.`)) return;
-    const { error } = await supabase.from('operation_files').delete().eq('customer_id', r.customer_id);
+    if (!confirm(`هل أنت متأكد من إرجاع العميل "${r.customer_name}" إلى قسم التشغيل وإلغاء تحويله للطيران؟`)) return;
+    const { error } = await supabase.from('operation_files').update({ workflow_stage: 'operations' }).eq('customer_id', r.customer_id);
     if (error) {
-      alert('فشل الحذف: ' + error.message);
+      alert('فشل الإرجاع: ' + error.message);
       return;
     }
     setReadyCustomers(prev => prev.filter(c => c.customer_id !== r.customer_id));
-    alert('تم حذف العميل بنجاح.');
+    alert('تم إرجاع العميل إلى قسم التشغيل بنجاح.');
   };
 
   const filteredReady = readyCustomers.filter((r: any) => {
@@ -378,10 +378,10 @@ export default function FlightTickets({ onNavigate }: Props) {
                   )}
                   <button
                     onClick={() => handleDeleteReadyCustomer(r)}
-                    title="حذف العميل من قسم الطيران"
-                    className="w-full text-xs py-2 mt-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors flex items-center justify-center gap-1.5"
+                    title="إرجاع العميل إلى قسم التشغيل"
+                    className="w-full text-xs py-2 mt-2 rounded-xl border border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <Trash2 size={13} /> حذف العميل
+                    <Undo2 size={13} /> إرجاع لقسم التشغيل
                   </button>
                 </div>
               );
@@ -678,6 +678,7 @@ export default function FlightTickets({ onNavigate }: Props) {
                   <Plane size={16} className="text-gold-500" /> تفاصيل الرحلة والتسكين
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div><span className="text-gray-400 block mb-0.5">الباقة المطلوبة</span><span className="font-semibold text-navy-800 text-xs bg-gold-50/70 border border-gold-200 px-2 py-0.5 rounded">{detailCustomer.packages?.name || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
