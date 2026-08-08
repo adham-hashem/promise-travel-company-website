@@ -84,24 +84,58 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
   // Autocomplete suggestions search
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
+    if (q.length < 1) {
       setCandidates([]);
       return;
     }
 
     const timer = setTimeout(async () => {
-      if (q.toUpperCase().includes('-INV-')) return;
-      if (q.toUpperCase().startsWith('OP-')) return;
-      if (/^[A-Z]{2}-\d+$/i.test(q)) return;
+      let matches: CandidateCustomer[] = [];
 
-      const { data: matches } = await supabase
-        .from('customers')
-        .select('id, name, client_code, phone, status')
-        .not('sales_agent_submitted', 'eq', false)
-        .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
-        .limit(8);
+      // 1. If it looks like an invoice
+      if (q.toUpperCase().includes('-INV-')) {
+        const { data: invs } = await supabase
+          .from('invoices')
+          .select('customer:customers(id, name, client_code, phone, status)')
+          .ilike('invoice_number', `%${q}%`)
+          .limit(5);
+        if (invs) {
+          matches = invs
+            .map(i => Array.isArray(i.customer) ? i.customer[0] : i.customer)
+            .filter(Boolean) as CandidateCustomer[];
+        }
+      }
+      // 2. If it looks like an operation file
+      else if (q.toUpperCase().startsWith('OP-')) {
+        const { data: ops } = await supabase
+          .from('operation_files')
+          .select('customer:customers(id, name, client_code, phone, status)')
+          .ilike('op_number', `%${q}%`)
+          .limit(5);
+        if (ops) {
+          matches = ops
+            .map(o => Array.isArray(o.customer) ? o.customer[0] : o.customer)
+            .filter(Boolean) as CandidateCustomer[];
+        }
+      }
+      // 3. General customer search (name, phone, client_code, passport)
+      else {
+        const { data } = await supabase
+          .from('customers')
+          .select('id, name, client_code, phone, status')
+          .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
+          .limit(8);
+        if (data) {
+          matches = data as CandidateCustomer[];
+        }
+      }
 
-      setCandidates((matches as CandidateCustomer[]) || []);
+      // Deduplicate matches
+      const uniqueMatches = matches.filter(
+        (c, index, self) => self.findIndex(t => t.id === c.id) === index
+      );
+
+      setCandidates(uniqueMatches);
     }, 250);
 
     return () => clearTimeout(timer);

@@ -209,7 +209,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
 
   // Super search: search across customers, operation files, invoices, visas
   const runSuperSearch = async (q: string) => {
-    if (q.trim().length < 2) { setSuperResults([]); return; }
+    if (q.trim().length < 1) { setSuperResults([]); return; }
     const query = q.trim();
     const [custRes, invRes, opRes, visaRes] = await Promise.all([
       supabase.from('customers').select('id, name, client_code, phone').or(`name.ilike.%${query}%,client_code.ilike.%${query}%,phone.ilike.%${query}%`).limit(4),
