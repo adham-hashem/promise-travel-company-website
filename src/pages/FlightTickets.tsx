@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { FlightTicket, Page } from '../types';
 
@@ -42,6 +43,8 @@ export default function FlightTickets({ onNavigate }: Props) {
   const [readyCustomers, setReadyCustomers] = useState<Array<{ customer_id: string; customer_name: string; client_code: string; booking_id: string; workflow_stage: string; destination: string; travel_date: string; return_date: string; pax_count: number; passport_name: string; visa_id: string; hotel_name: string; package_name: string; notes?: string; customer?: any; booking?: any }>>([]);
   const [allCustomers, setAllCustomers] = useState<Array<{ id: string; name: string; client_code: string }>>([]);
   const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
+  const [detailDocs, setDetailDocs] = useState<any[]>([]);
+  const [loadingDetailDocs, setLoadingDetailDocs] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -56,6 +59,21 @@ export default function FlightTickets({ onNavigate }: Props) {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!detailCustomer) {
+      setDetailDocs([]);
+      return;
+    }
+    setLoadingDetailDocs(true);
+    supabase.from('documents')
+      .select('*')
+      .eq('customer_id', detailCustomer.id)
+      .then(({ data }) => {
+        setDetailDocs(data || []);
+        setLoadingDetailDocs(false);
+      });
+  }, [detailCustomer]);
+
   const load = async () => {
     setLoading(true);
     const [ticketRes, opsRes, custRes] = await Promise.all([
@@ -66,34 +84,41 @@ export default function FlightTickets({ onNavigate }: Props) {
         booking:bookings(*, package:packages(*)),
         hotel:hotels(*)
       `).in('workflow_stage', ['flight', 'ready', 'completed']).order('created_at', { ascending: false }),
-      supabase.from('customers').select('id, name, client_code').order('name', { ascending: true }),
+      supabase.from('customers').select('id, name, client_code, service_type').order('name', { ascending: true }),
     ]);
 
     if (opsRes.error) {
       console.error('[FlightTickets] Error fetching ops data:', opsRes.error);
     }
 
-    setTickets((ticketRes.data as FlightTicket[]) || []);
-    setAllCustomers((custRes.data || []).map((c: any) => ({ id: c.id, name: c.name || '—', client_code: c.client_code || '' })));
-    const opsData = (opsRes.data || []).map((o: any) => ({
-      customer_id: o.customer_id,
-      customer_name: o.customer?.name || '—',
-      client_code: o.customer?.client_code || '—',
-      booking_id: o.booking_id,
-      workflow_stage: o.workflow_stage,
-      destination: o.booking?.destination || o.booking?.package?.destination || (o.customer?.packages?.type === 'حج' ? 'مكة والمدينة (حج)' : o.customer?.packages?.type === 'عمرة' ? 'مكة والمدينة (عمرة)' : '—'),
-      travel_date: o.travel_date || o.booking?.travel_date || '—',
-      return_date: o.return_date || o.booking?.return_date || '—',
-      pax_count: o.pax_count || o.booking?.pax_count || 1,
-      passport_name: o.customer?.name || '—',
-      visa_id: '',
-      hotel_name: o.booking?.hotel?.name || o.booking?.package?.hotel?.name || (o.customer?.hotel_makkah ? `${o.customer.hotel_makkah}${o.customer.hotel_madinah ? ' / ' + o.customer.hotel_madinah : ''}` : o.customer?.hotel_madinah || '—'),
-      package_name: o.booking?.package?.name || o.customer?.packages?.name || '—',
-      notes: o.notes || '',
-      is_archived: o.customer?.is_archived || false,
-      customer: o.customer,
-      booking: o.booking
-    }));
+    const fetchedTickets = (ticketRes.data as FlightTicket[]) || [];
+    setTickets(fetchedTickets.filter(t => t.customers?.service_type !== 'سياحة داخلية'));
+
+    setAllCustomers((custRes.data || [])
+      .filter((c: any) => c.service_type !== 'سياحة داخلية')
+      .map((c: any) => ({ id: c.id, name: c.name || '—', client_code: c.client_code || '' })));
+
+    const opsData = (opsRes.data || [])
+      .filter((o: any) => o.customer?.service_type !== 'سياحة داخلية')
+      .map((o: any) => ({
+        customer_id: o.customer_id,
+        customer_name: o.customer?.name || '—',
+        client_code: o.customer?.client_code || '—',
+        booking_id: o.booking_id,
+        workflow_stage: o.workflow_stage,
+        destination: o.booking?.destination || o.booking?.package?.destination || (o.customer?.packages?.type === 'حج' ? 'مكة والمدينة (حج)' : o.customer?.packages?.type === 'عمرة' ? 'مكة والمدينة (عمرة)' : '—'),
+        travel_date: o.travel_date || o.booking?.travel_date || '—',
+        return_date: o.return_date || o.booking?.return_date || '—',
+        pax_count: o.pax_count || o.booking?.pax_count || 1,
+        passport_name: o.customer?.name || '—',
+        visa_id: '',
+        hotel_name: o.booking?.hotel?.name || o.booking?.package?.hotel?.name || (o.customer?.hotel_makkah ? `${o.customer.hotel_makkah}${o.customer.hotel_madinah ? ' / ' + o.customer.hotel_madinah : ''}` : o.customer?.hotel_madinah || '—'),
+        package_name: o.booking?.package?.name || o.customer?.packages?.name || '—',
+        notes: o.notes || '',
+        is_archived: o.customer?.is_archived || false,
+        customer: o.customer,
+        booking: o.booking
+      }));
     setReadyCustomers(opsData);
     setLoading(false);
   };
@@ -140,10 +165,11 @@ export default function FlightTickets({ onNavigate }: Props) {
     setSaving(true);
 
     const tempTicketId = crypto.randomUUID();
-    const cleanFileName = ticketFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const compressedFile = await compressImage(ticketFile);
+    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `ticket-files/${tempTicketId}/${Date.now()}-${cleanFileName}`;
     
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, ticketFile);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) {
       alert('فشل رفع ملف التذكرة: ' + upErr.message);
       setSaving(false);
@@ -197,19 +223,30 @@ export default function FlightTickets({ onNavigate }: Props) {
       return;
     }
     setUploading(true);
-    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const compressedFile = await compressImage(file);
+    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `ticket-files/${selectedTicket.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase
       .from('flight_tickets')
-      .update({ ticket_file_path: filePath, ticket_file_name: file.name })
+      .update({ ticket_file_path: filePath, ticket_file_name: compressedFile.name })
       .eq('id', selectedTicket.id)
       .select('*, customers(*), bookings(*), user_profiles(*)')
       .single();
     if (data) {
       setTickets(tickets.map(t => t.id === selectedTicket.id ? (data as FlightTicket) : t));
       setSelectedTicket(data as FlightTicket);
+
+      // Return the file to operations stage
+      if (selectedTicket.customer_id) {
+        await supabase.from('operation_files').update({
+          workflow_stage: 'operations',
+          file_status: 'بانتظار استكمال التشغيل'
+        }).eq('customer_id', selectedTicket.customer_id);
+
+        setReadyCustomers(prev => prev.filter(r => r.customer_id !== selectedTicket.customer_id));
+      }
     }
     setUploading(false);
   };
@@ -687,6 +724,65 @@ export default function FlightTickets({ onNavigate }: Props) {
                   <div><span className="text-gray-400 block mb-0.5">فندق المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_madinah || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">غرفة المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_madinah || '—'}</span></div>
                 </div>
+              </div>
+
+              {/* Section: Uploaded Documents */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-gold-500" /> المستندات المرفوعة للعميل
+                </h4>
+                {loadingDetailDocs ? (
+                  <div className="flex items-center justify-center py-4 text-gray-500 gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>جاري تحميل المستندات...</span>
+                  </div>
+                ) : detailDocs.length === 0 ? (
+                  <p className="text-gray-400 py-2">لا توجد مستندات مرفوعة لهذا العميل.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {detailDocs.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <FileText size={16} className="text-navy-600" />
+                          <div className="text-right">
+                            <span className="font-semibold text-gray-800 block text-xs">{doc.doc_type}</span>
+                            <span className="text-[10px] text-gray-400 block truncate max-w-[150px]">{doc.file_name}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 3600);
+                              if (data) window.open(data.signedUrl);
+                            }}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
+                            title="عرض"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { data } = await supabase.storage.from('documents').download(doc.file_path);
+                              if (data) {
+                                const url = URL.createObjectURL(data);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = doc.file_name;
+                                a.click();
+                              }
+                            }}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
+                            title="تحميل"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Section 4: Notes */}

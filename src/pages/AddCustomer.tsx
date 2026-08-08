@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import type { Package, Employee, Page, ServiceType, CustomerStatus } from '../types';
 
 interface Props {
@@ -235,10 +236,11 @@ export default function AddCustomer({ onNavigate }: Props) {
       const uploadPromises = docTypes.map(async (d) => {
         const doc = docUploads[d.id];
         if (!doc.file) return;
-        const ext = (doc.file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+        const compressedFile = await compressImage(doc.file);
+        const ext = (compressedFile.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
         const safeDocType = docTypeKey[d.id] || 'document';
         const filePath = `${custId}/${Date.now()}_${safeDocType}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, doc.file);
+        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
         if (upErr) {
           console.error(`Error uploading document ${d.id}:`, upErr);
           return;
@@ -248,8 +250,8 @@ export default function AddCustomer({ onNavigate }: Props) {
           uploaded_by: profile?.id || null,
           doc_type: d.id,
           file_path: filePath,
-          file_name: doc.file.name,
-          file_size: doc.file.size,
+          file_name: compressedFile.name,
+          file_size: compressedFile.size,
           status: 'مرفوع',
         });
       });
@@ -633,6 +635,18 @@ export default function AddCustomer({ onNavigate }: Props) {
                 <div>
                   <label className="form-label">نوع غرفة المدينة</label>
                   <input value={form.room_type_madinah} onChange={(e) => update('room_type_madinah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
+                </div>
+              </>
+            )}
+            {form.service_type === 'سياحة داخلية' && (
+              <>
+                <div>
+                  <label className="form-label">الفندق المفضل (اختياري)</label>
+                  <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: فندق هيلتون دهب" />
+                </div>
+                <div>
+                  <label className="form-label">نوع الغرفة (اختياري)</label>
+                  <input value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
                 </div>
               </>
             )}

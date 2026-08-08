@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, Loader2, X, Wallet, Upload, Eye,
-  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package, Undo2,
+  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package, User, Plane,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import type { Payment, PaymentMethod, Booking, PaymentProof } from '../types';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
@@ -59,10 +60,28 @@ export default function Payments() {
 
   const [transferredFiles, setTransferredFiles] = useState<any[]>([]);
   const [opsTransferFile, setOpsTransferFile] = useState<any | null>(null);
+  const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
+  const [detailDocs, setDetailDocs] = useState<any[]>([]);
+  const [loadingDetailDocs, setLoadingDetailDocs] = useState(false);
 
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!detailCustomer) {
+      setDetailDocs([]);
+      return;
+    }
+    setLoadingDetailDocs(true);
+    supabase.from('documents')
+      .select('*')
+      .eq('customer_id', detailCustomer.id)
+      .then(({ data }) => {
+        setDetailDocs(data || []);
+        setLoadingDetailDocs(false);
+      });
+  }, [detailCustomer]);
 
   useEffect(() => {
     if (!form.customer_id || !form.package_id || !form.amount) return;
@@ -248,13 +267,14 @@ export default function Payments() {
       return;
     }
     setUploading(true);
-    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const compressedFile = await compressImage(file);
+    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `payment-proofs/${selectedPayment.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase
       .from('payment_proofs')
-      .insert({ payment_id: selectedPayment.id, file_path: filePath, file_name: file.name, file_size: file.size, status: 'مرفوع', uploaded_by: profile?.id || null })
+      .insert({ payment_id: selectedPayment.id, file_path: filePath, file_name: compressedFile.name, file_size: compressedFile.size, status: 'مرفوع', uploaded_by: profile?.id || null })
       .select('*')
       .single();
     if (data) {
@@ -314,6 +334,31 @@ export default function Payments() {
   const printReceipt = (p: PayRow) => {
     const w = window.open('', '_blank', 'width=400,height=600');
     if (!w) return;
+
+    // Calculate total paid by customer for this package/booking to ensure correct status is printed
+    const customerPayments = payments.filter(pay => pay.customer_id === p.customer_id && pay.package_id === p.package_id && pay.approval_status !== 'مرفوض');
+    const totalPaid = customerPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+    const pkgPrice = p.packages ? Number(p.packages.price || 0) : 0;
+
+    let printedStatus = p.status;
+    if (pkgPrice > 0) {
+      if (totalPaid >= pkgPrice) {
+        printedStatus = 'مدفوع بالكامل';
+      } else {
+        printedStatus = 'مدفوع جزئياً';
+      }
+    } else if (p.bookings) {
+      const totalBook = Number(p.bookings.total_amount || 0);
+      const paidBook = Number(p.bookings.paid_amount || 0);
+      if (totalBook > 0) {
+        if (paidBook >= totalBook) {
+          printedStatus = 'مدفوع بالكامل';
+        } else {
+          printedStatus = 'مدفوع جزئياً';
+        }
+      }
+    }
+
     w.document.write(`
       <html dir="rtl"><head><meta charset="utf-8"><title>إيصال دفع</title>
       <style>
@@ -336,7 +381,7 @@ export default function Payments() {
       <div class="row"><span class="label">رقم الحجز</span><span class="val">${p.booking_id ? '#' + p.booking_id.slice(0, 8) : '—'}</span></div>
       <div class="row"><span class="label">طريقة الدفع</span><span class="val">${p.payment_method}</span></div>
       <div class="row"><span class="label">التاريخ</span><span class="val">${new Date(p.payment_date).toLocaleDateString('ar-EG')}</span></div>
-      <div class="row"><span class="label">الحالة</span><span class="val">${p.status}</span></div>
+      <div class="row"><span class="label">الحالة</span><span class="val">${printedStatus}</span></div>
       <div class="total">${fmt(p.amount)} ج.م</div>
       <div class="foot">شكراً لتعاملكم مع Promise Travel<br>هذا الإيصال صالح كدفعة وليس تأكيداً نهائياً للحجز</div>
       </body></html>`);
@@ -629,6 +674,15 @@ export default function Payments() {
                   <td>{approvalBadge(p.approval_status)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
+                      {p.customers && (
+                        <button
+                          onClick={() => setDetailCustomer(p.customers)}
+                          title="عرض تفاصيل العميل"
+                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                        >
+                          <Eye size={15} />
+                        </button>
+                      )}
                       <button onClick={() => printReceipt(p)} title="طباعة إيصال" className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600"><Printer size={15} /></button>
                       <button onClick={() => openEdit(p)} title="تعديل" className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600"><Pencil size={15} /></button>
                       <button onClick={() => handleDelete(p)} title="حذف" className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"><Trash2 size={15} /></button>
@@ -900,6 +954,142 @@ export default function Payments() {
             load();
           }}
         />
+      )}
+
+      {/* Customer details modal */}
+      {detailCustomer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setDetailCustomer(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-navy-900 text-white rounded-t-3xl">
+              <div>
+                <h3 className="text-lg font-bold">{detailCustomer.name}</h3>
+                <p className="text-xs text-navy-200 font-mono mt-0.5">{detailCustomer.client_code || 'بدون كود'}</p>
+              </div>
+              <button onClick={() => setDetailCustomer(null)} className="p-1.5 rounded-xl hover:bg-white/10 text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-right text-xs">
+              {/* Section 1: Personal Info */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <User size={16} className="text-gold-500" /> البيانات الشخصية
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div><span className="text-gray-400 block mb-0.5">الهاتف</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.phone || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">واتساب</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.whatsapp || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">البريد الإلكتروني</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.email || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الجنس</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.gender || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">تاريخ الميلاد</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.birth_date || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الجنسية</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.nationality || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">المحافظة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.governorate || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">المدينة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.city || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">الدولة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.country || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 2: Passport & National ID */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-gold-500" /> الهوية وجواز السفر
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم الهوية الوطنية</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.national_id || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم جواز السفر</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.passport_number || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ إصدار جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_issue_date || '—'}</span></div>
+                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ انتهاء جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_expiry_date || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section 3: Trip & Housing */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <Plane size={16} className="text-gold-500" /> تفاصيل الرحلة والتسكين
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div><span className="text-gray-400 block mb-0.5">الباقة المطلوبة</span><span className="font-semibold text-navy-800 text-xs bg-gold-50/70 border border-gold-200 px-2 py-0.5 rounded">{detailCustomer.packages?.name || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">فندق مكة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_makkah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">غرفة مكة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_makkah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">فندق المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_madinah || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">غرفة المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_madinah || '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Section: Uploaded Documents */}
+              <div>
+                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                  <FileText size={16} className="text-gold-500" /> المستندات المرفوعة للعميل
+                </h4>
+                {loadingDetailDocs ? (
+                  <div className="flex items-center justify-center py-4 text-gray-500 gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>جاري تحميل المستندات...</span>
+                  </div>
+                ) : detailDocs.length === 0 ? (
+                  <p className="text-gray-400 py-2">لا توجد مستندات مرفوعة لهذا العميل.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {detailDocs.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <FileText size={16} className="text-navy-600" />
+                          <div className="text-right">
+                            <span className="font-semibold text-gray-800 block text-xs">{doc.doc_type}</span>
+                            <span className="text-[10px] text-gray-400 block truncate max-w-[150px]">{doc.file_name}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 3600);
+                              if (data) window.open(data.signedUrl);
+                            }}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
+                            title="عرض"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { data } = await supabase.storage.from('documents').download(doc.file_path);
+                              if (data) {
+                                const url = URL.createObjectURL(data);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = doc.file_name;
+                                a.click();
+                              }
+                            }}
+                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
+                            title="تحميل"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4: Notes */}
+              {detailCustomer.notes && (
+                <div>
+                  <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-2">📝 ملاحظات إضافية</h4>
+                  <p className="bg-gray-50 p-3 rounded-2xl text-gray-700 leading-relaxed font-medium">{detailCustomer.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

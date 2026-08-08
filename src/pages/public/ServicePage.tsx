@@ -24,6 +24,8 @@ const heroByType = {
 
 export default function ServicePage({ type, onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[]>([]);
+  const [expandedPackages, setExpandedPackages] = useState<Record<string, boolean>>({});
+  const toggleExpand = (id: string) => setExpandedPackages(prev => ({ ...prev, [id]: !prev[id] }));
   const [loading, setLoading] = useState(true);
   const hero = heroByType[type || 'حج'];
 
@@ -103,7 +105,24 @@ export default function ServicePage({ type, onNavigate }: Props) {
                   </div>
 
                   <div className="flex flex-1 flex-col p-4">
-                    {p.description ? <p className="text-sm leading-7 text-[#0B1F44]/60">{p.description}</p> : null}
+                    {p.description ? (
+                      <div className="text-right mb-3">
+                        <p className="text-sm leading-relaxed text-[#0B1F44]/60 transition-all duration-300">
+                          {p.description.length > 80 && !expandedPackages[p.id]
+                            ? p.description.slice(0, 80) + '...'
+                            : p.description}
+                        </p>
+                        {p.description.length > 80 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(p.id)}
+                            className="mt-1 text-xs font-bold text-[#D4A017] hover:underline focus:outline-none"
+                          >
+                            {expandedPackages[p.id] ? 'عرض أقل' : 'عرض المزيد'}
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
 
                     <div className="mt-3 space-y-2.5 text-sm text-[#0B1F44]/70">
                       {p.duration_days ? (
@@ -112,7 +131,19 @@ export default function ServicePage({ type, onNavigate }: Props) {
                           <span>{p.duration_days} يوم</span>
                         </div>
                       ) : null}
-                      {p.hotel ? (
+                      {p.hotel_makkah ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#D4A017] text-xs">🕋</span>
+                          <span>فندق مكة: {p.hotel_makkah}</span>
+                        </div>
+                      ) : null}
+                      {p.hotel_madinah ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#D4A017] text-xs">🕌</span>
+                          <span>فندق المدينة: {p.hotel_madinah}</span>
+                        </div>
+                      ) : null}
+                      {!p.hotel_makkah && !p.hotel_madinah && p.hotel ? (
                         <div className="flex items-center gap-2">
                           <Hotel size={13} className="text-[#D4A017]" />
                           <span>{p.hotel}</span>

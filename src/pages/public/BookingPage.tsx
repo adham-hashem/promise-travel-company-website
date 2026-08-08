@@ -348,15 +348,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">الاسم بالكامل <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pr-9" placeholder="الاسم بالكامل" />
+                    <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pr-10" placeholder="الاسم بالكامل" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">رقم الهاتف <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pr-9" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pr-10" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
               </div>
@@ -366,15 +366,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">رقم واتساب</label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pr-9" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pr-10" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">البريد الإلكتروني</label>
                   <div className="relative">
-                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pr-9" placeholder="example@email.com" />
+                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pr-10" placeholder="example@email.com" />
                   </div>
                 </div>
               </div>
@@ -384,15 +384,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">عدد الأفراد</label>
                   <div className="relative">
-                    <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-9" placeholder="1" />
+                    <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-10" placeholder="1" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">تاريخ السفر المفضل</label>
                   <div className="relative">
-                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-9" dir="ltr" />
+                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
+                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-10" dir="ltr" />
                   </div>
                 </div>
               </div>
@@ -401,8 +401,8 @@ export default function BookingPage({ preset, onDone }: Props) {
               <div>
                 <label className="form-label">ملاحظات إضافية</label>
                 <div className="relative">
-                  <FileText size={16} className="absolute top-4 right-3 text-gray-400" />
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pr-9 min-h-[90px] resize-none" placeholder="أي تفاصيل إضافية تود إخبارنا بها" />
+                  <FileText size={16} className="absolute top-4 right-3 text-gray-400 pointer-events-none z-10" />
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pr-10 min-h-[90px] resize-none" placeholder="أي تفاصيل إضافية تود إخبارنا بها" />
                 </div>
               </div>
 

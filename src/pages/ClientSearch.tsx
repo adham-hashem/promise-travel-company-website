@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Search, X, User, Phone, Hash, Calendar, FileText,
-  CalendarCheck, CreditCard, Building2, MessageSquare,
+  Search, X, User, Phone, Hash, FileText,
+  CalendarCheck, CreditCard, MessageSquare,
   ChevronRight, AlertCircle, Loader2, Wallet, FileCheck,
-  ListChecks, Plane, Hotel as HotelIcon, ClipboardList,
-  Download, Eye, Clock, CheckCircle2, Briefcase, ShieldAlert as ShieldCheck,
+  ListChecks, Plane, ClipboardList,
+  Download, Eye, Clock, Briefcase,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Booking, Invoice, Inquiry, Page, Task } from '../types';
@@ -76,8 +76,47 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FullData | null>(null);
   const [candidates, setCandidates] = useState<CandidateCustomer[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete suggestions search
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setCandidates([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      if (q.toUpperCase().includes('-INV-')) return;
+      if (q.toUpperCase().startsWith('OP-')) return;
+      if (/^[A-Z]{2}-\d+$/i.test(q)) return;
+
+      const { data: matches } = await supabase
+        .from('customers')
+        .select('id, name, client_code, phone, status')
+        .not('sales_agent_submitted', 'eq', false)
+        .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
+        .limit(8);
+
+      setCandidates((matches as CandidateCustomer[]) || []);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadFullByCode = async (clientCode: string) => {
     setLoading(true);
@@ -133,8 +172,9 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     // 1. Check Invoice Sub-code (CL-1001-INV-01)
     if (q.toUpperCase().includes('-INV-')) {
       const { data: inv } = await supabase.from('invoices').select('customer:customers(client_code)').eq('invoice_number', q).maybeSingle();
-      if (inv?.customer?.client_code) {
-        await loadFullByCode(inv.customer.client_code);
+      const customerObj = Array.isArray(inv?.customer) ? inv.customer[0] : (inv?.customer as any);
+      if (customerObj?.client_code) {
+        await loadFullByCode(customerObj.client_code);
         return;
       }
     }
@@ -142,8 +182,9 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     // 2. Check Operation File Number (OP-1001)
     if (q.toUpperCase().startsWith('OP-')) {
       const { data: op } = await supabase.from('operation_files').select('customer:customers(client_code)').eq('op_number', q.toUpperCase()).maybeSingle();
-      if (op?.customer?.client_code) {
-        await loadFullByCode(op.customer.client_code);
+      const customerObj = Array.isArray(op?.customer) ? op.customer[0] : (op?.customer as any);
+      if (customerObj?.client_code) {
+        await loadFullByCode(customerObj.client_code);
         return;
       }
     }
@@ -229,22 +270,58 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
       </div>
 
       {/* Search Bar */}
-      <form onSubmit={handleSearch} className="relative">
+      <form onSubmit={handleSearch} className="relative z-50">
         <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div ref={dropdownRef} className="relative flex-1">
+            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               ref={inputRef}
               value={query}
-              onChange={e => setQuery(e.target.value)}
-              className="w-full h-14 bg-white border-2 border-gray-200 focus:border-gold-400 rounded-2xl pr-12 pl-4 text-base font-medium outline-none transition-colors shadow-sm"
+              onChange={e => { setQuery(e.target.value); setShowDropdown(true); }}
+              onFocus={() => setShowDropdown(true)}
+              className="w-full h-14 bg-white border-2 border-gray-200 focus:border-gold-400 rounded-2xl pr-12 pl-12 text-base font-medium outline-none transition-colors shadow-sm"
               placeholder="ابحث بـ: كود CL-1001، ملف OP-1001، فاتورة، جواز السفر، هاتف، أو اسم العميل"
               dir="rtl"
             />
             {query && (
-              <button type="button" onClick={clear} className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors">
+              <button
+                type="button"
+                onClick={() => { clear(); setShowDropdown(false); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 <X size={16} className="text-gray-400" />
               </button>
+            )}
+
+            {/* Suggestions Dropdown */}
+            {showDropdown && candidates.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-y-auto z-[60] divide-y divide-gray-50">
+                {candidates.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={async () => {
+                      setShowDropdown(false);
+                      if (c.client_code) {
+                        setQuery(c.client_code);
+                        await loadFullByCode(c.client_code);
+                      } else {
+                        await loadFullById(c.id);
+                      }
+                    }}
+                    className="w-full text-right px-4 py-3.5 hover:bg-gold-50/50 flex items-center justify-between text-sm transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User size={14} className="text-gray-400" />
+                      <span className="font-semibold text-gray-800">{c.name}</span>
+                      <span className="text-xs text-gray-400 font-medium">({c.phone})</span>
+                    </div>
+                    <span className="text-[10px] font-bold font-mono text-gold-600 bg-gold-50 border border-gold-100/50 px-2 py-0.5 rounded-lg">
+                      {c.client_code || 'بدون كود'}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <button type="submit" disabled={loading || !query.trim()} className="btn-gold h-14 px-8 text-base">

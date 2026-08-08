@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import type { DocumentRecord, DocType, DocStatus } from '../types';
 
 interface Props {
@@ -60,7 +61,8 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    const ext = (file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+    const compressedFile = await compressImage(file);
+    const ext = (compressedFile.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
     // Sanitize doc type to ASCII-safe key
     const docTypeKey: Record<string, string> = {
       'جواز سفر': 'passport',
@@ -71,7 +73,7 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
     };
     const safeDocType = docTypeKey[uploadType] || 'document';
     const filePath = `${customerId || bookingId}/${Date.now()}_${safeDocType}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
 
     // Generate doc sub-code if customer has a client_code
@@ -90,8 +92,8 @@ export default function DocumentsSection({ customerId, bookingId, customerName }
       uploaded_by: profile?.id || null,
       doc_type: uploadType,
       file_path: filePath,
-      file_name: file.name,
-      file_size: file.size,
+      file_name: compressedFile.name,
+      file_size: compressedFile.size,
       status: 'مرفوع',
       doc_number: docNumber,
     }).select('*, customers(*), bookings(*)').single();

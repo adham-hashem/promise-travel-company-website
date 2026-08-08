@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { Plus, Pencil, Trash2, Package as PackageIcon, Upload, X, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Package } from '../types';
+import { compressImage } from '../lib/imageCompressor';
 
-const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', airline: '', duration_days: '', price: '', image_url: '', description: '', featured: false };
+const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', image_url: '', description: '', featured: false };
 
 export default function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -24,15 +25,15 @@ export default function Packages() {
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (p: Package) => {
-    setForm({ name: p.name, type: p.type, hotel: p.hotel || '', airline: p.airline || '', duration_days: String(p.duration_days || ''), price: String(p.price), image_url: p.image_url || '', description: p.description || '', featured: p.featured || false });
+    setForm({ name: p.name, type: p.type, hotel: p.hotel || '', hotel_makkah: p.hotel_makkah || '', hotel_madinah: p.hotel_madinah || '', airline: p.airline || '', duration_days: String(p.duration_days || ''), price: String(p.price), image_url: p.image_url || '', description: p.description || '', featured: p.featured || false });
     setEditId(p.id); setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!form.name || !form.price) return;
     setSaving(true);
-    const payload = { name: form.name, type: form.type, hotel: form.hotel || undefined, airline: form.airline || undefined, duration_days: form.duration_days ? parseInt(form.duration_days) : undefined, price: parseFloat(form.price), image_url: form.image_url || undefined, description: form.description || undefined, featured: form.featured };
-    const dbPayload = { name: form.name, type: form.type, hotel: form.hotel || null, airline: form.airline || null, duration_days: form.duration_days ? parseInt(form.duration_days) : null, price: parseFloat(form.price), image_url: form.image_url || null, description: form.description || null, featured: form.featured };
+    const payload = { name: form.name, type: form.type, hotel: form.hotel || undefined, hotel_makkah: form.hotel_makkah || undefined, hotel_madinah: form.hotel_madinah || undefined, airline: form.airline || undefined, duration_days: form.duration_days ? parseInt(form.duration_days) : undefined, price: parseFloat(form.price), image_url: form.image_url || undefined, description: form.description || undefined, featured: form.featured };
+    const dbPayload = { name: form.name, type: form.type, hotel: form.hotel || null, hotel_makkah: form.hotel_makkah || null, hotel_madinah: form.hotel_madinah || null, airline: form.airline || null, duration_days: form.duration_days ? parseInt(form.duration_days) : null, price: parseFloat(form.price), image_url: form.image_url || null, description: form.description || null, featured: form.featured };
     if (editId) {
       await supabase.from('packages').update(dbPayload).eq('id', editId);
       setPackages(packages.map(p => p.id === editId ? { ...p, ...payload } : p));
@@ -61,13 +62,14 @@ export default function Packages() {
 
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
+      const compressedFile = await compressImage(file);
+      const ext = compressedFile.name.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
       const filePath = `packages/${fileName}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(filePath, file, {
+        .upload(filePath, compressedFile, {
           cacheControl: '3600',
           upsert: true
         });
@@ -123,7 +125,24 @@ export default function Packages() {
                   </div>
                 </div>
                 <div className="space-y-2 text-xs text-gray-600">
-                  {p.hotel && <div className="flex justify-between"><span className="text-gray-400">الفندق</span><span className="font-medium">{p.hotel}</span></div>}
+                  {p.hotel_makkah && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 flex items-center gap-1">🕋 فندق مكة</span>
+                      <span className="font-medium">{p.hotel_makkah}</span>
+                    </div>
+                  )}
+                  {p.hotel_madinah && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400 flex items-center gap-1">🕌 فندق المدينة</span>
+                      <span className="font-medium">{p.hotel_madinah}</span>
+                    </div>
+                  )}
+                  {!p.hotel_makkah && !p.hotel_madinah && p.hotel && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">الفندق</span>
+                      <span className="font-medium">{p.hotel}</span>
+                    </div>
+                  )}
                   {p.airline && <div className="flex justify-between"><span className="text-gray-400">شركة الطيران</span><span className="font-medium">{p.airline}</span></div>}
                   {p.duration_days && <div className="flex justify-between"><span className="text-gray-400">المدة</span><span className="font-medium">{p.duration_days} يوم</span></div>}
                 </div>
@@ -140,11 +159,11 @@ export default function Packages() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn">
-            <div className="p-6 border-b border-gray-100">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex-shrink-0">
               <h3 className="text-lg font-bold text-navy-900">{editId ? 'تعديل الباقة' : 'إضافة باقة جديدة'}</h3>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="form-label">اسم الباقة <span className="text-red-500">*</span></label>
@@ -162,8 +181,16 @@ export default function Packages() {
                   <input type="number" value={form.duration_days} onChange={(e) => setForm({ ...form, duration_days: e.target.value })} className="form-input" placeholder="14" />
                 </div>
                 <div>
-                  <label className="form-label">الفندق</label>
-                  <input value={form.hotel} onChange={(e) => setForm({ ...form, hotel: e.target.value })} className="form-input" placeholder="اسم الفندق" />
+                  <label className="form-label">🕋 فندق مكة</label>
+                  <input value={form.hotel_makkah} onChange={(e) => setForm({ ...form, hotel_makkah: e.target.value })} className="form-input" placeholder="فندق مكة" />
+                </div>
+                <div>
+                  <label className="form-label">🕌 فندق المدينة</label>
+                  <input value={form.hotel_madinah} onChange={(e) => setForm({ ...form, hotel_madinah: e.target.value })} className="form-input" placeholder="فندق المدينة" />
+                </div>
+                <div>
+                  <label className="form-label">الفندق (عام)</label>
+                  <input value={form.hotel} onChange={(e) => setForm({ ...form, hotel: e.target.value })} className="form-input" placeholder="اسم الفندق العام" />
                 </div>
                 <div>
                   <label className="form-label">شركة الطيران</label>
@@ -235,7 +262,7 @@ export default function Packages() {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
               <button onClick={() => setShowModal(false)} className="btn-outline">إلغاء</button>
               <button onClick={handleSave} disabled={saving} className="btn-gold">
                 {saving ? 'جارٍ الحفظ...' : editId ? 'حفظ التعديلات' : 'إضافة الباقة'}

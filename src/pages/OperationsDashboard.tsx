@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 interface OpDoc {
@@ -36,7 +37,7 @@ interface OpFile {
   pax_count?: number;
   special_requests?: string | null;
   created_at: string;
-  customer: { id: string; name: string; client_code: string | null; phone: string; email: string | null; documents_status: string | null } | null;
+  customer: { id: string; name: string; client_code: string | null; phone: string; email: string | null; documents_status: string | null; service_type?: string | null; packages?: any | null } | null;
   booking: { id: string; status: string; payment_status: string; total_amount: number | null; paid_amount: number | null; package_name: string | null; source: string | null; destination: string | null; pax_count: number | null } | null;
   hotel: { name: string; city: string } | null;
   assigned_employee?: { id: string; name: string } | null;
@@ -442,7 +443,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   };
 
   const handleDeleteFile = async (file: OpFile) => {
-    const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', file.customer_id).limit(1);
+    const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', file.customer?.id || '').limit(1);
 
     if (hasFlight && hasFlight.length > 0) {
       alert("لا يمكن إزالة الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
@@ -471,9 +472,10 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       return;
     }
     setUploadingDoc(true);
-    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const compressedFile = await compressImage(file);
+    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `op-docs/${selected.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploadingDoc(false); return; }
     const { data } = await supabase
       .from('operation_file_documents')
@@ -481,8 +483,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         operation_file_id: selected.id,
         doc_type: newDocType,
         file_path: filePath,
-        file_name: file.name,
-        file_size: file.size,
+        file_name: compressedFile.name,
+        file_size: compressedFile.size,
         uploaded_by: profile?.id || null,
       })
       .select('*')
@@ -748,7 +750,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                   })}
                 </div>
                 {/* Send to Aviation Banner */}
-                {(!selected.workflow_stage || ['new', 'accounts', 'operations', 'visa'].includes(selected.workflow_stage)) && selected.file_status !== 'بانتظار استكمال التشغيل' && (
+                {selected.customer?.service_type !== 'سياحة داخلية' && (!selected.workflow_stage || ['new', 'accounts', 'operations', 'visa'].includes(selected.workflow_stage)) && selected.file_status !== 'بانتظار استكمال التشغيل' && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-50/80 p-3.5 rounded-xl border border-cyan-200 mt-3 gap-2">
                     <div>
                       <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
@@ -772,7 +774,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 )}
                 
                 {/* Close file as Ready to Travel (after returning from Aviation) */}
-                {selected.workflow_stage === 'operations' && selected.file_status === 'بانتظار استكمال التشغيل' && (
+                {selected.customer?.service_type !== 'سياحة داخلية' && selected.workflow_stage === 'operations' && selected.file_status === 'بانتظار استكمال التشغيل' && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 mt-3 gap-2">
                     <div>
                       <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
@@ -786,6 +788,30 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     <button
                       onClick={async () => {
                         if (!window.confirm('هل أنت متأكد من إنهاء كافة إجراءات هذا الملف وجعله جاهزاً للسفر؟')) return;
+                        await updateFile({ workflow_stage: 'ready', file_status: 'جاهز للسفر' });
+                      }}
+                      className="btn-gold !bg-emerald-600 hover:!bg-emerald-700 text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                    >
+                      <CheckCircle2 size={14} /> ملف مكتمل وجاهز للسفر
+                    </button>
+                  </div>
+                )}
+
+                {/* For domestic trips: show finish button directly in operations stage */}
+                {selected.customer?.service_type === 'سياحة داخلية' && selected.workflow_stage === 'operations' && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 mt-3 gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <CheckCircle2 size={15} className="text-emerald-600" />
+                        إنهاء ملف الرحلة الداخلية وجعله جاهزاً للسفر
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        بما أن الرحلة داخلية (سياحة داخلية)، لا تتطلب إجراءات طيران وتذاكر. يمكنك إنهاء الملف مباشرة.
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('هل أنت متأكد من إنهاء إجراءات هذه الرحلة الداخلية وجعلها جاهزة للسفر؟')) return;
                         await updateFile({ workflow_stage: 'ready', file_status: 'جاهز للسفر' });
                       }}
                       className="btn-gold !bg-emerald-600 hover:!bg-emerald-700 text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"

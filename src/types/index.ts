@@ -118,6 +118,8 @@ export interface Package {
   name: string;
   type: PackageType;
   hotel?: string;
+  hotel_makkah?: string;
+  hotel_madinah?: string;
   airline?: string;
   duration_days?: number;
   price: number;
