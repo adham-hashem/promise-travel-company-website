@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { TravelGroupMember, GroupFamily, GroupRoom } from '../types';
 
 interface Props {
@@ -314,6 +314,31 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
 
   if (loading) return <div className="p-10 text-center text-gray-500">جاري تحميل بيانات التسكين...</div>;
 
+  const incompleteRooms = rooms.map(r => {
+    const occupantsCount = members.filter(m => m.room_id === r.id).length;
+    let capacity = Infinity;
+    if (r.is_family) {
+      const typeStr = r.room_type || '';
+      if (typeStr.includes('مفتوح') || typeStr === 'عائلة') {
+        capacity = Infinity;
+      } else {
+        const match = typeStr.match(/\d+/);
+        capacity = match ? parseInt(match[0]) : Infinity;
+      }
+    } else {
+      if (r.room_type === 'ثنائي') capacity = 2;
+      else if (r.room_type === 'ثلاثي') capacity = 3;
+      else if (r.room_type === 'رباعي') capacity = 4;
+    }
+
+    return {
+      room: r,
+      occupantsCount,
+      capacity,
+      missing: capacity - occupantsCount
+    };
+  }).filter(item => item.capacity !== Infinity && item.missing > 0);
+
   return (
     <div className="p-6 space-y-8 h-full overflow-y-auto bg-gray-50/50">
       
@@ -436,6 +461,45 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Alert Panel for Incomplete Rooms */}
+      {incompleteRooms.length > 0 && (
+        <div className="bg-amber-50 border border-amber-250 rounded-2xl p-5 shadow-sm space-y-3">
+          <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+            <AlertTriangle size={18} className="text-amber-600 animate-bounce" />
+            الغرف غير المكتملة ({incompleteRooms.length} غرف تحتاج إلى استكمال التسكين)
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {incompleteRooms.map(({ room, occupantsCount, capacity, missing }) => {
+              const fam = room.is_family && room.family_id ? families.find(f => f.id === room.family_id) : null;
+              return (
+                <div key={room.id} className="bg-white/80 backdrop-blur-sm rounded-xl p-3 border border-amber-100 flex flex-col justify-between text-xs space-y-1.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-navy-950 flex items-center gap-1">
+                      <Building2 size={12} className="text-gold-500" />
+                      {room.room_number ? `غرفة ${room.room_number}` : 'غرفة بدون رقم'}
+                    </span>
+                    <span className={`badge ${room.is_family ? 'bg-purple-100 text-purple-700' : (room.gender === 'رجال' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700')}`}>
+                      {room.is_family ? 'عائلية' : room.gender}
+                    </span>
+                  </div>
+                  <div className="text-gray-600">
+                    <p>النوع: <span className="font-semibold">{room.room_type}</span></p>
+                    {fam && <p>العائلة: <span className="font-semibold text-purple-700">{fam.family_name}</span></p>}
+                    <p>المسكنون: <span className="font-semibold text-navy-900">{occupantsCount}</span> من <span className="font-semibold text-navy-900">{capacity}</span></p>
+                  </div>
+                  <div className="pt-1.5 border-t border-amber-50 flex items-center justify-between text-amber-800 font-bold">
+                    <span>ينقصها:</span>
+                    <span className="badge bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
+                      {missing === 1 ? 'شخص واحد' : missing === 2 ? 'شخصين' : `${missing} أشخاص`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Unassigned Members & Member List */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
