@@ -58,6 +58,12 @@ export default function BookingPage({ preset, onDone }: Props) {
     });
   }, []);
 
+  useEffect(() => {
+    if (done) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [done]);
+
   const loadOptions = async (type: string) => {
     setPackages(null);
     setForm((f) => ({ ...f, package_id: '', hotel_id: '' }));
