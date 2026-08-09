@@ -148,7 +148,7 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     name: 'Promise Travel | بروميس للسياحة والسفر',
-    telephone: '+201001234567',
+    telephone: '+201012484971',
     email: 'info@promisetravel.com',
     url: 'https://promisetravelgroup.com/contact',
     address: {
@@ -212,6 +212,23 @@ export default function WebsiteRouter() {
       </main>
 
       <WebsiteFooter onNavigate={go} />
+
+      {/* Floating WhatsApp Button */}
+      <a
+        href="https://wa.me/201012484971"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 left-6 z-50 bg-emerald-500 text-white p-3 md:p-3.5 rounded-full shadow-[0_8px_30px_rgba(16,185,129,0.4)] hover:bg-emerald-600 hover:scale-110 active:scale-95 transition-all flex items-center justify-center border border-emerald-400/20"
+        title="تواصل معنا عبر واتساب"
+      >
+        <svg
+          className="w-6 h-6 md:w-7 md:h-7 fill-current"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M17.472 14.382c-.022-.08-.124-.14-.262-.21-.137-.07-.812-.4-1-.47-.188-.07-.324-.103-.462.103-.137.21-.53.667-.648.796-.12.13-.238.143-.377.07-.138-.07-.58-.214-1.107-.686-.407-.364-.682-.814-.762-.95-.08-.138-.01-.212.06-.28.064-.06.137-.16.205-.24.07-.08.09-.14.137-.21.047-.07.025-.136-.011-.21-.037-.07-.325-.785-.445-1.07-.117-.285-.235-.24-.325-.245-.083-.004-.178-.004-.275-.004-.097 0-.256.036-.39.18-.134.143-.513.5-.513 1.21 0 .71.52 1.39.59 1.49.073.097 1.02 1.558 2.47 2.18.347.148.617.237.828.303.35.11.666.095.918.058.28-.04.812-.33 1-.65.187-.32.187-.6.13-.65zM12 2C6.477 2 2 6.477 2 12c0 2.01.593 3.88 1.61 5.45L2.1 21.9l4.58-1.5C8.12 21.407 10 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18c-1.84 0-3.55-.52-5.02-1.42l-.36-.22-2.72.89.91-2.61-.24-.38C3.65 14.88 3 13.01 3 12c0-4.96 4.04-9 9-9s9 4.04 9 9-4.04 9-9 9z" />
+        </svg>
+      </a>
     </div>
   );
 }
