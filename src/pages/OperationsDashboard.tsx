@@ -550,7 +550,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث برقم الملف (OP-1001)، كود العميل (CL-1001)، أو الاسم..."
-            className="form-input pr-10"
+            className="form-input !pr-10"
           />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="form-input sm:w-40">
