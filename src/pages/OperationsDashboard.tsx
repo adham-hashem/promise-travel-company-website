@@ -403,6 +403,27 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const updateFile = async (updates: Record<string, any>) => {
     if (!selected) return;
     setSaving(true);
+
+    // Auto-archive customer and files when workflow stage is 'completed' or status is 'مكتمل'
+    if (updates.workflow_stage === 'completed' || updates.file_status === 'مكتمل') {
+      updates.is_archived = true;
+      if (selected.customer_id) {
+        await supabase.from('customers').update({ is_archived: true }).eq('id', selected.customer_id);
+        await supabase.from('vip_requests').update({ is_archived: true }).eq('customer_id', selected.customer_id);
+      }
+    } else if (
+      (updates.workflow_stage && updates.workflow_stage !== 'completed') ||
+      (updates.file_status && updates.file_status !== 'مكتمل' && updates.file_status !== 'مغلق')
+    ) {
+      if (selected.is_archived) {
+        updates.is_archived = false;
+        if (selected.customer_id) {
+          await supabase.from('customers').update({ is_archived: false }).eq('id', selected.customer_id);
+          await supabase.from('vip_requests').update({ is_archived: false }).eq('customer_id', selected.customer_id);
+        }
+      }
+    }
+
     const { data } = await supabase
       .from('operation_files')
       .update(updates)

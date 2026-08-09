@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Plane, Moon, MapPin, Star, Clock, Hotel as HotelIcon, ArrowLeft,
   ShieldCheck, Award, Users, Headphones, Plus, Minus, Tag,
-  CheckCircle2, Quote, Sparkles, CalendarDays, UtensilsCrossed,
+  CheckCircle2, Sparkles, CalendarDays, UtensilsCrossed,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package, Offer, Hotel, InternalTrip } from '../../types';
@@ -77,11 +77,7 @@ const whyChoose = [
   { icon: Headphones, title: 'دعم 24/7', desc: 'فريق دعم متواصل طوال أيام الأسبوع' },
 ];
 
-const testimonials = [
-  { name: 'محمود السيد', text: 'تجربة رائعة من البداية للنهاية، الفندق ممتاز وقريب من الحرم والخدمة احترافية. شكراً Promise.', role: 'معتمر', stars: 5 },
-  { name: 'أم عبد الله', text: 'أرسلت أبي للحج عن طريقهم وكنت مطمئنة طوال الرحلة. متابعة مستمرة وخدمة راقية. رزقكم الله البركة.', role: 'حاج', stars: 5 },
-  { name: 'عائلة العمري', text: 'رحلة شرم الشيخ كانت ممتعة جداً، التنظيم ممتاز والفندق فخم. تعامل راقي جداً مع الجميع.', role: 'سائح', stars: 5 },
-];
+
 
 const faqs = [
   { q: 'كيف يمكنني الحجز؟', a: 'يمكنك الحجز مباشرة من خلال صفحة "احجز الآن" على موقعنا، أو التواصل معنا هاتفياً وسيقوم فريقنا بمساعدتك في إتمام الحجز.' },
@@ -751,37 +747,7 @@ export default function Home({ onNavigate }: Props) {
         </div>
       </section>
 
-      {/* ===== Testimonials ===== */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-12">
-            <span className="text-gold-600 font-bold text-sm">آراء عملائنا</span>
-            <h2 className="text-3xl md:text-4xl font-black text-navy-900 mt-2">قصص نجاح حقيقية</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((t) => (
-              <div key={t.name} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 relative">
-                <Quote size={36} className="text-gold-200 absolute top-5 left-5" />
-                <div className="flex items-center gap-1 mb-4 relative">
-                  {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} size={16} className="text-gold-500" fill="currentColor" />
-                  ))}
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed mb-4 relative">"{t.text}"</p>
-                <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                  <div className="w-11 h-11 rounded-full bg-gradient-navy flex items-center justify-center text-gold-400 font-black">
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-bold text-navy-900 text-sm">{t.name}</p>
-                    <p className="text-xs text-gray-400">{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* ===== FAQ ===== */}
       <section className="py-20">

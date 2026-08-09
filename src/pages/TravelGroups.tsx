@@ -160,7 +160,7 @@ export default function TravelGroups({}: Props) {
         promises.push(
           supabase
             .from('documents')
-            .select('customer_id, file_path, file_name, document_type, status, created_at')
+            .select('customer_id, file_path, file_name, doc_type, status, created_at')
             .in('customer_id', customerIds)
             .then(res => {
               if (res.error) throw res.error;
@@ -218,7 +218,7 @@ export default function TravelGroups({}: Props) {
         // Passports
         if (type === 'passports' || type === 'all') {
           // Find passport document (prefer approved status 'مقبول')
-          const customerDocs = docs.filter(d => d.customer_id === cId && d.document_type === 'جواز سفر' && d.file_path);
+          const customerDocs = docs.filter(d => d.customer_id === cId && d.doc_type === 'جواز سفر' && d.file_path);
           const passport = customerDocs.find(d => d.status === 'مقبول') || customerDocs[0];
           if (passport) {
             const ext = passport.file_path.split('.').pop() || 'pdf';
@@ -234,7 +234,7 @@ export default function TravelGroups({}: Props) {
 
         // Personal Photos
         if (type === 'photos' || type === 'all') {
-          const customerDocs = docs.filter(d => d.customer_id === cId && d.document_type === 'صورة شخصية' && d.file_path);
+          const customerDocs = docs.filter(d => d.customer_id === cId && d.doc_type === 'صورة شخصية' && d.file_path);
           const photo = customerDocs.find(d => d.status === 'مقبول') || customerDocs[0];
           if (photo) {
             const ext = photo.file_path.split('.').pop() || 'jpg';

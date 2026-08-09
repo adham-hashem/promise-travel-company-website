@@ -354,6 +354,14 @@ export default function Payments() {
 
     const printedStatus = getPaymentStatusText(p);
 
+    const customerPayments = payments.filter(
+      (x) => x.customer_id === p.customer_id && x.approval_status !== 'مرفوض'
+    );
+    const totalPaid = customerPayments.reduce((sum, x) => sum + Number(x.amount || 0), 0);
+    const packagePrice = Number(p.packages?.price || p.customers?.packages?.price || 0);
+    const bookingTotal = Number(p.bookings?.total_amount || 0) || packagePrice;
+    const remaining = Math.max(0, bookingTotal - totalPaid);
+
     w.document.write(`
       <html dir="rtl"><head><meta charset="utf-8"><title>إيصال دفع</title>
       <style>
@@ -376,6 +384,8 @@ export default function Payments() {
       <div class="row"><span class="label">رقم الحجز</span><span class="val">${p.booking_id ? '#' + p.booking_id.slice(0, 8) : '—'}</span></div>
       <div class="row"><span class="label">طريقة الدفع</span><span class="val">${p.payment_method}</span></div>
       <div class="row"><span class="label">التاريخ</span><span class="val">${new Date(p.payment_date).toLocaleDateString('ar-EG')}</span></div>
+      <div class="row"><span class="label">إجمالي المدفوع</span><span class="val">${fmt(totalPaid)} ج.م</span></div>
+      <div class="row"><span class="label">المتبقي المطلوب</span><span class="val">${fmt(remaining)} ج.م</span></div>
       <div class="row"><span class="label">الحالة</span><span class="val">${printedStatus}</span></div>
       <div class="total">${fmt(p.amount)} ج.م</div>
       <div class="foot">شكراً لتعاملكم مع Promise Travel<br>هذا الإيصال صالح كدفعة وليس تأكيداً نهائياً للحجز</div>
