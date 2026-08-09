@@ -233,12 +233,81 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       colorIndex++;
     });
 
-    const sortedMembers = [...members].sort((a, b) => {
-      if (a.room_id && !b.room_id) return -1;
-      if (!a.room_id && b.room_id) return 1;
-      if (!a.room_id && !b.room_id) return 0;
-      return a.room_id!.localeCompare(b.room_id!);
+    const rowsHtml: string[] = [];
+
+    // 1. Render all rooms with their members and empty beds
+    rooms.forEach(room => {
+      const roomMembers = members.filter(m => m.room_id === room.id);
+      
+      let capacity = roomMembers.length;
+      if (room.is_family) {
+        const typeStr = room.room_type || '';
+        if (typeStr.includes('مفتوح') || typeStr === 'عائلة') {
+          capacity = roomMembers.length;
+        } else {
+          const match = typeStr.match(/\d+/);
+          capacity = match ? parseInt(match[0]) : roomMembers.length;
+        }
+      } else {
+        if (room.room_type === 'ثنائي') capacity = 2;
+        else if (room.room_type === 'ثلاثي') capacity = 3;
+        else if (room.room_type === 'رباعي') capacity = 4;
+      }
+
+      // Ensure capacity is at least the number of assigned members
+      capacity = Math.max(capacity, roomMembers.length);
+
+      const color = roomColorMap[room.id] || { bg: '#ffffff', text: '#000000' };
+      const styleAttr = `style="background-color: ${color.bg} !important; color: ${color.text} !important; font-weight: bold;"`;
+
+      const fam = room.is_family && room.family_id ? families.find(f => f.id === room.family_id) : null;
+      const familyName = fam ? fam.family_name : '—';
+      const roomLabel = room.room_number ? `غرفة ${room.room_number} (${room.room_type})` : `غرفة ${room.room_type}`;
+
+      // Print assigned members
+      roomMembers.forEach(m => {
+        rowsHtml.push(`
+          <tr ${styleAttr}>
+            <td>${m.customers.name}</td>
+            <td>${m.customers.client_code}</td>
+            <td>${familyName}</td>
+            <td>${roomLabel}</td>
+            <td>${m.rooming_type || '—'}</td>
+          </tr>
+        `);
+      });
+
+      // Print empty beds
+      const emptyCount = capacity - roomMembers.length;
+      for (let i = 0; i < emptyCount; i++) {
+        rowsHtml.push(`
+          <tr ${styleAttr}>
+            <td style="border-style: dashed; color: rgba(0,0,0,0.4); font-style: italic;">(سرير شاغر)</td>
+            <td style="border-style: dashed;">—</td>
+            <td style="border-style: dashed;">${familyName}</td>
+            <td style="border-style: dashed;">${roomLabel}</td>
+            <td style="border-style: dashed; color: rgba(0,0,0,0.4); font-style: italic;">شاغر</td>
+          </tr>
+        `);
+      }
     });
+
+    // 2. Render unassigned members at the end
+    const unassignedMembers = members.filter(m => !m.room_id);
+    if (unassignedMembers.length > 0) {
+      unassignedMembers.forEach(m => {
+        const fam = families.find(f => f.id === m.family_id);
+        rowsHtml.push(`
+          <tr class="unassigned">
+            <td style="color: #9ca3af; font-style: italic;">${m.customers.name}</td>
+            <td>${m.customers.client_code}</td>
+            <td>${fam ? fam.family_name : '—'}</td>
+            <td>— (غير مسكن)</td>
+            <td>${m.rooming_type || '—'}</td>
+          </tr>
+        `);
+      });
+    }
 
     const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -278,28 +347,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
     </tr>
   </thead>
   <tbody>
-    ${sortedMembers.map(m => {
-      const fam = families.find(f => f.id === m.family_id);
-      const room = rooms.find(r => r.id === m.room_id);
-      
-      let styleAttr = '';
-      if (room) {
-        const color = roomColorMap[room.id];
-        if (color) {
-          styleAttr = `style="background-color: ${color.bg} !important; color: ${color.text} !important; font-weight: bold;"`;
-        }
-      } else {
-        styleAttr = `class="unassigned"`;
-      }
-
-      return `<tr ${styleAttr}>
-        <td>${m.customers.name}</td>
-        <td>${m.customers.client_code}</td>
-        <td>${fam ? fam.family_name : '—'}</td>
-        <td>${room ? (room.room_number ? 'غرفة ' + room.room_number + ' (' + room.room_type + ')' : room.room_type) : '—'}</td>
-        <td>${m.rooming_type || '—'}</td>
-      </tr>`;
-    }).join('')}
+    ${rowsHtml.join('')}
   </tbody>
 </table>
 </body>
