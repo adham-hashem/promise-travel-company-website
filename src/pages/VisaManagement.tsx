@@ -8,6 +8,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
+import { compressImage } from '../lib/imageCompressor';
 import type { Visa, VisaStatus, VisaType, VisaDocument, VisaDocType, Customer, Employee, Page } from '../types';
 
 const visaStatuses: VisaStatus[] = ['لم يبدأ', 'قيد التقديم', 'قيد المراجعة', 'تمت الموافقة', 'مرفوضة', 'منتهية'];
@@ -252,13 +253,14 @@ export default function VisaManagement({ onNavigate }: Props) {
   const uploadDoc = async (file: File) => {
     if (!selected) return;
     setUploading(true);
-    const cleanFileName = file.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const compressedFile = await compressImage(file);
+    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `visa-docs/${selected.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase
       .from('visa_documents')
-      .insert({ visa_id: selected.id, doc_type: uploadDocType, file_path: filePath, file_name: file.name, file_size: file.size, status: 'مرفوع' })
+      .insert({ visa_id: selected.id, doc_type: uploadDocType, file_path: filePath, file_name: compressedFile.name, file_size: compressedFile.size, status: 'مرفوع' })
       .select('*')
       .single();
     if (data) setVisaDocs([data as VisaDocument, ...visaDocs]);
@@ -279,15 +281,16 @@ export default function VisaManagement({ onNavigate }: Props) {
       return;
     }
     setVisaFileUploading(true);
+    const compressedFile = await compressImage(file);
     const filePath = `visa-files/${selected.id}/visa-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setVisaFileUploading(false); return; }
     const { data } = await supabase
       .from('visa_management')
       .update({
         visa_number: visaNumber || null,
         visa_file_path: filePath,
-        visa_file_name: file.name,
+        visa_file_name: compressedFile.name,
         visa_upload_status: 'Uploaded',
         visa_file_uploaded_at: new Date().toISOString(),
         visa_file_uploaded_by: profile?.id || null,

@@ -8,13 +8,14 @@ import UmrahPage from '../../pages/public/UmrahPage';
 import InternalPage from '../../pages/public/InternalPage';
 import HotelsPage from '../../pages/public/HotelsPage';
 import HotelDetailsPage from '../../pages/public/HotelDetailsPage';
+import PackageDetailsPage from '../../pages/public/PackageDetailsPage';
 import OffersPage from '../../pages/public/OffersPage';
 import BookingPage from '../../pages/public/BookingPage';
 import ContactPage from '../../pages/public/ContactPage';
 
 export type PublicPage =
   | 'home' | 'hajj' | 'umrah' | 'internal'
-  | 'hotels' | 'hotel-details' | 'offers' | 'booking' | 'contact';
+  | 'hotels' | 'hotel-details' | 'package-details' | 'offers' | 'booking' | 'contact';
 
 interface HotelPreset {
   packageId?: string;
@@ -72,6 +73,11 @@ const SEO_META: Record<PublicPage, { title: string; description: string; path: s
     title: 'اتصل بنا وتواصل مع بروميس للسياحة | Promise Travel',
     description: 'تواصل مع وكالة بروميس للسياحة والسفر للحصول على الاستشارات والحجوزات. هاتف، واتساب، والعنوان.',
     path: 'contact',
+  },
+  'package-details': {
+    title: 'تفاصيل الباقة والحجز المباشر | Promise Travel',
+    description: 'عرض تفاصيل باقة الحج أو العمرة، خطة الرحلة والأسعار والحجز المباشر مع بروميس للسياحة.',
+    path: 'packages',
   },
 };
 
@@ -163,6 +169,7 @@ export default function WebsiteRouter() {
   const [page, setPage] = useState<PublicPage>('home');
   const [bookingPreset, setBookingPreset] = useState<HotelPreset | undefined>();
   const [hotelId, setHotelId] = useState<string | undefined>();
+  const [packageId, setPackageId] = useState<string | undefined>();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -170,7 +177,11 @@ export default function WebsiteRouter() {
 
   const go = (p: PublicPage, preset?: HotelPreset, id?: string) => {
     setBookingPreset(preset);
-    setHotelId(id);
+    if (p === 'hotel-details') {
+      setHotelId(id);
+    } else if (p === 'package-details') {
+      setPackageId(id);
+    }
     setPage(p);
   };
 
@@ -194,6 +205,7 @@ export default function WebsiteRouter() {
         {page === 'internal' && <InternalPage onNavigate={go} />}
         {page === 'hotels' && <HotelsPage onNavigate={go} />}
         {page === 'hotel-details' && hotelId && <HotelDetailsPage hotelId={hotelId} onNavigate={go} />}
+        {page === 'package-details' && packageId && <PackageDetailsPage packageId={packageId} onNavigate={go} />}
         {page === 'offers' && <OffersPage onNavigate={go} />}
         {page === 'booking' && <BookingPage preset={bookingPreset} onDone={() => go('home')} />}
         {page === 'contact' && <ContactPage />}

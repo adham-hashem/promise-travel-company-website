@@ -6,7 +6,7 @@ import type { PublicPage } from '../../components/public/WebsiteRouter';
 
 interface Props {
   type?: 'حج' | 'عمرة';
-  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }) => void;
+  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
 }
 
 const heroByType = {
@@ -105,24 +105,22 @@ export default function ServicePage({ type, onNavigate }: Props) {
                   </div>
 
                   <div className="flex flex-1 flex-col p-4">
-                    {p.description ? (
+                     {p.description ? (
                       <div className="text-right mb-3">
-                        <p className="text-sm leading-relaxed text-[#0B1F44]/60 transition-all duration-300">
-                          {p.description.length > 80 && !expandedPackages[p.id]
+                        <p className="text-sm leading-relaxed text-[#0B1F44]/60">
+                          {p.description.length > 80
                             ? p.description.slice(0, 80) + '...'
                             : p.description}
                         </p>
-                        {p.description.length > 80 && (
-                          <div className="flex justify-center mt-3">
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(p.id)}
-                              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#D4A017] bg-[#D4A017]/15 hover:bg-[#D4A017]/25 px-5 py-2 rounded-full transition-all focus:outline-none border border-[#D4A017]/30 shadow-md hover:scale-105 active:scale-95"
-                            >
-                              {expandedPackages[p.id] ? '▲ عرض أقل' : '▼ عرض المزيد'}
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex justify-center mt-3">
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('package-details', undefined, p.id)}
+                            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#D4A017] bg-[#D4A017]/15 hover:bg-[#D4A017]/25 px-5 py-2 rounded-full transition-all focus:outline-none border border-[#D4A017]/30 shadow-md hover:scale-105 active:scale-95"
+                          >
+                            ▼ عرض المزيد
+                          </button>
+                        </div>
                       </div>
                     ) : null}
 

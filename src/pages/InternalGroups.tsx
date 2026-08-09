@@ -357,8 +357,6 @@ export default function InternalGroups({}: Props) {
   <div><span>الباقة:</span> ${g.packages?.name || '—'}</div>
   <div><span>تاريخ السفر:</span> ${fmt(g.travel_date)}</div>
   <div><span>تاريخ العودة:</span> ${fmt(g.return_date)}</div>
-  <div><span>شركة الطيران:</span> ${g.airline || '—'}</div>
-  <div><span>رقم الرحلة:</span> ${g.flight_number || '—'}</div>
   <div><span>فندق الإقامة:</span> ${g.hotel_mecca || '—'}</div>
   <div><span>المشرف:</span> ${g.supervisor || '—'}</div>
   <div><span>عدد المسافرين:</span> ${members.length} / ${g.max_capacity}</div>
@@ -647,23 +645,9 @@ export default function InternalGroups({}: Props) {
                 </div>
               </div>
 
-              {/* Airline */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">شركة الطيران</label>
-                  <input value={form.airline} onChange={e => setForm(f => ({ ...f, airline: e.target.value }))}
-                    className="form-input" placeholder="Saudia / flynas ..." />
-                </div>
-                <div>
-                  <label className="form-label">رقم الرحلة</label>
-                  <input value={form.flight_number} onChange={e => setForm(f => ({ ...f, flight_number: e.target.value }))}
-                    className="form-input font-mono" placeholder="SV123" dir="ltr" />
-                </div>
-              </div>
-
               {/* Hotel */}
               <div>
-                <label className="form-label">فندق الإقامة</label>
+                <label className="form-label">فندق الإقامة (اختياري)</label>
                 <input value={form.hotel_mecca} onChange={e => setForm(f => ({ ...f, hotel_mecca: e.target.value }))}
                   className="form-input" placeholder="اسم الفندق" />
               </div>

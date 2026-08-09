@@ -6,7 +6,7 @@ import type { PublicPage, NavigateProps } from '../../components/public/WebsiteR
 
 interface Props {
   hotelId: string;
-  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }) => void;
+  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
 }
 
 export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
@@ -145,7 +145,10 @@ export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
                 <div className="grid sm:grid-cols-2 gap-4">
                   {packages.map((p) => (
                     <div key={p.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group hover:shadow-lg transition-all flex">
-                      <div className="w-28 flex-shrink-0 overflow-hidden bg-navy-100">
+                      <div 
+                        onClick={() => onNavigate('package-details', undefined, p.id)}
+                        className="w-28 flex-shrink-0 overflow-hidden bg-navy-100 cursor-pointer"
+                      >
                         {p.image_url ? (
                           <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                         ) : (
@@ -155,7 +158,12 @@ export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
                         )}
                       </div>
                       <div className="p-4 flex-1 flex flex-col">
-                        <h3 className="font-bold text-navy-900 text-sm mb-1 line-clamp-1">{p.name}</h3>
+                        <h3 
+                          onClick={() => onNavigate('package-details', undefined, p.id)}
+                          className="font-bold text-navy-900 text-sm mb-1 line-clamp-1 cursor-pointer hover:text-[#D4A017] transition-colors"
+                        >
+                          {p.name}
+                        </h3>
                         {p.duration_days && (
                           <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2">
                             <Clock size={12} className="text-gold-600" /> {p.duration_days} يوم

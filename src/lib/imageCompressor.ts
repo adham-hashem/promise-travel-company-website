@@ -2,7 +2,7 @@
  * Utility to compress image files on the client-side before uploading to Supabase Storage.
  * This drastically reduces upload time and server bandwidth.
  */
-export const compressImage = (file: File, maxDimension: number = 1600, quality: number = 0.7): Promise<File> => {
+export const compressImage = (file: File, maxDimension: number = 2000, quality: number = 0.8): Promise<File> => {
   return new Promise((resolve) => {
     // Only compress images, keep PDFs and others as is
     if (!file.type.startsWith('image/')) {

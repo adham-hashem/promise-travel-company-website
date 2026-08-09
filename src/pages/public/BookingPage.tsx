@@ -5,6 +5,7 @@ import {
   Eye, Trash2, Globe,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { compressImage } from '../../lib/imageCompressor';
 import type { Package, Hotel, InternalTrip } from '../../types';
 
 interface Props {
@@ -134,16 +135,17 @@ export default function BookingPage({ preset, onDone }: Props) {
       for (const docType of optionalDocs) {
         const file = docFiles[docType.id];
         if (!file) continue;
-        const ext = file.name.split('.').pop();
+        const compressedFile = await compressImage(file);
+        const ext = compressedFile.name.split('.').pop();
         const filePath = `${customerId}/${Date.now()}_${docType.id}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
+        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
         if (upErr) continue;
         await supabase.from('documents').insert({
           customer_id: customerId,
           doc_type: docType.id,
           file_path: filePath,
-          file_name: file.name,
-          file_size: file.size,
+          file_name: compressedFile.name,
+          file_size: compressedFile.size,
           status: 'مرفوع',
         });
       }

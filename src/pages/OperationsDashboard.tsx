@@ -68,6 +68,19 @@ const workflowStages = [
   { key: 'completed', label: 'مكتمل', icon: CheckCircle2 },
 ];
 
+const getWorkflowStages = (serviceType?: string) => {
+  if (serviceType === 'سياحة داخلية') {
+    return [
+      { key: 'new', label: 'جديد', icon: FileCheck },
+      { key: 'accounts', label: 'الحسابات', icon: Wallet },
+      { key: 'operations', label: 'التشغيل', icon: Briefcase },
+      { key: 'ready', label: 'جاهز للسفر', icon: CheckCircle2 },
+      { key: 'completed', label: 'مكتمل', icon: CheckCircle2 },
+    ];
+  }
+  return workflowStages;
+};
+
 const opDocTypes = ['تذكرة مؤكدة', 'فاوتشر فندق', 'فاوتشر نقل', 'تأمين سفر', 'نسخة التأشيرة', 'برنامج الرحلة', 'مستند إضافي'];
 
 const fileStatusOptions = ['جديد', 'قيد التجهيز', 'مستندات ناقصة', 'جاهز للسفر', 'مكتمل', 'مغلق'];
@@ -499,7 +512,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setOpDocs(opDocs.filter((d) => d.id !== doc.id));
   };
 
-  const currentStageIndex = selected ? workflowStages.findIndex((s) => s.key === (selected.workflow_stage || 'new')) : 0;
+  const activeStages = selected ? getWorkflowStages(selected.customer?.service_type) : workflowStages;
+  const currentStageIndex = selected ? activeStages.findIndex((s) => s.key === (selected.workflow_stage || 'new')) : 0;
 
   return (
     <div className="space-y-5">
@@ -606,16 +620,16 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                           {f.assigned_employee?.name && <span className="flex items-center gap-1"><UserCheck size={11} /> {f.assigned_employee.name}</span>}
                         </div>
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          {f.visa_status === 'مرفوضة' && (
+                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_status === 'مرفوضة' && (
                             <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-lg"><AlertCircle size={11} /> تأشيرة مرفوضة</span>
                           )}
-                          {f.visa_status === 'تمت الموافقة' && (
+                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_status === 'تمت الموافقة' && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><CheckCircle2 size={11} /> تأشيرة معتمدة</span>
                           )}
-                          {(f.visa_status === 'قيد التقديم' || f.visa_status === 'قيد المراجعة') && (
+                          {f.customer?.service_type !== 'سياحة داخلية' && (f.visa_status === 'قيد التقديم' || f.visa_status === 'قيد المراجعة') && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg"><Clock size={11} /> {f.visa_status}</span>
                           )}
-                          {f.visa_upload_status === 'Uploaded' && (
+                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_upload_status === 'Uploaded' && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><FileCheck size={11} /> ملف التأشيرة</span>
                           )}
                           {f.workflow_stage === 'flight' && (
@@ -716,7 +730,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               <div>
                 <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Briefcase size={15} className="text-gold-500" /> مسار العمل (Workflow Pipeline)</h4>
                 <div className="flex items-center gap-1 overflow-x-auto pb-2">
-                  {workflowStages.map((stage, i) => {
+                  {activeStages.map((stage, i) => {
                     const Icon = stage.icon;
                     const isDone = i <= currentStageIndex;
                     const isCurrent = i === currentStageIndex;
@@ -733,7 +747,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                             <button
                               title={`إلغاء مرحلة "${stage.label}" وجميع المراحل اللاحقة`}
                               onClick={async () => {
-                                const prevStage = workflowStages[i - 1];
+                                const prevStage = activeStages[i - 1];
                                 const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${stage.label}" وإرجاع العميل إلى مرحلة "${prevStage.label}"؟\n\nسيتم أيضاً إلغاء جميع المراحل اللاحقة تلقائياً.`;
                                 if (!window.confirm(confirmMsg)) return;
                                 await updateFile({ workflow_stage: prevStage.key });
@@ -744,7 +758,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                             </button>
                           )}
                         </div>
-                        {i < workflowStages.length - 1 && <div className={`w-4 h-0.5 ${i < currentStageIndex ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
+                        {i < activeStages.length - 1 && <div className={`w-4 h-0.5 ${i < currentStageIndex ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
                       </div>
                     );
                   })}
@@ -881,23 +895,25 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               </div>
 
               {/* Visa status */}
-              <div className="bg-gray-50 rounded-2xl p-4">
-                <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Shield size={15} className="text-gold-500" /> حالة التأشيرة</h4>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {selected.visa_status === 'تمت الموافقة' ? (
-                    <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><CheckCircle2 size={14} /> تمت الموافقة</span>
-                  ) : selected.visa_status === 'مرفوضة' ? (
-                    <span className="badge bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={14} /> مرفوضة</span>
-                  ) : selected.visa_status ? (
-                    <span className="badge bg-amber-100 text-amber-700 flex items-center gap-1"><Clock size={14} /> {selected.visa_status}</span>
-                  ) : (
-                    <span className="badge bg-gray-100 text-gray-500">لم يتم التقديم</span>
-                  )}
-                  {selected.visa_upload_status === 'Uploaded' && (
-                    <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><FileCheck size={14} /> ملف التأشيرة مرفوع</span>
-                  )}
+              {selected.customer?.service_type !== 'سياحة داخلية' && (
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Shield size={15} className="text-gold-500" /> حالة التأشيرة</h4>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {selected.visa_status === 'تمت الموافقة' ? (
+                      <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><CheckCircle2 size={14} /> تمت الموافقة</span>
+                    ) : selected.visa_status === 'مرفوضة' ? (
+                      <span className="badge bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={14} /> مرفوضة</span>
+                    ) : selected.visa_status ? (
+                      <span className="badge bg-amber-100 text-amber-700 flex items-center gap-1"><Clock size={14} /> {selected.visa_status}</span>
+                    ) : (
+                      <span className="badge bg-gray-100 text-gray-500">لم يتم التقديم</span>
+                    )}
+                    {selected.visa_upload_status === 'Uploaded' && (
+                      <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><FileCheck size={14} /> ملف التأشيرة مرفوع</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Customer documents */}
               <div>
@@ -987,7 +1003,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     onChange={(e) => updateFile({ workflow_stage: e.target.value })}
                     className="form-input border-gold-300 font-bold text-navy-900 bg-white"
                   >
-                    {workflowStages.map((stage) => (
+                    {activeStages.map((stage) => (
                       <option key={stage.key} value={stage.key}>{stage.label}</option>
                     ))}
                   </select>
