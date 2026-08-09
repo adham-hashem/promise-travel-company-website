@@ -116,52 +116,91 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   };
 
   const printRoomingList = () => {
-    // Group members by room, family, and single
+    const colorsPalette = [
+      { bg: '#eff6ff', text: '#1e40af' }, // Light Blue
+      { bg: '#f0fdf4', text: '#166534' }, // Light Green
+      { bg: '#f5f3ff', text: '#5b21b6' }, // Light Purple
+      { bg: '#fefce8', text: '#854d0e' }, // Light Yellow
+      { bg: '#fdf2f8', text: '#9d174d' }, // Light Pink
+      { bg: '#e0e7ff', text: '#3730a3' }, // Light Indigo
+      { bg: '#f0fdfa', text: '#0f766e' }, // Light Teal
+      { bg: '#fff7ed', text: '#9a3412' }, // Light Orange
+      { bg: '#ecfeff', text: '#0891b2' }, // Light Cyan
+      { bg: '#ecfdf5', text: '#065f46' }, // Light Emerald
+      { bg: '#fffbeb', text: '#92400e' }  // Light Amber
+    ];
+
+    const roomColorMap: Record<string, typeof colorsPalette[0]> = {};
+    let colorIndex = 0;
+    rooms.forEach((room) => {
+      roomColorMap[room.id] = colorsPalette[colorIndex % colorsPalette.length];
+      colorIndex++;
+    });
+
+    const sortedMembers = [...members].sort((a, b) => {
+      if (a.room_id && !b.room_id) return -1;
+      if (!a.room_id && b.room_id) return 1;
+      if (!a.room_id && !b.room_id) return 0;
+      return a.room_id!.localeCompare(b.room_id!);
+    });
+
     const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8">
-<title>شيت التسكين</title>
+<title>شيت التسكين الملون</title>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
-  h1 { font-size: 18px; text-align: center; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-  th { background: #1e3a5f; color: white; padding: 7px 5px; text-align: right; }
-  td { padding: 6px 5px; border-bottom: 1px solid #ddd; }
-  .room-family { background: #f3e8ff; /* purple-50 */ }
-  .room-male { background: #eff6ff; /* blue-50 */ }
-  .room-female { background: #fdf2f8; /* pink-50 */ }
-  .unassigned { background: #fff1f2; color: #e11d48; }
-  @media print { body { margin: 10px; } }
+  * {
+    -webkit-print-color-adjust: exact !important; 
+    print-color-adjust: exact !important; 
+  }
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 5px; color: #0c224f; font-weight: 900; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 25px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  th { background: #0c224f; color: white; padding: 12px 10px; text-align: right; font-weight: bold; font-size: 13px; }
+  td { padding: 11px 10px; border: 1px solid #e5e7eb; font-size: 13px; }
+  .unassigned { background: #fafafa; color: #9ca3af; }
+  @media print { 
+    body { margin: 10px; } 
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+  }
 </style>
 </head>
 <body>
 <h1>شيت التسكين (Rooming List)</h1>
+<div class="subtitle">شركة بروميس للسياحة والسفر</div>
 <table>
   <thead>
     <tr>
       <th>الاسم</th>
-      <th>الكود</th>
+      <th>كود العميل</th>
       <th>العائلة</th>
       <th>الغرفة</th>
       <th>نوع التسكين</th>
     </tr>
   </thead>
   <tbody>
-    ${members.map(m => {
+    ${sortedMembers.map(m => {
       const fam = families.find(f => f.id === m.family_id);
       const room = rooms.find(r => r.id === m.room_id);
-      let rowClass = 'unassigned';
+      
+      let styleAttr = '';
       if (room) {
-        if (room.is_family) rowClass = 'room-family';
-        else if (room.gender === 'رجال') rowClass = 'room-male';
-        else rowClass = 'room-female';
+        const color = roomColorMap[room.id];
+        if (color) {
+          styleAttr = `style="background-color: ${color.bg} !important; color: ${color.text} !important; font-weight: bold;"`;
+        }
+      } else {
+        styleAttr = `class="unassigned"`;
       }
-      return `<tr class="${rowClass}">
+
+      return `<tr ${styleAttr}>
         <td>${m.customers.name}</td>
         <td>${m.customers.client_code}</td>
         <td>${fam ? fam.family_name : '—'}</td>
-        <td>${room ? (room.room_number ? room.room_number + ' - ' : '') + room.room_type : '—'}</td>
+        <td>${room ? (room.room_number ? 'غرفة ' + room.room_number + ' (' + room.room_type + ')' : room.room_type) : '—'}</td>
         <td>${m.rooming_type || '—'}</td>
       </tr>`;
     }).join('')}
