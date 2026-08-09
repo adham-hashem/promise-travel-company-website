@@ -166,22 +166,85 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
 };
 
 export default function WebsiteRouter() {
-  const [page, setPage] = useState<PublicPage>('home');
+  const [page, setPage] = useState<PublicPage>(() => {
+    if (typeof window === 'undefined') return 'home';
+    const h = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+    if (h.startsWith('hotel-details/')) {
+      return 'hotel-details';
+    }
+    if (h.startsWith('package-details/')) {
+      return 'package-details';
+    }
+    const validPages: PublicPage[] = ['home', 'hajj', 'umrah', 'internal', 'hotels', 'offers', 'booking', 'contact'];
+    if (validPages.includes(h as PublicPage)) {
+      return h as PublicPage;
+    }
+    return 'home';
+  });
+
   const [bookingPreset, setBookingPreset] = useState<HotelPreset | undefined>();
-  const [hotelId, setHotelId] = useState<string | undefined>();
-  const [packageId, setPackageId] = useState<string | undefined>();
+
+  const [hotelId, setHotelId] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    const h = window.location.hash.replace(/^#\/?/, '');
+    if (h.startsWith('hotel-details/')) {
+      return h.substring('hotel-details/'.length);
+    }
+    return undefined;
+  });
+
+  const [packageId, setPackageId] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    const h = window.location.hash.replace(/^#\/?/, '');
+    if (h.startsWith('package-details/')) {
+      return h.substring('package-details/'.length);
+    }
+    return undefined;
+  });
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      const h = window.location.hash.replace(/^#\/?/, '');
+      if (!h) {
+        setPage('home');
+        return;
+      }
+      
+      if (h.startsWith('hotel-details/')) {
+        setHotelId(h.substring('hotel-details/'.length));
+        setPage('hotel-details');
+      } else if (h.startsWith('package-details/')) {
+        setPackageId(h.substring('package-details/'.length));
+        setPage('package-details');
+      } else {
+        const validPages: PublicPage[] = ['home', 'hajj', 'umrah', 'internal', 'hotels', 'offers', 'booking', 'contact'];
+        if (validPages.includes(h as PublicPage)) {
+          setPage(h as PublicPage);
+        } else {
+          setPage('home');
+        }
+      }
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const go = (p: PublicPage, preset?: HotelPreset, id?: string) => {
     setBookingPreset(preset);
-    if (p === 'hotel-details') {
+    let hash = p as string;
+    if (p === 'hotel-details' && id) {
       setHotelId(id);
-    } else if (p === 'package-details') {
+      hash = `hotel-details/${id}`;
+    } else if (p === 'package-details' && id) {
       setPackageId(id);
+      hash = `package-details/${id}`;
     }
+    window.location.hash = hash;
     setPage(p);
   };
 
