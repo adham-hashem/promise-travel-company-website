@@ -28,7 +28,7 @@ export default function InternalPage({ onNavigate }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[55vh] min-h-[400px] overflow-hidden">
-        <img src="https://images.pexels.com/photos/1287460/pexels-photo-1287460.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="الرحلات الداخلية" className="w-full h-full object-cover" />
+        <img src="/صفحة الرحلات الداخلية.webp" alt="الرحلات الداخلية" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-16 text-white">
           <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">

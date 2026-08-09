@@ -245,7 +245,16 @@ export default function BookingPage({ preset, onDone }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[35vh] min-h-[280px] overflow-hidden">
-        <img src="https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="احجز الآن" className="w-full h-full object-cover" />
+        <img 
+          src="/صفحة الحجز للكمبيوتر.webp" 
+          alt="احجز رحلتك" 
+          className="hidden md:block w-full h-full object-cover" 
+        />
+        <img 
+          src="/صفحة الحجز للموبايل .webp" 
+          alt="احجز رحلتك" 
+          className="block md:hidden w-full h-full object-cover" 
+        />
         <div className="absolute inset-0 bg-white/10" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
           <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-3 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">

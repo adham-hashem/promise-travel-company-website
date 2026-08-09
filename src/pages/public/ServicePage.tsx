@@ -11,12 +11,12 @@ interface Props {
 
 const heroByType = {
   حج: {
-    img: 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/صفحة الحج .webp',
     title: 'باقات الحج',
     subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
   },
   عمرة: {
-    img: 'https://images.pexels.com/photos/934879/pexels-photo-934879.jpeg?auto=compress&cs=tinysrgb&w=1920',
+    img: '/صفحة العمرة.webp',
     title: 'باقات العمرة',
     subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
   },
