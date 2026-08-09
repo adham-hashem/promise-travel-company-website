@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Loader2, CheckCircle2, Moon, Plane, MapPin, Hotel as HotelIcon,
   User, Phone, Mail, FileText, Send, Calendar, Users, Upload,
-  Eye, Trash2, Globe, Hash,
+  Eye, Trash2, Globe,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package, Hotel, InternalTrip } from '../../types';
@@ -44,6 +44,7 @@ export default function BookingPage({ preset, onDone }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -190,11 +191,11 @@ export default function BookingPage({ preset, onDone }: Props) {
           travel_date: form.travel_date || null,
           notes: 'تم الإنشاء تلقائياً من حجز الموقع',
         });
+        setCreatedBookingId(booking.id);
       }
 
       setCreatedCode(clientCode);
       setDone(true);
-      setTimeout(() => { onDone(); }, 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى');
     } finally {
@@ -204,20 +205,35 @@ export default function BookingPage({ preset, onDone }: Props) {
 
   if (done) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-20">
-        <div className="max-w-md text-center">
-          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 animate-fadeIn">
-            <CheckCircle2 size={48} className="text-emerald-600" />
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-20 bg-gray-50/50" dir="rtl">
+        <div className="max-w-md w-full text-center bg-white rounded-3xl border border-gray-100 p-8 shadow-xl animate-fadeIn">
+          <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 size={40} className="text-emerald-600" />
           </div>
           <h2 className="text-2xl font-black text-navy-900 mb-3">تم استلام طلبك بنجاح!</h2>
-          <p className="text-gray-500 mb-2">شكراً لك. سيتواصل معك فريق المبيعات لدينا في أقرب وقت لتأكيد الحجز.</p>
-          {createdCode && (
-            <div className="inline-flex items-center gap-2 bg-navy-50 border border-navy-200 rounded-xl px-4 py-2 mt-3 mb-4">
-              <Hash size={16} className="text-gold-600" />
-              <span className="font-mono font-black text-navy-800">كود العميل: {createdCode}</span>
-            </div>
-          )}
-          <p className="text-gold-600 font-semibold text-sm">جارٍ تحويلك للصفحة الرئيسية...</p>
+          <p className="text-gray-500 text-sm mb-6">شكراً لك على الحجز مع Promise Travel. يمكنك الاحتفاظ ببيانات الحجز التالية للمتابعة مع خدمة العملاء:</p>
+          
+          <div className="space-y-3 mb-8 text-right">
+            {createdBookingId && (
+              <div className="flex items-center justify-between p-4 bg-navy-50/80 border border-navy-100 rounded-2xl">
+                <span className="text-sm font-semibold text-gray-500">رقم الحجز:</span>
+                <span className="font-mono font-black text-navy-900 text-lg">#{createdBookingId.slice(0, 8).toUpperCase()}</span>
+              </div>
+            )}
+            {createdCode && (
+              <div className="flex items-center justify-between p-4 bg-gold-50/80 border border-gold-100 rounded-2xl">
+                <span className="text-sm font-semibold text-gray-500">كود العميل:</span>
+                <span className="font-mono font-black text-gold-700 text-lg">{createdCode}</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onDone}
+            className="w-full bg-gradient-navy text-white font-bold py-3.5 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
+          >
+            العودة للصفحة الرئيسية
+          </button>
         </div>
       </div>
     );
