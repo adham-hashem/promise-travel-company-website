@@ -64,9 +64,17 @@ export default function BookingPage({ preset, onDone }: Props) {
     }
   }, [done]);
 
-  const loadOptions = async (type: string) => {
+  useEffect(() => {
+    if (preset?.type) {
+      loadOptions(preset.type, preset.packageId);
+    } else {
+      setPackages([]);
+    }
+  }, [preset]);
+
+  const loadOptions = async (type: string, initialPackageId?: string) => {
     setPackages(null);
-    setForm((f) => ({ ...f, package_id: '', hotel_id: '' }));
+    setForm((f) => ({ ...f, package_id: initialPackageId || '', hotel_id: '' }));
     if (!type) { setPackages([]); return; }
     if (type === 'داخلي') {
       setPackages([]);
