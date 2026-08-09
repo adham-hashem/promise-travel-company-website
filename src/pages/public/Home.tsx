@@ -436,13 +436,15 @@ export default function Home({ onNavigate }: Props) {
                               : p.description}
                           </p>
                           {p.description.length > 80 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(p.id)}
-                              className="mt-2 inline-block text-xs font-extrabold text-[#D4A017] bg-[#D4A017]/10 hover:bg-[#D4A017]/20 px-3 py-1 rounded-full transition-all focus:outline-none border border-[#D4A017]/20 shadow-sm"
-                            >
-                              {expandedPackages[p.id] ? '▲ عرض أقل' : '▼ عرض المزيد'}
-                            </button>
+                            <div className="flex justify-center mt-3">
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(p.id)}
+                                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#D4A017] bg-[#D4A017]/15 hover:bg-[#D4A017]/25 px-5 py-2 rounded-full transition-all focus:outline-none border border-[#D4A017]/30 shadow-md hover:scale-105 active:scale-95"
+                              >
+                                {expandedPackages[p.id] ? '▲ عرض أقل' : '▼ عرض المزيد'}
+                              </button>
+                            </div>
                           )}
                         </div>
                       ) : null}
