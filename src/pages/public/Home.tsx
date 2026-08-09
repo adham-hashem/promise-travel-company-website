@@ -439,9 +439,9 @@ export default function Home({ onNavigate }: Props) {
                             <button
                               type="button"
                               onClick={() => toggleExpand(p.id)}
-                              className="mt-1 text-xs font-bold text-[#D4A017] hover:underline focus:outline-none"
+                              className="mt-2 inline-block text-xs font-extrabold text-[#D4A017] bg-[#D4A017]/10 hover:bg-[#D4A017]/20 px-3 py-1 rounded-full transition-all focus:outline-none border border-[#D4A017]/20 shadow-sm"
                             >
-                              {expandedPackages[p.id] ? 'عرض أقل' : 'عرض المزيد'}
+                              {expandedPackages[p.id] ? '▲ عرض أقل' : '▼ عرض المزيد'}
                             </button>
                           )}
                         </div>
