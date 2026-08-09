@@ -286,7 +286,7 @@ export default function WebsiteRouter() {
       >
         <span className="absolute inset-0 rounded-full bg-[#25D366] opacity-35 group-hover:animate-ping -z-10"></span>
         <svg
-          className="w-6 h-6 md:w-7 md:h-7 fill-current"
+          className="w-6 h-6 md:w-7 md:h-7 fill-current transform -translate-x-[1px] translate-y-[0.5px]"
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
         >
