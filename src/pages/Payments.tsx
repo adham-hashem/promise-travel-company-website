@@ -64,6 +64,23 @@ export default function Payments() {
   const [detailDocs, setDetailDocs] = useState<any[]>([]);
   const [loadingDetailDocs, setLoadingDetailDocs] = useState(false);
 
+  const getPaymentStatusText = (p: PayRow) => {
+    if (!p.packages && !p.bookings) return p.status;
+    const totalAmount = p.bookings ? Number(p.bookings.total_amount || 0) : (p.packages ? Number(p.packages.price || 0) : 0);
+    if (totalAmount <= 0) return p.status;
+
+    // Calculate total paid by this customer for this package
+    const customerPayments = payments.filter(pay => pay.customer_id === p.customer_id && pay.package_id === p.package_id && pay.approval_status !== 'مرفوض');
+    const totalPaid = customerPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
+    const remaining = Math.max(0, totalAmount - totalPaid);
+
+    if (remaining <= 0) {
+      return 'مدفوع بالكامل';
+    } else {
+      return `مدفوع جزء وهناك باقي ${remaining.toLocaleString('ar-EG')} ج.م`;
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -335,29 +352,7 @@ export default function Payments() {
     const w = window.open('', '_blank', 'width=400,height=600');
     if (!w) return;
 
-    // Calculate total paid by customer for this package/booking to ensure correct status is printed
-    const customerPayments = payments.filter(pay => pay.customer_id === p.customer_id && pay.package_id === p.package_id && pay.approval_status !== 'مرفوض');
-    const totalPaid = customerPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
-    const pkgPrice = p.packages ? Number(p.packages.price || 0) : 0;
-
-    let printedStatus = p.status;
-    if (pkgPrice > 0) {
-      if (totalPaid >= pkgPrice) {
-        printedStatus = 'مدفوع بالكامل';
-      } else {
-        printedStatus = 'مدفوع جزئياً';
-      }
-    } else if (p.bookings) {
-      const totalBook = Number(p.bookings.total_amount || 0);
-      const paidBook = Number(p.bookings.paid_amount || 0);
-      if (totalBook > 0) {
-        if (paidBook >= totalBook) {
-          printedStatus = 'مدفوع بالكامل';
-        } else {
-          printedStatus = 'مدفوع جزئياً';
-        }
-      }
-    }
+    const printedStatus = getPaymentStatusText(p);
 
     w.document.write(`
       <html dir="rtl"><head><meta charset="utf-8"><title>إيصال دفع</title>
@@ -394,7 +389,7 @@ export default function Payments() {
       '#': i + 1, 'العميل': p.customers?.name || '—', 'نوع العملية': p.payment_type || 'دفعة عادية',
       'رقم الحجز': p.booking_id?.slice(0, 8) || '—',
       'المبلغ': p.amount, 'الطريقة': p.payment_method, 'التاريخ': new Date(p.payment_date).toLocaleDateString('ar-EG'),
-      'الحالة': p.status, 'الاعتماد': p.approval_status || 'بانتظار الاعتماد',
+      'الحالة': getPaymentStatusText(p), 'الاعتماد': p.approval_status || 'بانتظار الاعتماد',
     }));
     exportToExcel(data, 'المدفوعات');
   };
@@ -408,7 +403,7 @@ export default function Payments() {
       `${p.amount} ج.م`,
       p.payment_method,
       new Date(p.payment_date).toLocaleDateString('ar-EG'),
-      p.status,
+      getPaymentStatusText(p),
       p.approval_status || 'بانتظار الاعتماد',
     ]);
     exportToPDF('تقرير المدفوعات والحسابات', headers, rows);
@@ -669,7 +664,13 @@ export default function Payments() {
                   <td><span className="badge bg-gray-100 text-gray-600 text-xs">{p.payment_method}</span></td>
                   <td className="text-gray-500 text-sm">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</td>
                   <td>
-                    <span className={`badge ${p.status === 'مدفوع بالكامل' ? 'bg-emerald-100 text-emerald-700' : p.status === 'مدفوع جزئياً' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span>
+                    {(() => {
+                      const statusText = getPaymentStatusText(p);
+                      const badgeClass = statusText === 'مدفوع بالكامل'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : (statusText === 'غير مدفوع' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
+                      return <span className={`badge ${badgeClass}`}>{statusText}</span>;
+                    })()}
                   </td>
                   <td>{approvalBadge(p.approval_status)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
@@ -828,7 +829,7 @@ export default function Payments() {
                   { label: 'طريقة الدفع', value: selectedPayment.payment_method },
                   { label: 'تاريخ العملية', value: new Date(selectedPayment.payment_date).toLocaleDateString('ar-EG') },
                   { label: 'الموظف المسجل', value: selectedPayment.user_profiles?.name || '—' },
-                  { label: 'حالة العملية', value: selectedPayment.status },
+                  { label: 'حالة العملية', value: getPaymentStatusText(selectedPayment) },
                 ].map(r => (
                   <div key={r.label} className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-0.5">{r.label}</p>
