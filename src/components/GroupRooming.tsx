@@ -269,6 +269,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         rowsHtml.push(`
           <tr ${styleAttr}>
             <td>${m.customers.name}</td>
+            <td dir="ltr" style="text-align: right;">${m.customers.phone || '—'}</td>
             <td>${m.customers.client_code}</td>
             <td>${familyName}</td>
             <td>${roomLabel}</td>
@@ -283,6 +284,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         rowsHtml.push(`
           <tr ${styleAttr}>
             <td style="border-style: dashed; color: rgba(0,0,0,0.4); font-style: italic;">(سرير شاغر)</td>
+            <td style="border-style: dashed;">—</td>
             <td style="border-style: dashed;">—</td>
             <td style="border-style: dashed;">${familyName}</td>
             <td style="border-style: dashed;">${roomLabel}</td>
@@ -300,6 +302,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         rowsHtml.push(`
           <tr class="unassigned">
             <td style="color: #9ca3af; font-style: italic;">${m.customers.name}</td>
+            <td dir="ltr" style="text-align: right;">${m.customers.phone || '—'}</td>
             <td>${m.customers.client_code}</td>
             <td>${fam ? fam.family_name : '—'}</td>
             <td>— (غير مسكن)</td>
@@ -340,6 +343,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   <thead>
     <tr>
       <th>الاسم</th>
+      <th>رقم الهاتف</th>
       <th>كود العميل</th>
       <th>العائلة</th>
       <th>الغرفة</th>
