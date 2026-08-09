@@ -104,6 +104,36 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
 
   const saveAssign = async () => {
     if (!assigningMember) return;
+
+    // Check capacity limit if a room is selected
+    if (assignForm.room_id) {
+      const targetRoom = rooms.find(r => r.id === assignForm.room_id);
+      if (targetRoom) {
+        const occupants = members.filter(m => m.room_id === assignForm.room_id && m.id !== assigningMember.id);
+        const currentCount = occupants.length;
+
+        let capacity = Infinity;
+        if (targetRoom.is_family) {
+          const typeStr = targetRoom.room_type || '';
+          if (typeStr.includes('مفتوح') || typeStr === 'عائلة') {
+            capacity = Infinity;
+          } else {
+            const match = typeStr.match(/\d+/);
+            capacity = match ? parseInt(match[0]) : Infinity;
+          }
+        } else {
+          if (targetRoom.room_type === 'ثنائي') capacity = 2;
+          else if (targetRoom.room_type === 'ثلاثي') capacity = 3;
+          else if (targetRoom.room_type === 'رباعي') capacity = 4;
+        }
+
+        if (currentCount >= capacity) {
+          alert(`⚠️ تنبيه: لا يمكن إضافة العضو إلى الغرفة لأنها ممتلئة بالكامل (الحد الأقصى: ${capacity === Infinity ? 'غير محدود' : `${capacity} أفراد`}).`);
+          return;
+        }
+      }
+    }
+
     await supabase.from('travel_group_members').update({
       rooming_type: assignForm.rooming_type,
       family_id: assignForm.rooming_type === 'عائلة' ? (assignForm.family_id || null) : null,
@@ -268,17 +298,33 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                   <input value={roomForm.room_number} onChange={e => setRoomForm({...roomForm, room_number: e.target.value})} className="form-input text-sm" placeholder="مثال: 101" />
                 </div>
                 <div>
-                  <label className="form-label text-[10px]">نوع الغرفة</label>
-                  <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
-                    <option>ثنائي</option>
-                    <option>ثلاثي</option>
-                    <option>رباعي</option>
-                  </select>
+                  <label className="form-label text-[10px]">{roomForm.is_family ? 'سعة الغرفة العائلية' : 'نوع الغرفة'}</label>
+                  {!roomForm.is_family ? (
+                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
+                      <option value="ثنائي">ثنائي</option>
+                      <option value="ثلاثي">ثلاثي</option>
+                      <option value="رباعي">رباعي</option>
+                    </select>
+                  ) : (
+                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
+                      <option value="عائلة - مفتوح">قبول أي عدد عادي</option>
+                      <option value="عائلة - 1">شخص واحد</option>
+                      <option value="عائلة - 2">شخصين (2)</option>
+                      <option value="عائلة - 3">3 أشخاص</option>
+                      <option value="عائلة - 4">4 أشخاص</option>
+                      <option value="عائلة - 5">5 أشخاص</option>
+                      <option value="عائلة - 6">6 أشخاص</option>
+                      <option value="عائلة - 7">7 أشخاص</option>
+                      <option value="عائلة - 8">8 أشخاص</option>
+                      <option value="عائلة - 9">9 أشخاص</option>
+                      <option value="عائلة - 10">10 أشخاص</option>
+                    </select>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={roomForm.is_family} onChange={e => setRoomForm({...roomForm, is_family: e.target.checked, gender: e.target.checked ? 'عائلة' : 'رجال'})} className="rounded text-gold-500 focus:ring-gold-500" />
+                  <input type="checkbox" checked={roomForm.is_family} onChange={e => setRoomForm({...roomForm, is_family: e.target.checked, gender: e.target.checked ? 'عائلة' : 'رجال', room_type: e.target.checked ? 'عائلة - مفتوح' : 'ثنائي'})} className="rounded text-gold-500 focus:ring-gold-500" />
                   غرفة عائلية؟
                 </label>
               </div>
@@ -294,8 +340,8 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 <div>
                   <label className="form-label text-[10px]">الجنس</label>
                   <select value={roomForm.gender} onChange={e => setRoomForm({...roomForm, gender: e.target.value})} className="form-input text-sm">
-                    <option>رجال</option>
-                    <option>نساء</option>
+                    <option value="رجال">رجال</option>
+                    <option value="نساء">نساء</option>
                   </select>
                 </div>
               )}
@@ -331,54 +377,56 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <span className="badge bg-white text-navy-700 border border-gray-200">الإجمالي: {members.length}</span>
           </div>
         </div>
-        <table className="w-full text-xs text-right">
-          <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
-            <tr>
-              <th className="px-5 py-3">الاسم</th>
-              <th className="px-5 py-3">نوع التسكين</th>
-              <th className="px-5 py-3">العائلة</th>
-              <th className="px-5 py-3">الغرفة</th>
-              <th className="px-5 py-3">الإجراء</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {members.map(m => {
-              const fam = families.find(f => f.id === m.family_id);
-              const room = rooms.find(r => r.id === m.room_id);
-              return (
-                <tr key={m.id} className="hover:bg-gray-50/50">
-                  <td className="px-5 py-3 font-semibold text-navy-900">{m.customers.name}</td>
-                  <td className="px-5 py-3">
-                    <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {m.rooming_type || 'غير محدد'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-gray-600">{fam ? fam.family_name : '—'}</td>
-                  <td className="px-5 py-3 text-gray-600">
-                    {room ? (
-                      <span className="flex items-center gap-1 font-semibold">
-                        <Building2 size={12} className="text-navy-400" />
-                        {room.room_number ? `${room.room_number} - ` : ''}{room.room_type}
-                      </span>
-                    ) : (
-                      <span className="text-red-500 flex items-center gap-1"><AlertCircle size={12}/> غير مسكن</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <button onClick={() => openAssignModal(m)} className="btn-outline text-[10px] px-2 py-1 flex items-center gap-1">
-                      <Edit2 size={12} /> تعيين
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-            {members.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-right">
+            <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
               <tr>
-                <td colSpan={5} className="text-center py-10 text-gray-400">لا يوجد أعضاء في هذا الفوج</td>
+                <th className="px-5 py-3">الاسم</th>
+                <th className="px-5 py-3">نوع التسكين</th>
+                <th className="px-5 py-3">العائلة</th>
+                <th className="px-5 py-3">الغرفة</th>
+                <th className="px-5 py-3">الإجراء</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {members.map(m => {
+                const fam = families.find(f => f.id === m.family_id);
+                const room = rooms.find(r => r.id === m.room_id);
+                return (
+                  <tr key={m.id} className="hover:bg-gray-50/50">
+                    <td className="px-5 py-3 font-semibold text-navy-900">{m.customers.name}</td>
+                    <td className="px-5 py-3">
+                      <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {m.rooming_type || 'غير محدد'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-600">{fam ? fam.family_name : '—'}</td>
+                    <td className="px-5 py-3 text-gray-600">
+                      {room ? (
+                        <span className="flex items-center gap-1 font-semibold">
+                          <Building2 size={12} className="text-navy-400" />
+                          {room.room_number ? `${room.room_number} - ` : ''}{room.room_type}
+                        </span>
+                      ) : (
+                        <span className="text-red-500 flex items-center gap-1"><AlertCircle size={12}/> غير مسكن</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <button onClick={() => openAssignModal(m)} className="btn-outline text-[10px] px-2 py-1 flex items-center gap-1">
+                        <Edit2 size={12} /> تعيين
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+              {members.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center py-10 text-gray-400">لا يوجد أعضاء في هذا الفوج</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Assign Modal */}

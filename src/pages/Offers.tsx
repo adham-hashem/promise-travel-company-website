@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Tag, EyeOff, Power, Loader2, Image as ImageIcon, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageCompressor';
 import type { Offer, OfferType, Package } from '../types';
 
 interface OfferRow extends Offer {
@@ -35,6 +36,45 @@ export default function Offers() {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الصورة كبير جداً. يجب أن يكون أقل من 5 ميجابايت.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const compressedFile = await compressImage(file);
+      const ext = compressedFile.name.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+      const filePath = `offers/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, compressedFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        alert('فشل رفع الصورة: ' + uploadError.message);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      setForm(prev => ({ ...prev, image_url: publicUrlData.publicUrl }));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -260,10 +300,42 @@ export default function Offers() {
 
               {/* Image */}
               <div>
-                <label className="form-label">رابط صورة العرض</label>
-                <div className="flex gap-2">
-                  <input dir="ltr" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="form-input" placeholder="https://..." />
-                  {form.image_url && <img src={form.image_url} alt="" className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />}
+                <label className="form-label">صورة العرض <span className="text-gray-400 text-xs">(رفع مباشر من الجهاز)</span></label>
+                <div className="flex items-center gap-4">
+                  {form.image_url ? (
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0 group">
+                      <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setForm(p => ({ ...p, image_url: '' }))}
+                        className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="border-2 border-dashed border-gray-300 hover:border-gold-500 rounded-2xl w-24 h-24 flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50 text-gray-500 hover:text-gold-600 flex-shrink-0">
+                      {uploading ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-gold-500" />
+                      ) : (
+                        <>
+                          <ImageIcon size={20} />
+                          <span className="text-[10px] font-bold mt-1">رفع صورة</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+                    </label>
+                  )}
+                  <div className="text-xs text-gray-400 space-y-1">
+                    <p>صيغ الصور المدعومة: PNG, JPG, WEBP</p>
+                    <p>الحد الأقصى للملف: 5 ميجابايت</p>
+                  </div>
                 </div>
               </div>
 

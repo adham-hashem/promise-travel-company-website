@@ -784,39 +784,41 @@ export default function InternalGroups({}: Props) {
                   <p className="text-sm">لا يوجد أعضاء في هذا الفوج بعد</p>
                 </div>
               ) : (
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      {['#', 'الاسم', 'الكود', 'الهاتف', 'الهوية / الجواز', 'الخدمة', ''].map(h => (
-                        <th key={h} className="text-right px-4 py-2.5 font-semibold text-gray-600 border-b border-gray-100">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {filteredMembers.map((m, i) => (
-                      <tr key={m.id} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
-                        <td className="px-4 py-2.5 font-semibold text-navy-900">{m.customers.name}</td>
-                        <td className="px-4 py-2.5 font-mono text-gold-600">{m.customers.client_code}</td>
-                        <td className="px-4 py-2.5 text-gray-600" dir="ltr">{m.customers.phone || '—'}</td>
-                        <td className="px-4 py-2.5 text-gray-500">
-                          {m.customers.passport_number || m.customers.national_id || '—'}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {m.customers.service_type && (
-                            <span className="badge bg-blue-50 text-blue-700 text-[10px]">{m.customers.service_type}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <button onClick={() => removeMember(m.id, m.customer_id)}
-                            className="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600">
-                            <UserMinus size={14} />
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        {['#', 'الاسم', 'الكود', 'الهاتف', 'الهوية / الجواز', 'الخدمة', ''].map(h => (
+                          <th key={h} className="text-right px-4 py-2.5 font-semibold text-gray-600 border-b border-gray-100">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredMembers.map((m, i) => (
+                        <tr key={m.id} className="hover:bg-gray-50/50">
+                          <td className="px-4 py-2.5 text-gray-400">{i + 1}</td>
+                          <td className="px-4 py-2.5 font-semibold text-navy-900">{m.customers.name}</td>
+                          <td className="px-4 py-2.5 font-mono text-gold-600">{m.customers.client_code}</td>
+                          <td className="px-4 py-2.5 text-gray-600" dir="ltr">{m.customers.phone || '—'}</td>
+                          <td className="px-4 py-2.5 text-gray-500">
+                            {m.customers.passport_number || m.customers.national_id || '—'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {m.customers.service_type && (
+                              <span className="badge bg-blue-50 text-blue-700 text-[10px]">{m.customers.service_type}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <button onClick={() => removeMember(m.id, m.customer_id)}
+                              className="p-1 rounded hover:bg-red-50 text-red-400 hover:text-red-600">
+                              <UserMinus size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 

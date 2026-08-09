@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   Building2, Plus, Search, Star, Wifi, Coffee, Utensils,
   Dumbbell, Car, Waves, BedDouble, X, Pencil, Trash2, Eye,
-  MapPin, CheckCircle, XCircle,
+  MapPin, CheckCircle, XCircle, Upload, Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import type { Hotel, HotelCategory, HotelStatus } from '../types';
 
 const HOTEL_SERVICES = [
@@ -49,8 +50,63 @@ function HotelModal({ hotel, onClose, onSave }: HotelModalProps) {
     services: hotel?.services ?? [],
     status: hotel?.status ?? ('نشط' as HotelStatus),
     description: hotel?.description ?? '',
+    images: hotel?.images ?? [],
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const newUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 5 * 1024 * 1024) {
+          alert(`حجم الصورة ${file.name} كبير جداً. يجب أن يكون أقل من 5 ميجابايت.`);
+          continue;
+        }
+        const compressedFile = await compressImage(file);
+        const ext = compressedFile.name.split('.').pop() || 'jpg';
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const filePath = `hotels/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(filePath, compressedFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          alert('فشل رفع الصورة: ' + uploadError.message);
+          continue;
+        }
+
+        const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+        newUrls.push(publicUrlData.publicUrl);
+      }
+
+      setForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...newUrls]
+      }));
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء رفع الصور');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
 
   const toggleService = (svc: string) => {
     setForm(prev => ({
@@ -146,6 +202,43 @@ function HotelModal({ hotel, onClose, onSave }: HotelModalProps) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">وصف الفندق</label>
             <textarea className="input-field resize-none" rows={3} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="وصف موجز للفندق ومميزاته" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">صور الفندق (اختياري)</label>
+            <div className="grid grid-cols-4 gap-3">
+              {form.images.map((url, idx) => (
+                <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 group">
+                  <img src={url} alt="Hotel" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-md hover:bg-red-700 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              
+              <label className="border-2 border-dashed border-gray-300 hover:border-gold-500 rounded-xl aspect-video flex flex-col items-center justify-center cursor-pointer transition-all bg-gray-50 text-gray-500 hover:text-gold-600">
+                {uploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-gold-500" />
+                ) : (
+                  <>
+                    <Upload size={20} />
+                    <span className="text-[10px] font-bold mt-1">رفع صورة</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">
