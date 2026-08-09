@@ -14,6 +14,16 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const [rooms, setRooms] = useState<GroupRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Global default family capacity state
+  const [maxFamilyCapacity, setMaxFamilyCapacity] = useState<number>(() => {
+    const saved = localStorage.getItem('max_family_capacity');
+    return saved ? parseInt(saved) || 5 : 5;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('max_family_capacity', String(maxFamilyCapacity));
+  }, [maxFamilyCapacity]);
+
   // Form states
   const [newFamilyName, setNewFamilyName] = useState('');
   
@@ -30,6 +40,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const [assigningMember, setAssigningMember] = useState<TravelGroupMember | null>(null);
   const [assignForm, setAssignForm] = useState({
     rooming_type: 'منفرد',
+    is_head: false,
     family_id: '',
     room_id: '',
     gender: 'ذكر'
@@ -38,6 +49,47 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   useEffect(() => {
     loadData();
   }, [groupId]);
+
+  // Auto-allocate member to the first available room when family_id, gender, or rooming_type changes
+  useEffect(() => {
+    if (!assigningMember) return;
+    
+    if (assignForm.rooming_type === 'عائلة') {
+      if (!assignForm.family_id) {
+        setAssignForm(prev => ({ ...prev, room_id: '' }));
+        return;
+      }
+      
+      const familyRooms = rooms.filter(r => r.is_family && r.family_id === assignForm.family_id);
+      const recommendedRoom = familyRooms.find(r => {
+        const occupants = members.filter(m => m.room_id === r.id && m.id !== assigningMember.id);
+        let capacity = maxFamilyCapacity;
+        const typeStr = r.room_type || '';
+        if (typeStr.includes('مفتوح') || typeStr === 'عائلة') {
+          capacity = Infinity;
+        } else {
+          const match = typeStr.match(/\d+/);
+          capacity = match ? parseInt(match[0]) : maxFamilyCapacity;
+        }
+        return occupants.length < capacity;
+      });
+      
+      setAssignForm(prev => ({ ...prev, room_id: recommendedRoom?.id || '' }));
+    } else {
+      // Find first available room for this gender
+      const genderRooms = rooms.filter(r => !r.is_family && r.gender === (assignForm.gender === 'ذكر' ? 'رجال' : 'نساء'));
+      const recommendedRoom = genderRooms.find(r => {
+        const occupants = members.filter(m => m.room_id === r.id && m.id !== assigningMember.id);
+        let capacity = 2; // default
+        if (r.room_type === 'ثنائي') capacity = 2;
+        else if (r.room_type === 'ثلاثي') capacity = 3;
+        else if (r.room_type === 'رباعي') capacity = 4;
+        return occupants.length < capacity;
+      });
+      
+      setAssignForm(prev => ({ ...prev, room_id: recommendedRoom?.id || '' }));
+    }
+  }, [assignForm.rooming_type, assignForm.family_id, assignForm.gender, assigningMember?.id, rooms, members]);
 
   const loadData = async () => {
     setLoading(true);
@@ -51,10 +103,10 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   };
 
   const createFamily = async () => {
-    if (!newFamilyName.trim()) return;
+    const familyName = newFamilyName.trim() || `عائلة جديدة #${families.length + 1}`;
     const { data, error } = await supabase.from('group_families').insert({
       group_id: groupId,
-      family_name: newFamilyName
+      family_name: familyName
     }).select().single();
     if (data) {
       setFamilies([...families, data as GroupFamily]);
@@ -95,7 +147,8 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const openAssignModal = (member: TravelGroupMember) => {
     setAssigningMember(member);
     setAssignForm({
-      rooming_type: member.rooming_type || 'منفرد',
+      rooming_type: member.rooming_type?.startsWith('عائلة') ? 'عائلة' : (member.rooming_type || 'منفرد'),
+      is_head: member.rooming_type === 'عائلة - رئيس',
       family_id: member.family_id || '',
       room_id: member.room_id || '',
       gender: member.gender || 'ذكر'
@@ -134,8 +187,21 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       }
     }
 
+    const finalRoomingType = assignForm.rooming_type === 'عائلة'
+      ? (assignForm.is_head ? 'عائلة - رئيس' : 'عائلة')
+      : assignForm.rooming_type;
+
+    // If this member is designated as the family head, clear the head status of other members of this family
+    if (finalRoomingType === 'عائلة - رئيس' && assignForm.family_id) {
+      const otherHeads = members.filter(m => m.family_id === assignForm.family_id && m.rooming_type === 'عائلة - رئيس' && m.id !== assigningMember.id);
+      if (otherHeads.length > 0) {
+        const otherHeadIds = otherHeads.map(h => h.id);
+        await supabase.from('travel_group_members').update({ rooming_type: 'عائلة' }).in('id', otherHeadIds);
+      }
+    }
+
     await supabase.from('travel_group_members').update({
-      rooming_type: assignForm.rooming_type,
+      rooming_type: finalRoomingType,
       family_id: assignForm.rooming_type === 'عائلة' ? (assignForm.family_id || null) : null,
       room_id: assignForm.room_id || null,
       gender: assignForm.gender
@@ -263,10 +329,10 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <input 
               value={newFamilyName} 
               onChange={e => setNewFamilyName(e.target.value)}
-              placeholder="اسم العائلة (مثال: عائلة أحمد)" 
+              placeholder="اسم العائلة (اختياري - سيتم التوليد تلقائياً إن تركت فارغة)" 
               className="form-input flex-1 text-sm"
             />
-            <button onClick={createFamily} disabled={!newFamilyName} className="btn-gold px-4 py-2 text-sm flex items-center gap-1 whitespace-nowrap">
+            <button onClick={createFamily} className="btn-gold px-4 py-2 text-sm flex items-center gap-1 whitespace-nowrap">
               <Plus size={14} /> إضافة عائلة
             </button>
           </div>
@@ -283,12 +349,24 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
 
         {/* Create Room */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <h4 className="text-sm font-bold text-navy-800 mb-4 flex items-center gap-2 justify-between">
-            <div className="flex items-center gap-2"><Building2 size={16} className="text-gold-500" /> إدارة الغرف</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 text-navy-800 font-bold text-sm">
+              <Building2 size={16} className="text-gold-500" /> إدارة الغرف
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-gray-500 font-medium">سعة العائلة الافتراضية:</span>
+              <input 
+                type="number" 
+                min={1}
+                value={maxFamilyCapacity} 
+                onChange={e => setMaxFamilyCapacity(Math.max(1, parseInt(e.target.value) || 5))} 
+                className="w-12 text-center border border-gray-200 rounded px-1.5 py-0.5 text-xs font-bold text-gold-600 focus:outline-none focus:border-gold-500"
+              />
+            </div>
             <button onClick={() => setShowRoomForm(!showRoomForm)} className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1">
               <Plus size={14} /> إضافة غرفة
             </button>
-          </h4>
+          </div>
           
           {showRoomForm && (
             <div className="bg-gray-50 p-4 rounded-xl space-y-3 mb-4">
@@ -308,23 +386,18 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                   ) : (
                     <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
                       <option value="عائلة - مفتوح">قبول أي عدد عادي</option>
-                      <option value="عائلة - 1">شخص واحد</option>
-                      <option value="عائلة - 2">شخصين (2)</option>
-                      <option value="عائلة - 3">3 أشخاص</option>
-                      <option value="عائلة - 4">4 أشخاص</option>
-                      <option value="عائلة - 5">5 أشخاص</option>
-                      <option value="عائلة - 6">6 أشخاص</option>
-                      <option value="عائلة - 7">7 أشخاص</option>
-                      <option value="عائلة - 8">8 أشخاص</option>
-                      <option value="عائلة - 9">9 أشخاص</option>
-                      <option value="عائلة - 10">10 أشخاص</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, maxFamilyCapacity].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b).map(num => (
+                        <option key={num} value={`عائلة - ${num}`}>
+                          {num} {num === 1 ? 'شخص واحد' : num === 2 ? 'شخصين' : `${num} أشخاص`} {num === maxFamilyCapacity ? '(السعة الافتراضية)' : ''}
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={roomForm.is_family} onChange={e => setRoomForm({...roomForm, is_family: e.target.checked, gender: e.target.checked ? 'عائلة' : 'رجال', room_type: e.target.checked ? 'عائلة - مفتوح' : 'ثنائي'})} className="rounded text-gold-500 focus:ring-gold-500" />
+                  <input type="checkbox" checked={roomForm.is_family} onChange={e => setRoomForm({...roomForm, is_family: e.target.checked, gender: e.target.checked ? 'عائلة' : 'رجال', room_type: e.target.checked ? `عائلة - ${maxFamilyCapacity}` : 'ثنائي'})} className="rounded text-gold-500 focus:ring-gold-500" />
                   غرفة عائلية؟
                 </label>
               </div>
@@ -396,9 +469,15 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                   <tr key={m.id} className="hover:bg-gray-50/50">
                     <td className="px-5 py-3 font-semibold text-navy-900">{m.customers.name}</td>
                     <td className="px-5 py-3">
-                      <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {m.rooming_type || 'غير محدد'}
-                      </span>
+                      {m.rooming_type === 'عائلة - رئيس' ? (
+                        <span className="badge bg-amber-100 text-amber-800 border border-amber-200 font-bold flex items-center gap-1 w-fit">
+                          👑 رئيس العائلة
+                        </span>
+                      ) : (
+                        <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {m.rooming_type || 'غير محدد'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-gray-600">{fam ? fam.family_name : '—'}</td>
                     <td className="px-5 py-3 text-gray-600">
@@ -448,12 +527,23 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
               </div>
 
               {assignForm.rooming_type === 'عائلة' ? (
-                <div>
-                  <label className="form-label text-xs">العائلة</label>
-                  <select value={assignForm.family_id} onChange={e => setAssignForm({...assignForm, family_id: e.target.value})} className="form-input text-sm">
-                    <option value="">-- اختر العائلة --</option>
-                    {families.map(f => <option key={f.id} value={f.id}>{f.family_name}</option>)}
-                  </select>
+                <div className="space-y-3">
+                  <div>
+                    <label className="form-label text-xs">العائلة</label>
+                    <select value={assignForm.family_id} onChange={e => setAssignForm({...assignForm, family_id: e.target.value})} className="form-input text-sm">
+                      <option value="">-- اختر العائلة --</option>
+                      {families.map(f => <option key={f.id} value={f.id}>{f.family_name}</option>)}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-navy-800 cursor-pointer pt-1">
+                    <input 
+                      type="checkbox" 
+                      checked={assignForm.is_head} 
+                      onChange={e => setAssignForm({...assignForm, is_head: e.target.checked})} 
+                      className="rounded text-gold-500 focus:ring-gold-500 w-4 h-4" 
+                    />
+                    <span className="font-semibold">👑 تعيين كأب / رئيس للعائلة</span>
+                  </label>
                 </div>
               ) : (
                 <div>
@@ -468,13 +558,24 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
               <div>
                 <label className="form-label text-xs">الغرفة (اختياري)</label>
                 <select value={assignForm.room_id} onChange={e => setAssignForm({...assignForm, room_id: e.target.value})} className="form-input text-sm">
-                  <option value="">-- غير مسكن --</option>
-                  {rooms.map(r => (
+                  <option value="">-- غير مسكن (تسكين تلقائي) --</option>
+                  {rooms.filter(r => {
+                    if (assignForm.rooming_type === 'عائلة') {
+                      return r.is_family && r.family_id === assignForm.family_id;
+                    }
+                    return !r.is_family && (r.gender === (assignForm.gender === 'ذكر' ? 'رجال' : 'نساء'));
+                  }).map(r => (
                     <option key={r.id} value={r.id}>
                       {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({r.is_family ? 'عائلية' : r.gender})
                     </option>
                   ))}
                 </select>
+                {assignForm.rooming_type === 'عائلة' && !assignForm.family_id && (
+                  <p className="text-[10px] text-gray-400 mt-1">💡 يرجى اختيار العائلة أولاً لرؤية غرفها.</p>
+                )}
+                {assignForm.rooming_type === 'عائلة' && assignForm.family_id && rooms.filter(r => r.is_family && r.family_id === assignForm.family_id).length === 0 && (
+                  <p className="text-[10px] text-red-500 mt-1">⚠️ لا توجد غرف لهذه العائلة. يرجى إنشاء غرفة عائلية وربطها بهذه العائلة.</p>
+                )}
               </div>
 
             </div>
