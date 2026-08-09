@@ -30,7 +30,7 @@ const statusConfig: Record<DocStatus, { label: string; class: string; icon: type
   'مرفوض': { label: 'مرفوض', class: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-export default function DocumentsSection({ customerId, bookingId, customerName }: Props) {
+export default function DocumentsSection({ customerId, bookingId, customerName, onDocsChange }: Props) {
   const { profile, can } = useAuth();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
