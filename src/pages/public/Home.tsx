@@ -446,7 +446,11 @@ export default function Home({ onNavigate }: Props) {
                       <div className="mt-4 rounded-[16px] border border-[#0B1F44]/10 bg-[#F8F9FB] p-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#0B1F44]/45">ابتداءً من</p>
                         <p className="mt-1 text-xl font-black text-[#D4A017]">
-                          {Number(p.price).toLocaleString('ar-EG')}
+                          {Number((() => {
+                            if (Number(p.price) > 0) return Number(p.price);
+                            const roomPrices = [p.price_double, p.price_triple, p.price_quad].filter(x => Number(x) > 0);
+                            return roomPrices.length > 0 ? Math.min(...roomPrices) : 0;
+                          })()).toLocaleString('ar-EG')}
                           <span className="ml-1 text-sm font-semibold text-[#0B1F44]/75">ج.م</span>
                         </p>
                       </div>

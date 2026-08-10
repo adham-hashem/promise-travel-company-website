@@ -164,12 +164,52 @@ export default function PackageDetailsPage({ packageId, onNavigate }: Props) {
           {/* Right Column: Pricing & Booking Sidebar */}
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-lg sticky top-24">
-              <div className="text-center pb-5 border-b border-gray-100">
-                <span className="text-xs text-gray-400 font-medium">سعر الفرد يبدأ من</span>
-                <div className="text-3xl font-black text-[#D4A017] mt-1.5">
-                  {Number(pkg.price).toLocaleString('ar-EG')}
-                  <span className="text-sm font-semibold text-[#0B1F44] mr-1.5">ج.م</span>
+              <div className="pb-5 border-b border-gray-100 space-y-4">
+                <div className="text-center">
+                  <span className="text-xs text-gray-400 font-medium">السعر الأساسي للفرد</span>
+                  <div className="text-2xl font-black text-[#D4A017] mt-1">
+                    {Number(pkg.price).toLocaleString('ar-EG')}
+                    <span className="text-xs font-semibold text-[#0B1F44] mr-1">ج.م</span>
+                  </div>
                 </div>
+
+                <div className="bg-navy-50/50 rounded-2xl p-3.5 border border-navy-100/50 space-y-2">
+                  <p className="text-xs font-bold text-[#0B1F44] border-b border-navy-100 pb-1.5">أسعار الغرف المتاحة للفرد:</p>
+                  <div className="space-y-1.5 text-xs text-right">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">غرفة ثنائية:</span>
+                      <span className="font-bold text-[#0B1F44]">{Number(pkg.price_double || pkg.price).toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">غرفة ثلاثية:</span>
+                      <span className="font-bold text-[#0B1F44]">{Number(pkg.price_triple || pkg.price).toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">غرفة رباعية:</span>
+                      <span className="font-bold text-[#0B1F44]">{Number(pkg.price_quad || pkg.price).toLocaleString('ar-EG')} ج.م</span>
+                    </div>
+                  </div>
+                </div>
+
+                {(pkg.price_child > 0 || pkg.price_infant > 0) && (
+                  <div className="bg-gold-50/40 rounded-2xl p-3.5 border border-gold-100/50 space-y-2">
+                    <p className="text-xs font-bold text-[#b45309] border-b border-gold-100/50 pb-1.5">أسعار الفئات العمرية:</p>
+                    <div className="space-y-1.5 text-xs text-right">
+                      {pkg.price_child > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-amber-800">سعر الطفل (Child):</span>
+                          <span className="font-bold text-amber-900">{Number(pkg.price_child).toLocaleString('ar-EG')} ج.م</span>
+                        </div>
+                      )}
+                      {pkg.price_infant > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-amber-800">سعر الرضيع (Infant):</span>
+                          <span className="font-bold text-amber-900">{Number(pkg.price_infant).toLocaleString('ar-EG')} ج.م</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="py-5 space-y-4">
