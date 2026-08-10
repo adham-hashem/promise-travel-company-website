@@ -350,17 +350,33 @@ function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAcc
   const [targetEmpId, setTargetEmpId] = useState('');
   const [notes, setNotes] = useState('');
   const [transferring, setTransferring] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<{ id: string; name: string; client_code?: string }[]>([]);
+  const [accountMethod, setAccountMethod] = useState<'independent' | 'linked'>('independent');
+  const [parentCustomerId, setParentCustomerId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
-      const accList = (data || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
+      const { data: empData } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
+      const accList = (empData || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
       setAccountsEmployees(accList.map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` })));
+
+      const { data: custData } = await supabase.from('customers').select('id, name, client_code').order('name');
+      setAllCustomers(custData || []);
     })();
   }, []);
 
   const handleTransfer = async () => {
+    if (accountMethod === 'linked' && !parentCustomerId) {
+      alert('⚠️ يرجى اختيار العميل صاحب الحساب الرئيسي أولاً.');
+      return;
+    }
     setTransferring(true);
+
+    const parentId = accountMethod === 'linked' ? parentCustomerId : null;
+    await supabase.from('customers').update({ parent_customer_id: parentId }).eq('id', customer.id);
+
     const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
     const payload = {
       customer_id: customer.id,
@@ -399,6 +415,12 @@ function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAcc
     onTransferred();
   };
 
+  const filteredCustomers = allCustomers.filter(c => 
+    c.id !== customer.id &&
+    (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+     (c.client_code && c.client_code.toLowerCase().includes(searchQuery.toLowerCase())))
+  ).slice(0, 10);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
@@ -426,6 +448,77 @@ function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAcc
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="form-label font-bold text-navy-900 text-xs">طريقة الحساب المالي:</label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setAccountMethod('independent')}
+                className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
+                  accountMethod === 'independent'
+                    ? 'border-gold-500 bg-gold-50 text-navy-900'
+                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                }`}
+              >
+                حساب مستقل
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountMethod('linked')}
+                className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
+                  accountMethod === 'linked'
+                    ? 'border-gold-500 bg-gold-50 text-navy-900'
+                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                }`}
+              >
+                ربط الحساب بعميل آخر
+              </button>
+            </div>
+          </div>
+
+          {accountMethod === 'linked' && (
+            <div className="relative">
+              <label className="form-label font-bold text-navy-900 text-xs">ابحث عن العميل صاحب الحساب الرئيسي:</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                className="form-input text-xs"
+                placeholder="ابحث بالاسم أو كود العميل..."
+              />
+              {showDropdown && searchQuery && (
+                <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-lg max-h-48 overflow-y-auto">
+                  {filteredCustomers.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setParentCustomerId(c.id);
+                        setSearchQuery(`${c.name} (${c.client_code || '—'})`);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-right px-4 py-2 hover:bg-gray-50 text-xs text-navy-900 font-semibold border-b border-gray-50 last:border-b-0"
+                    >
+                      {c.name} {c.client_code ? `(${c.client_code})` : ''}
+                    </button>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <p className="p-3 text-xs text-gray-400 text-center">لا توجد نتائج مطابقة</p>
+                  )}
+                </div>
+              )}
+              {parentCustomerId && !showDropdown && (
+                <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                  ✔ تم الاختيار بنجاح
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للحسابات:</label>

@@ -95,6 +95,8 @@ export default function AddCustomer({ onNavigate }: Props) {
     city: '', country: 'مصر',
     hotel_makkah: '', hotel_madinah: '',
     room_type_makkah: '', room_type_madinah: '',
+    client_type: 'فردي' as 'فردي' | 'فوج',
+    age_group: 'بالغ' as 'بالغ' | 'طفل' | 'رضيع',
   });
 
   const [docUploads, setDocUploads] = useState<Record<string, DocUpload>>(
@@ -112,6 +114,23 @@ export default function AddCustomer({ onNavigate }: Props) {
   }, []);
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
+
+  const calculateAgeGroup = (birthDateStr: string): 'بالغ' | 'طفل' | 'رضيع' => {
+    if (!birthDateStr) return 'بالغ';
+    const birthDate = new Date(birthDateStr);
+    if (isNaN(birthDate.getTime())) return 'بالغ';
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    if (age < 2) return 'رضيع';
+    if (age <= 12) return 'طفل';
+    return 'بالغ';
+  };
 
   const handleFileSelect = (docType: string, file: File | null) => {
     setDocUploads({
@@ -182,6 +201,8 @@ export default function AddCustomer({ onNavigate }: Props) {
           room_type_makkah: form.room_type_makkah || null,
           room_type_madinah: form.room_type_madinah || null,
           is_vip: isVip,
+          client_type: form.client_type,
+          age_group: form.age_group,
         })
         .select('id, client_code')
         .single();
@@ -382,6 +403,21 @@ export default function AddCustomer({ onNavigate }: Props) {
                 <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
                 <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} className="form-input pr-9" placeholder="example@email.com" dir="ltr" />
               </div>
+            </div>
+            <div>
+              <label className="form-label">نوع العميل</label>
+              <select value={form.client_type} onChange={(e) => update('client_type', e.target.value)} className="form-input">
+                <option value="فردي">عميل فردي (Individual)</option>
+                <option value="فوج">عميل فوج (Group)</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">الفئة العمرية</label>
+              <select value={form.age_group} onChange={(e) => update('age_group', e.target.value as any)} className="form-input">
+                <option value="بالغ">بالغ (Adult)</option>
+                <option value="طفل">طفل (Child)</option>
+                <option value="رضيع">رضيع (Infant)</option>
+              </select>
             </div>
           </div>
 
@@ -589,7 +625,17 @@ export default function AddCustomer({ onNavigate }: Props) {
               <label className="form-label">تاريخ الميلاد</label>
               <div className="relative">
                 <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                <input type="date" value={form.birth_date} onChange={(e) => update('birth_date', e.target.value)} className="form-input pr-9" dir="ltr" />
+                <input
+                  type="date"
+                  value={form.birth_date}
+                  onChange={(e) => {
+                    const dateVal = e.target.value;
+                    const calculated = calculateAgeGroup(dateVal);
+                    setForm(prev => ({ ...prev, birth_date: dateVal, age_group: calculated }));
+                  }}
+                  className="form-input pr-9"
+                  dir="ltr"
+                />
               </div>
             </div>
             <div>

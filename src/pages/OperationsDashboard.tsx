@@ -247,7 +247,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     const empMap: Record<string, { id: string; name: string }> = {};
     (empData || []).forEach((e: any) => { empMap[e.id] = e; });
 
-    const rows = ((data as unknown as any[]) || []).map((r: any) => {
+    const rows = ((data as unknown as any[]) || [])
+      .filter((r: any) => r.customer?.client_type !== 'فوج')
+      .map((r: any) => {
       let packageName = '-';
       if (r.booking?.package?.name) {
         packageName = r.booking.package.name;

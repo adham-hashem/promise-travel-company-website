@@ -31,6 +31,34 @@ interface PayRow extends Payment {
   payment_proofs?: PaymentProof[];
 }
 
+const calculateCustomerPackagePrice = (cust: any, pkg: any) => {
+  if (!pkg) return 0;
+  let price = Number(pkg.price || 0);
+  const roomType = (cust?.room_type_makkah || cust?.room_type_madinah || 'ثنائي').toLowerCase();
+  
+  let selectedRoomPrice = 0;
+  if (roomType.includes('ثنائ') || roomType.includes('double')) {
+    selectedRoomPrice = Number(pkg.price_double || 0);
+  } else if (roomType.includes('ثلاث') || roomType.includes('triple')) {
+    selectedRoomPrice = Number(pkg.price_triple || 0);
+  } else if (roomType.includes('رباع') || roomType.includes('quad')) {
+    selectedRoomPrice = Number(pkg.price_quad || 0);
+  }
+  
+  if (selectedRoomPrice > 0) {
+    price = selectedRoomPrice;
+  }
+  
+  const ageGroup = cust?.age_group || 'بالغ';
+  if (ageGroup === 'طفل' && pkg.price_child > 0) {
+    price = Number(pkg.price_child);
+  } else if (ageGroup === 'رضيع' && pkg.price_infant > 0) {
+    price = Number(pkg.price_infant);
+  }
+  
+  return price;
+};
+
 export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
@@ -105,7 +133,8 @@ export default function Payments() {
     const customerPayments = payments.filter(p => p.customer_id === form.customer_id && p.id !== editId && p.approval_status !== 'مرفوض');
     const totalPaid = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const pkg = packages.find(p => p.id === form.package_id);
-    const pkgPrice = pkg ? Number(pkg.price || 0) : 0;
+    const cust = customersList.find(c => c.id === form.customer_id);
+    const pkgPrice = pkg ? calculateCustomerPackagePrice(cust, pkg) : 0;
     const currentAmt = parseFloat(form.amount) || 0;
     
     if (pkgPrice > 0) {
@@ -129,7 +158,7 @@ export default function Payments() {
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
       supabase.from('packages').select('*').eq('is_active', true).order('name', { ascending: true }),
-      supabase.from('customers').select('id, name').order('name', { ascending: true }),
+      supabase.from('customers').select('id, name, age_group, room_type_makkah, room_type_madinah, requested_package_id').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
@@ -503,7 +532,9 @@ export default function Payments() {
               // Compute payment totals from linked payments
               const filePayments: any[] = file.payments || [];
               const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-              const packagePrice = Number(file.customer?.packages?.price || 0);
+              const packagePrice = file.customer?.packages 
+                ? calculateCustomerPackagePrice(file.customer, file.customer.packages) 
+                : 0;
               const bookingTotal = Number(file.booking?.total_amount || 0) || packagePrice;
               const paidPct = bookingTotal > 0 ? Math.min(100, Math.round((totalPaid / bookingTotal) * 100)) : 0;
 

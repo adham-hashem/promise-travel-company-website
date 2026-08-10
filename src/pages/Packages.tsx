@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { Package } from '../types';
 import { compressImage } from '../lib/imageCompressor';
 
-const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', image_url: '', description: '', featured: false };
+const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', price_double: '', price_triple: '', price_quad: '', price_child: '', price_infant: '', image_url: '', description: '', featured: false };
 
 export default function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -25,15 +25,65 @@ export default function Packages() {
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (p: Package) => {
-    setForm({ name: p.name, type: p.type, hotel: p.hotel || '', hotel_makkah: p.hotel_makkah || '', hotel_madinah: p.hotel_madinah || '', airline: p.airline || '', duration_days: String(p.duration_days || ''), price: String(p.price), image_url: p.image_url || '', description: p.description || '', featured: p.featured || false });
+    setForm({
+      name: p.name,
+      type: p.type,
+      hotel: p.hotel || '',
+      hotel_makkah: p.hotel_makkah || '',
+      hotel_madinah: p.hotel_madinah || '',
+      airline: p.airline || '',
+      duration_days: String(p.duration_days || ''),
+      price: String(p.price),
+      price_double: String(p.price_double || ''),
+      price_triple: String(p.price_triple || ''),
+      price_quad: String(p.price_quad || ''),
+      price_child: String(p.price_child || ''),
+      price_infant: String(p.price_infant || ''),
+      image_url: p.image_url || '',
+      description: p.description || '',
+      featured: p.featured || false
+    });
     setEditId(p.id); setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!form.name || !form.price) return;
     setSaving(true);
-    const payload = { name: form.name, type: form.type, hotel: form.hotel || undefined, hotel_makkah: form.hotel_makkah || undefined, hotel_madinah: form.hotel_madinah || undefined, airline: form.airline || undefined, duration_days: form.duration_days ? parseInt(form.duration_days) : undefined, price: parseFloat(form.price), image_url: form.image_url || undefined, description: form.description || undefined, featured: form.featured };
-    const dbPayload = { name: form.name, type: form.type, hotel: form.hotel || null, hotel_makkah: form.hotel_makkah || null, hotel_madinah: form.hotel_madinah || null, airline: form.airline || null, duration_days: form.duration_days ? parseInt(form.duration_days) : null, price: parseFloat(form.price), image_url: form.image_url || null, description: form.description || null, featured: form.featured };
+    const parsedPrices = {
+      price_double: parseFloat(form.price_double) || 0,
+      price_triple: parseFloat(form.price_triple) || 0,
+      price_quad: parseFloat(form.price_quad) || 0,
+      price_child: parseFloat(form.price_child) || 0,
+      price_infant: parseFloat(form.price_infant) || 0,
+    };
+    const payload = {
+      name: form.name,
+      type: form.type,
+      hotel: form.hotel || undefined,
+      hotel_makkah: form.hotel_makkah || undefined,
+      hotel_madinah: form.hotel_madinah || undefined,
+      airline: form.airline || undefined,
+      duration_days: form.duration_days ? parseInt(form.duration_days) : undefined,
+      price: parseFloat(form.price),
+      ...parsedPrices,
+      image_url: form.image_url || undefined,
+      description: form.description || undefined,
+      featured: form.featured
+    };
+    const dbPayload = {
+      name: form.name,
+      type: form.type,
+      hotel: form.hotel || null,
+      hotel_makkah: form.hotel_makkah || null,
+      hotel_madinah: form.hotel_madinah || null,
+      airline: form.airline || null,
+      duration_days: form.duration_days ? parseInt(form.duration_days) : null,
+      price: parseFloat(form.price),
+      ...parsedPrices,
+      image_url: form.image_url || null,
+      description: form.description || null,
+      featured: form.featured
+    };
     if (editId) {
       await supabase.from('packages').update(dbPayload).eq('id', editId);
       setPackages(packages.map(p => p.id === editId ? { ...p, ...payload } : p));
@@ -197,8 +247,38 @@ export default function Packages() {
                   <input value={form.airline} onChange={(e) => setForm({ ...form, airline: e.target.value })} className="form-input" placeholder="مثال: مصر للطيران" />
                 </div>
                 <div className="col-span-2">
-                  <label className="form-label">السعر (ج.م) <span className="text-red-500">*</span></label>
+                  <label className="form-label">السعر الأساسي للفرد (ج.م) <span className="text-red-500">*</span></label>
                   <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="form-input" placeholder="18000" />
+                </div>
+                <div className="col-span-2">
+                  <label className="form-label font-bold text-navy-800 text-xs">تفاصيل أسعار الغرف (ج.م):</label>
+                  <div className="grid grid-cols-3 gap-3 p-3 bg-navy-50 rounded-xl border border-navy-100 mt-1">
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة ثنائية</label>
+                      <input type="number" value={form.price_double} onChange={(e) => setForm({ ...form, price_double: e.target.value })} className="form-input text-xs" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة ثلاثية</label>
+                      <input type="number" value={form.price_triple} onChange={(e) => setForm({ ...form, price_triple: e.target.value })} className="form-input text-xs" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة رباعية</label>
+                      <input type="number" value={form.price_quad} onChange={(e) => setForm({ ...form, price_quad: e.target.value })} className="form-input text-xs" placeholder="0" />
+                    </div>
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <label className="form-label font-bold text-navy-800 text-xs">تفاصيل أسعار الفئات العمرية (ج.م):</label>
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-gold-50/50 rounded-xl border border-gold-100 mt-1">
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">سعر الطفل (Child)</label>
+                      <input type="number" value={form.price_child} onChange={(e) => setForm({ ...form, price_child: e.target.value })} className="form-input text-xs" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">سعر الرضيع (Infant)</label>
+                      <input type="number" value={form.price_infant} onChange={(e) => setForm({ ...form, price_infant: e.target.value })} className="form-input text-xs" placeholder="0" />
+                    </div>
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <label className="form-label">صورة الباقة (للموقع)</label>

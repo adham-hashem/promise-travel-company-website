@@ -38,6 +38,10 @@ export default function BookingPage({ preset, onDone }: Props) {
     travelers: '1',
     travel_date: '',
     notes: '',
+    room_type: 'ثنائي' as 'ثنائي' | 'ثلاثي' | 'رباعي',
+    num_adults: '1',
+    num_children: '0',
+    num_infants: '0',
   });
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({
     'جواز سفر': null, 'بطاقة رقم قومي': null, 'صورة شخصية': null,
@@ -188,7 +192,23 @@ export default function BookingPage({ preset, onDone }: Props) {
       } else if (form.package_id) {
         bookingData.package_id = form.package_id;
         const pkg = packages?.find((p) => p.id === form.package_id);
-        if (pkg) bookingData.total_amount = Number(pkg.price) * (Number(form.travelers) || 1);
+        if (pkg) {
+          let roomRate = Number(pkg.price);
+          if (form.room_type === 'ثنائي' && pkg.price_double) roomRate = Number(pkg.price_double);
+          else if (form.room_type === 'ثلاثي' && pkg.price_triple) roomRate = Number(pkg.price_triple);
+          else if (form.room_type === 'رباعي' && pkg.price_quad) roomRate = Number(pkg.price_quad);
+
+          const adultsVal = Number(form.num_adults) || 0;
+          const childrenVal = Number(form.num_children) || 0;
+          const infantsVal = Number(form.num_infants) || 0;
+
+          const childRate = pkg.price_child ? Number(pkg.price_child) : roomRate;
+          const infantRate = pkg.price_infant ? Number(pkg.price_infant) : roomRate;
+
+          const total = (roomRate * adultsVal) + (childRate * childrenVal) + (infantRate * infantsVal);
+          bookingData.total_amount = total;
+          bookingData.notes = `تفاصيل السكن: غرفة ${form.room_type} — الأفراد: ${adultsVal} بالغ، ${childrenVal} طفل، ${infantsVal} رضيع — ${bookingNotes}`;
+        }
       }
 
       const { data: booking, error: bkErr } = await supabase
@@ -418,13 +438,84 @@ export default function BookingPage({ preset, onDone }: Props) {
                 </div>
               </div>
 
+              {/* Room type and Age splits for Packages */}
+              {(form.service_type === 'حج' || form.service_type === 'عمرة') && form.package_id && (
+                <div className="p-4 bg-navy-50/50 rounded-2xl border border-navy-100/80 space-y-3">
+                  <p className="text-xs font-bold text-navy-900 border-b border-navy-100 pb-2">تفاصيل الغرفة وتوزيع المسافرين:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">نوع الغرفة</label>
+                      <select
+                        value={form.room_type}
+                        onChange={(e) => setForm({ ...form, room_type: e.target.value as any })}
+                        className="form-input text-xs"
+                      >
+                        <option value="ثنائي">ثنائي (Double)</option>
+                        <option value="ثلاثي">ثلاثي (Triple)</option>
+                        <option value="رباعي">رباعي (Quad)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد البالغين</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.num_adults}
+                        onChange={(e) => {
+                          const adults = e.target.value;
+                          const total = Number(adults) + Number(form.num_children) + Number(form.num_infants);
+                          setForm({ ...form, num_adults: adults, travelers: String(total) });
+                        }}
+                        className="form-input text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد الأطفال (2-12 سنة)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.num_children}
+                        onChange={(e) => {
+                          const kids = e.target.value;
+                          const total = Number(form.num_adults) + Number(kids) + Number(form.num_infants);
+                          setForm({ ...form, num_children: kids, travelers: String(total) });
+                        }}
+                        className="form-input text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد الرضع (أقل من سنتين)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.num_infants}
+                        onChange={(e) => {
+                          const infants = e.target.value;
+                          const total = Number(form.num_adults) + Number(form.num_children) + Number(infants);
+                          setForm({ ...form, num_infants: infants, travelers: String(total) });
+                        }}
+                        className="form-input text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Travelers + Travel date */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">عدد الأفراد</label>
+                  <label className="form-label">إجمالي عدد الأفراد</label>
                   <div className="relative">
                     <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input !pr-12" placeholder="1" />
+                    <input
+                      type="number"
+                      min="1"
+                      disabled={form.service_type === 'حج' || form.service_type === 'عمرة'}
+                      value={form.travelers}
+                      onChange={(e) => setForm({ ...form, travelers: e.target.value })}
+                      className="form-input !pr-12 disabled:bg-gray-50 disabled:text-gray-500"
+                      placeholder="1"
+                    />
                   </div>
                 </div>
                 <div>

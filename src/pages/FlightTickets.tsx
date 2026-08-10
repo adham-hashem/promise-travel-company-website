@@ -84,7 +84,7 @@ export default function FlightTickets({ onNavigate }: Props) {
         booking:bookings(*, package:packages(*)),
         hotel:hotels(*)
       `).in('workflow_stage', ['flight', 'ready', 'completed']).order('created_at', { ascending: false }),
-      supabase.from('customers').select('id, name, client_code, service_type').order('name', { ascending: true }),
+      supabase.from('customers').select('id, name, client_code, service_type, client_type').order('name', { ascending: true }),
     ]);
 
     if (opsRes.error) {
@@ -92,14 +92,14 @@ export default function FlightTickets({ onNavigate }: Props) {
     }
 
     const fetchedTickets = (ticketRes.data as FlightTicket[]) || [];
-    setTickets(fetchedTickets.filter(t => t.customers?.service_type !== 'سياحة داخلية'));
+    setTickets(fetchedTickets.filter(t => t.customers?.service_type !== 'سياحة داخلية' && t.customers?.client_type !== 'فوج'));
 
     setAllCustomers((custRes.data || [])
-      .filter((c: any) => c.service_type !== 'سياحة داخلية')
+      .filter((c: any) => c.service_type !== 'سياحة داخلية' && c.client_type !== 'فوج')
       .map((c: any) => ({ id: c.id, name: c.name || '—', client_code: c.client_code || '' })));
 
     const opsData = (opsRes.data || [])
-      .filter((o: any) => o.customer?.service_type !== 'سياحة داخلية')
+      .filter((o: any) => o.customer?.service_type !== 'سياحة داخلية' && o.customer?.client_type !== 'فوج')
       .map((o: any) => ({
         customer_id: o.customer_id,
         customer_name: o.customer?.name || '—',

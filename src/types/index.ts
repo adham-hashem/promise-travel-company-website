@@ -123,6 +123,11 @@ export interface Package {
   airline?: string;
   duration_days?: number;
   price: number;
+  price_double?: number;
+  price_triple?: number;
+  price_quad?: number;
+  price_child?: number;
+  price_infant?: number;
   cost_price?: number;
   is_active: boolean;
   image_url?: string;
@@ -186,6 +191,9 @@ export interface Customer {
   packages?: Package;
   employees?: Employee;
   is_vip?: boolean;
+  client_type?: 'فردي' | 'فوج';
+  parent_customer_id?: string;
+  age_group?: 'بالغ' | 'طفل' | 'رضيع';
 }
 
 export interface VipRequest {

@@ -68,19 +68,109 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
   const [accountsTransferNotes, setAccountsTransferNotes] = useState('');
   const [transferringAccounts, setTransferringAccounts] = useState(false);
   const [accountsEmployees, setAccountsEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [allCustomers, setAllCustomers] = useState<{ id: string; name: string; client_code?: string }[]>([]);
+  const [accountMethod, setAccountMethod] = useState<'independent' | 'linked'>('independent');
+  const [parentCustomerId, setParentCustomerId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const [parentCustomer, setParentCustomer] = useState<{ id: string; name: string; client_code?: string } | null>(null);
+  const [children, setChildren] = useState<{ id: string; name: string; client_code?: string }[]>([]);
+  const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [editCustomerForm, setEditCustomerForm] = useState({
+    name: '',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    city: '',
+    birth_date: '',
+    age_group: 'بالغ' as 'بالغ' | 'طفل' | 'رضيع',
+    client_type: 'فردي' as 'فردي' | 'فوج',
+  });
+
+  const handleOpenEditModal = () => {
+    if (!customer) return;
+    setEditCustomerForm({
+      name: customer.name || '',
+      phone: customer.phone || '',
+      whatsapp: customer.whatsapp || '',
+      email: customer.email || '',
+      city: customer.city || '',
+      birth_date: customer.birth_date || '',
+      age_group: customer.age_group || 'بالغ',
+      client_type: customer.client_type || 'فردي',
+    });
+    setShowEditCustomerModal(true);
+  };
+
+  const handleEditBirthDateChange = (dateVal: string) => {
+    const calculated = calculateAgeGroup(dateVal);
+    setEditCustomerForm(prev => ({ ...prev, birth_date: dateVal, age_group: calculated }));
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!customer) return;
+    try {
+      const { error: saveErr } = await supabase.from('customers').update({
+        name: editCustomerForm.name,
+        phone: editCustomerForm.phone,
+        whatsapp: editCustomerForm.whatsapp || null,
+        email: editCustomerForm.email || null,
+        city: editCustomerForm.city || null,
+        birth_date: editCustomerForm.birth_date || null,
+        age_group: editCustomerForm.age_group,
+        client_type: editCustomerForm.client_type,
+      }).eq('id', customer.id);
+      if (saveErr) throw saveErr;
+      
+      alert('✔ تم حفظ التعديلات بنجاح.');
+      setShowEditCustomerModal(false);
+      const { data } = await supabase.from('customers').select('*, packages(*), employees(*)').eq('id', customer.id).maybeSingle();
+      if (data) setCustomer(data as Customer);
+    } catch (err: any) {
+      alert('❌ فشل حفظ التعديلات: ' + err.message);
+    }
+  };
+
+  const calculateAgeGroup = (birthDateStr: string): 'بالغ' | 'طفل' | 'رضيع' => {
+    if (!birthDateStr) return 'بالغ';
+    const birthDate = new Date(birthDateStr);
+    if (isNaN(birthDate.getTime())) return 'بالغ';
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    if (age < 2) return 'رضيع';
+    if (age <= 12) return 'طفل';
+    return 'بالغ';
+  };
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
       const accList = (data || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
       setAccountsEmployees(accList.map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` })));
+
+      const { data: custData } = await supabase.from('customers').select('id, name, client_code').order('name');
+      setAllCustomers(custData || []);
     })();
   }, []);
 
   const handleTransferToAccounts = async () => {
     if (!customer) return;
+    if (accountMethod === 'linked' && !parentCustomerId) {
+      alert('⚠️ يرجى اختيار العميل صاحب الحساب الرئيسي أولاً.');
+      return;
+    }
     setTransferringAccounts(true);
-    
+
+    const parentId = accountMethod === 'linked' ? parentCustomerId : null;
+    await supabase.from('customers').update({ parent_customer_id: parentId }).eq('id', customer.id);
+
     const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
     const payload = {
       customer_id: customer.id,
@@ -127,13 +217,43 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
         supabase.from('customers').select('*, packages(*), employees(*)').eq('id', customerId).maybeSingle(),
         supabase.from('communication_logs').select('*, employees(*)').eq('customer_id', customerId).order('created_at', { ascending: false }),
       ]);
-      setCustomer((custRes.data as Customer) || null);
+      const custData = custRes.data as Customer;
+      setCustomer(custData || null);
       setLogs((logsRes.data as CommunicationLog[]) || []);
 
+      let financialIds = [customerId];
+      if (custData) {
+        if (custData.parent_customer_id) {
+          const { data: parentData } = await supabase
+            .from('customers')
+            .select('id, name, client_code')
+            .eq('id', custData.parent_customer_id)
+            .maybeSingle();
+          setParentCustomer(parentData || null);
+          if (parentData) {
+            const { data: siblingData } = await supabase
+              .from('customers')
+              .select('id, name, client_code')
+              .eq('parent_customer_id', parentData.id);
+            const sList = siblingData || [];
+            financialIds = [parentData.id, ...sList.map(c => c.id)];
+          }
+        } else {
+          setParentCustomer(null);
+          const { data: childrenData } = await supabase
+            .from('customers')
+            .select('id, name, client_code')
+            .eq('parent_customer_id', customerId);
+          const cList = childrenData || [];
+          setChildren(cList);
+          financialIds = [customerId, ...cList.map(c => c.id)];
+        }
+      }
+
       const [bkRes, invRes, payRes, opsRes, docsRes, tlRes] = await Promise.all([
-        supabase.from('bookings').select('*, packages(*), employees(*)').eq('customer_id', customerId).order('created_at', { ascending: false }),
-        supabase.from('invoices').select('*, hotels(*)').eq('customer_id', customerId).order('created_at', { ascending: false }),
-        supabase.from('payments').select('*').eq('customer_id', customerId).order('payment_date', { ascending: false }),
+        supabase.from('bookings').select('*, packages(*), employees(*)').in('customer_id', financialIds).order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*, hotels(*)').in('customer_id', financialIds).order('created_at', { ascending: false }),
+        supabase.from('payments').select('*').in('customer_id', financialIds).order('payment_date', { ascending: false }),
         supabase.from('operation_files').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }),
         supabase.from('documents').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }),
         supabase.from('customer_timeline').select('*').eq('customer_id', customerId).order('created_at', { ascending: false }),
@@ -189,7 +309,196 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
     }
     setNewLog({ type: 'مكالمة', result: '', notes: '', agreed_on: '', next_follow_up: '' });
     setShowAddLog(false);
-    setSaving(false);
+  };
+
+  const filteredCustomers = allCustomers.filter(c => 
+    customer && c.id !== customer.id &&
+    (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+     (c.client_code && c.client_code.toLowerCase().includes(searchQuery.toLowerCase())))
+  ).slice(0, 10);
+
+  const getItemOwner = (itemCustomerId?: string) => {
+    if (!itemCustomerId || !customer || itemCustomerId === customer.id) return '';
+    if (parentCustomer && parentCustomer.id === itemCustomerId) {
+      return ` (${parentCustomer.name})`;
+    }
+    const child = children.find(c => c.id === itemCustomerId);
+    if (child) {
+      return ` (${child.name})`;
+    }
+    return '';
+  };
+
+  const printAccountStatement = () => {
+    if (!customer) return;
+
+    const ledger: Array<{
+      date: string;
+      desc: string;
+      debit: number;
+      credit: number;
+    }> = [];
+
+    bookings.forEach(b => {
+      ledger.push({
+        date: b.booking_date || b.created_at,
+        desc: `قيمة برنامج ${b.packages?.name ? `(${b.packages.name})` : ''}${b.customer_id !== customer.id ? ` - العميل: ${allCustomers.find(c => c.id === b.customer_id)?.name || 'تابع'}` : ''}`,
+        debit: b.total_amount || 0,
+        credit: 0
+      });
+    });
+
+    payments.forEach(p => {
+      ledger.push({
+        date: p.payment_date,
+        desc: `دفعة ${p.payment_method}${p.transaction_number ? ` (رقم: ${p.transaction_number})` : ''}${p.customer_id !== customer.id ? ` - العميل: ${allCustomers.find(c => c.id === p.customer_id)?.name || 'تابع'}` : ''}`,
+        debit: 0,
+        credit: p.amount || 0
+      });
+    });
+
+    ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let runningBalance = 0;
+    const ledgerWithBalances = ledger.map(item => {
+      runningBalance += (item.debit - item.credit);
+      return {
+        ...item,
+        balance: runningBalance
+      };
+    });
+
+    const totalDebit = ledger.reduce((s, x) => s + x.debit, 0);
+    const totalCredit = ledger.reduce((s, x) => s + x.credit, 0);
+    const currentBalance = totalDebit - totalCredit;
+
+    const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>كشف حساب مالي - ${customer.name}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
+  .header { border-bottom: 2px solid #0c224f; padding-bottom: 15px; margin-bottom: 20px; }
+  h1 { font-size: 22px; color: #0c224f; margin: 0 0 5px 0; font-weight: 900; }
+  .company-info { font-size: 12px; color: #666; }
+  .statement-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; color: #854d0e; }
+  .client-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
+  .client-details table { width: 100%; border: none; }
+  .client-details td { border: none; padding: 4px 8px; font-size: 13px; }
+  .client-details td.label { font-weight: bold; color: #475569; width: 15%; }
+  table.ledger { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+  table.ledger th { background: #0c224f; color: white; padding: 10px; text-align: right; font-size: 12px; font-weight: bold; }
+  table.ledger td { padding: 10px; border: 1px solid #cbd5e1; font-size: 12px; }
+  .summary { float: left; width: 300px; background: #f8fafc; border: 2px solid #0c224f; border-radius: 8px; padding: 15px; }
+  .summary table { width: 100%; border-collapse: collapse; }
+  .summary td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
+  .summary tr:last-child td { border-bottom: none; font-weight: bold; font-size: 14px; color: #0c224f; }
+  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 15px; clear: both; }
+</style>
+</head>
+<body>
+<div class="header">
+  <table style="width: 100%; border: none;">
+    <tr style="border: none;">
+      <td style="border: none; padding: 0;">
+        <h1>شركة بروميس للسياحة والسفر</h1>
+        <span class="company-info">رقم السجل التجاري: 124578 | هاتف: +201012484971</span>
+      </td>
+      <td style="border: none; padding: 0; text-align: left;">
+        <span style="font-size: 11px; color: #64748b;">تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')}</span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="statement-title">كشف حساب مالي مجمع</div>
+
+<div class="client-details">
+  <table>
+    <tr>
+      <td class="label">اسم العميل:</td>
+      <td>${customer.name}</td>
+      <td class="label">كود العميل:</td>
+      <td>${customer.client_code || '—'}</td>
+    </tr>
+    <tr>
+      <td class="label">الهاتف:</td>
+      <td dir="ltr" style="text-align: right;">${customer.phone || '—'}</td>
+      <td class="label">الخدمة:</td>
+      <td>${customer.service_type || '—'}</td>
+    </tr>
+    ${parentCustomer ? `
+    <tr>
+      <td class="label">الحساب الرئيسي:</td>
+      <td colspan="3" style="color: #4f46e5; font-weight: bold;">${parentCustomer.name} (${parentCustomer.client_code || '—'})</td>
+    </tr>
+    ` : ''}
+    ${children.length > 0 ? `
+    <tr>
+      <td class="label">العملاء التابعين:</td>
+      <td colspan="3">${children.map(c => `${c.name} (${c.client_code || '—'})`).join(' ، ')}</td>
+    </tr>
+    ` : ''}
+  </table>
+</div>
+
+<table class="ledger">
+  <thead>
+    <tr>
+      <th style="width: 15%;">التاريخ</th>
+      <th style="width: 45%;">البيان</th>
+      <th style="width: 12%; text-align: left;">مدين (ج.م)</th>
+      <th style="width: 12%; text-align: left;">دائن (ج.م)</th>
+      <th style="width: 16%; text-align: left;">الرصيد التراكمي</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${ledgerWithBalances.map(item => `
+      <tr>
+        <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
+        <td>${item.desc}</td>
+        <td style="text-align: left; font-weight: ${item.debit > 0 ? 'bold' : 'normal'};">${item.debit > 0 ? item.debit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
+        <td style="text-align: left; font-weight: ${item.credit > 0 ? 'bold' : 'normal'};">${item.credit > 0 ? item.credit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
+        <td style="text-align: left; font-weight: bold; color: ${item.balance > 0 ? '#b91c1c' : '#15803d'};">
+          ${item.balance.toLocaleString('ar-EG')} ج.م
+        </td>
+      </tr>
+    `).join('')}
+  </tbody>
+</table>
+
+<div class="summary">
+  <table>
+    <tr>
+      <td>إجمالي المستحقات (مدين):</td>
+      <td style="text-align: left; font-weight: bold;">${totalDebit.toLocaleString('ar-EG')} ج.م</td>
+    </tr>
+    <tr>
+      <td>إجمالي المدفوعات (دائن):</td>
+      <td style="text-align: left; font-weight: bold; color: #16a34a;">${totalCredit.toLocaleString('ar-EG')} ج.م</td>
+    </tr>
+    <tr>
+      <td>الرصيد الحالي:</td>
+      <td style="text-align: left; font-weight: 900; color: ${currentBalance > 0 ? '#dc2626' : '#15803d'};">
+        ${currentBalance.toLocaleString('ar-EG')} ج.م
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="footer">
+  شيت مالي إلكتروني صادر عن نظام شركة بروميس للسياحة والسفر. لا يعتبر فاتورة رسمية بدون ختم وتوقيع الشركة الإداري.
+</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-navy-200 border-t-navy-700 rounded-full animate-spin" /></div>;
@@ -218,6 +527,42 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           <p className="section-subtitle">{customer.name}</p>
         </div>
       </div>
+
+      {parentCustomer && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-center justify-between text-xs shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-indigo-600 rounded-full animate-ping" />
+            <p className="font-semibold text-indigo-900">
+              🔗 الحساب المالي لهذا العميل مرتبط بالحساب الرئيسي: <span className="font-bold">{parentCustomer.name}</span> {parentCustomer.client_code ? `(كود: ${parentCustomer.client_code})` : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('customer-details', parentCustomer.id)}
+            className="text-indigo-700 hover:text-indigo-900 font-bold underline"
+          >
+            عرض ملف الحساب الرئيسي ➜
+          </button>
+        </div>
+      )}
+
+      {children.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-xs shadow-sm space-y-2">
+          <p className="font-semibold text-purple-900 flex items-center gap-1.5">
+            👥 الحسابات المالية التابعة المرتبطة بهذا الحساب الرئيسي ({children.length} عملاء):
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {children.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onNavigate('customer-details', c.id)}
+                className="badge bg-white border border-purple-200 text-purple-700 hover:bg-purple-100/50 flex items-center gap-1 font-semibold"
+              >
+                {c.name} {c.client_code ? `(${c.client_code})` : ''} ➜
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Left col */}
@@ -255,6 +600,9 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                 { icon: MapPin, label: 'المدينة', value: customer.city },
                 { icon: Package, label: 'الباقة', value: customer.packages?.name },
                 { icon: User, label: 'الموظف', value: customer.employees?.name },
+                { icon: User, label: 'نوع العميل', value: customer.client_type ? (customer.client_type === 'فوج' ? 'عميل فوج' : 'عميل فردي') : 'عميل فردي' },
+                { icon: Calendar, label: 'الفئة العمرية', value: customer.age_group || 'بالغ' },
+                { icon: Calendar, label: 'تاريخ الميلاد', value: customer.birth_date ? new Date(customer.birth_date).toLocaleDateString('ar-EG') : undefined },
               ].map((item, i) => item.value && (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg bg-navy-50 flex items-center justify-center flex-shrink-0">
@@ -266,6 +614,15 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="p-5 border-t border-gray-100">
+              <button
+                onClick={handleOpenEditModal}
+                className="w-full btn-outline text-xs py-2 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Edit2 size={12} /> تعديل البيانات الأساسية
+              </button>
             </div>
           </div>
 
@@ -449,16 +806,25 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           {/* Financial transactions */}
           {(payments.length > 0 || invoices.length > 0) && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h4 className="text-sm font-bold text-navy-800 mb-4 flex items-center gap-2">
-                <CreditCard size={16} className="text-gold-500" /> سجل المعاملات المالية
-              </h4>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-navy-800 flex items-center gap-2">
+                  <CreditCard size={16} className="text-gold-500" /> سجل المعاملات المالية
+                </h4>
+                <button
+                  onClick={printAccountStatement}
+                  className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1.5 shadow-sm"
+                >
+                  <FileText size={13} className="text-navy-600" />
+                  طباعة كشف الحساب
+                </button>
+              </div>
               <div className="space-y-2">
                 {payments.map((p) => (
                   <div key={p.id} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center"><CheckCircle2 size={14} className="text-emerald-600" /></div>
                       <div>
-                        <p className="text-sm font-semibold text-navy-900">دفعة — {p.payment_method}</p>
+                        <p className="text-sm font-semibold text-navy-900">دفعة — {p.payment_method}{getItemOwner(p.customer_id)}</p>
                         <p className="text-xs text-gray-500">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</p>
                       </div>
                     </div>
@@ -470,7 +836,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-navy-100 flex items-center justify-center"><FileText size={14} className="text-navy-600" /></div>
                       <div>
-                        <p className="text-sm font-mono font-semibold text-navy-700">{inv.invoice_number}</p>
+                        <p className="text-sm font-mono font-semibold text-navy-700">{inv.invoice_number}{getItemOwner(inv.customer_id)}</p>
                         <p className="text-xs text-gray-500">{inv.service_type} · {inv.payment_status}</p>
                       </div>
                     </div>
@@ -844,6 +1210,77 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
               </div>
 
               <div>
+                <label className="form-label font-bold text-navy-900 text-xs">طريقة الحساب المالي:</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setAccountMethod('independent')}
+                    className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
+                      accountMethod === 'independent'
+                        ? 'border-gold-500 bg-gold-50 text-navy-900'
+                        : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                    }`}
+                  >
+                    حساب مستقل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountMethod('linked')}
+                    className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
+                      accountMethod === 'linked'
+                        ? 'border-gold-500 bg-gold-50 text-navy-900'
+                        : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                    }`}
+                  >
+                    ربط الحساب بعميل آخر
+                  </button>
+                </div>
+              </div>
+
+              {accountMethod === 'linked' && (
+                <div className="relative">
+                  <label className="form-label font-bold text-navy-900 text-xs">ابحث عن العميل صاحب الحساب الرئيسي:</label>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowDropdown(true);
+                    }}
+                    onFocus={() => setShowDropdown(true)}
+                    className="form-input text-xs"
+                    placeholder="ابحث بالاسم أو كود العميل..."
+                  />
+                  {showDropdown && searchQuery && (
+                    <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-lg max-h-48 overflow-y-auto">
+                      {filteredCustomers.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setParentCustomerId(c.id);
+                            setSearchQuery(`${c.name} (${c.client_code || '—'})`);
+                            setShowDropdown(false);
+                          }}
+                          className="w-full text-right px-4 py-2 hover:bg-gray-50 text-xs text-navy-900 font-semibold border-b border-gray-50 last:border-b-0"
+                        >
+                          {c.name} {c.client_code ? `(${c.client_code})` : ''}
+                        </button>
+                      ))}
+                      {filteredCustomers.length === 0 && (
+                        <p className="p-3 text-xs text-gray-400 text-center">لا توجد نتائج مطابقة</p>
+                      )}
+                    </div>
+                  )}
+                  {parentCustomerId && !showDropdown && (
+                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                      ✔ تم الاختيار بنجاح
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div>
                 <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للحسابات:</label>
                 <textarea
                   value={accountsTransferNotes}
@@ -865,6 +1302,121 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
               </button>
               <button
                 onClick={() => setShowTransferAccountsModal(false)}
+                className="btn-outline flex-1 justify-center text-xs py-2.5"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Basic Info Modal */}
+      {showEditCustomerModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={() => setShowEditCustomerModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
+                <Edit2 size={18} />
+              </div>
+              <div>
+                <h3 className="font-bold text-navy-900 text-base">تعديل البيانات الأساسية</h3>
+                <p className="text-xs text-gray-500">تعديل بيانات العميل الشخصية والفئة العمرية</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-right">
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">الاسم بالكامل:</label>
+                <input
+                  type="text"
+                  value={editCustomerForm.name}
+                  onChange={(e) => setEditCustomerForm({ ...editCustomerForm, name: e.target.value })}
+                  className="form-input text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">رقم الهاتف:</label>
+                  <input
+                    type="text"
+                    value={editCustomerForm.phone}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })}
+                    className="form-input text-xs"
+                    dir="ltr"
+                  />
+                </div>
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">رقم واتساب:</label>
+                  <input
+                    type="text"
+                    value={editCustomerForm.whatsapp}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, whatsapp: e.target.value })}
+                    className="form-input text-xs"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">تاريخ الميلاد:</label>
+                  <input
+                    type="date"
+                    value={editCustomerForm.birth_date}
+                    onChange={(e) => handleEditBirthDateChange(e.target.value)}
+                    className="form-input text-xs"
+                    dir="ltr"
+                  />
+                </div>
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">الفئة العمرية:</label>
+                  <select
+                    value={editCustomerForm.age_group}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, age_group: e.target.value as any })}
+                    className="form-input text-xs"
+                  >
+                    <option value="بالغ">بالغ (Adult)</option>
+                    <option value="طفل">طفل (Child)</option>
+                    <option value="رضيع">رضيع (Infant)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">نوع العميل:</label>
+                  <select
+                    value={editCustomerForm.client_type}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, client_type: e.target.value as any })}
+                    className="form-input text-xs"
+                  >
+                    <option value="فردي">عميل فردي</option>
+                    <option value="فوج">عميل فوج</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label font-bold text-navy-900 text-xs">المدينة:</label>
+                  <input
+                    type="text"
+                    value={editCustomerForm.city}
+                    onChange={(e) => setEditCustomerForm({ ...editCustomerForm, city: e.target.value })}
+                    className="form-input text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleSaveCustomer}
+                className="btn-gold flex-1 justify-center text-xs py-2.5"
+              >
+                حفظ التعديلات
+              </button>
+              <button
+                onClick={() => setShowEditCustomerModal(false)}
                 className="btn-outline flex-1 justify-center text-xs py-2.5"
               >
                 إلغاء

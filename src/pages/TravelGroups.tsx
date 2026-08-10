@@ -328,10 +328,10 @@ export default function TravelGroups({}: Props) {
     // Load main CRM customers
     const { data: cData } = await supabase
       .from('customers')
-      .select('id, name, phone, client_code, national_id, passport_number, service_type')
+      .select('id, name, phone, client_code, national_id, passport_number, service_type, client_type')
       .order('name');
     
-    let candidates = (cData || []) as (Customer & { isInternalCustomer?: boolean; originalInternalId?: string })[];
+    let candidates = (cData || []).filter((c: any) => c.client_type === 'فوج') as (Customer & { isInternalCustomer?: boolean; originalInternalId?: string })[];
 
     // If it's an internal trip group, also fetch internal customers
     if (detailGroup?.internal_trip_id) {
