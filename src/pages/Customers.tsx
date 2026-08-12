@@ -245,11 +245,22 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                     <td>
                       <div className="flex items-center gap-1.5">
                         {c.operation_files && c.operation_files.length > 0 ? (
-                          <>
-                            <span className="text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-semibold whitespace-nowrap">
-                              محوّل ✔
-                            </span>
-                          </>
+                          (() => {
+                            const op = c.operation_files[0];
+                            const stageLabels: Record<string, string> = {
+                              accounts: '💰 الحسابات',
+                              operations: '⚙️ التشغيل',
+                              visa: '🛂 التأشيرة',
+                              flight: '✈️ الطيران',
+                              ready: '✅ جاهز',
+                              completed: '🏁 مكتمل'
+                            };
+                            return (
+                              <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-bold whitespace-nowrap">
+                                {stageLabels[op.workflow_stage] || 'محوّل ✔'}
+                              </span>
+                            );
+                          })()
                         ) : (
                           <button
                             onClick={() => setTransferCustomer(c)}

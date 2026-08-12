@@ -830,12 +830,27 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
 
             {/* Stage 2 -> Stage 3 Transfer Button */}
             <div className="pt-3 border-t border-gray-100">
-              <button
-                onClick={() => setShowTransferAccountsModal(true)}
-                className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
-              </button>
+              {opFiles.length > 0 ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                  <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    {opFiles[0].workflow_stage === 'accounts' && 'تم التحويل لقسم الحسابات 💰'}
+                    {opFiles[0].workflow_stage === 'operations' && 'في قسم التشغيل ⚙️'}
+                    {opFiles[0].workflow_stage === 'visa' && 'في قسم التأشيرات 🛂'}
+                    {opFiles[0].workflow_stage === 'flight' && 'في قسم الطيران ✈️'}
+                    {opFiles[0].workflow_stage === 'ready' && 'جاهز للسفر ✅'}
+                    {opFiles[0].workflow_stage === 'completed' && 'ملف مكتمل 🏁'}
+                    {!['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'].includes(opFiles[0].workflow_stage || '') && 'تم التحويل للعمليات'}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowTransferAccountsModal(true)}
+                  className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
+                </button>
+              )}
             </div>
           </div>
         </div>
