@@ -834,31 +834,31 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
             </div>
 
             {/* Stage 2 -> Stage 3 Transfer Button */}
-            <div className="pt-3 border-t border-gray-100">
+            <div className="pt-3 border-t border-gray-100 space-y-2.5">
               {(() => {
                 const activeOpFile = opFiles.find(o => o.workflow_stage !== 'completed');
-                if (activeOpFile) {
-                  return (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                      <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
-                        <CheckCircle2 size={14} className="text-emerald-600" />
-                        {activeOpFile.workflow_stage === 'accounts' && 'تم التحويل لقسم الحسابات 💰'}
-                        {activeOpFile.workflow_stage === 'operations' && 'في قسم التشغيل ⚙️'}
-                        {activeOpFile.workflow_stage === 'visa' && 'في قسم التأشيرات 🛂'}
-                        {activeOpFile.workflow_stage === 'flight' && 'في قسم الطيران ✈️'}
-                        {activeOpFile.workflow_stage === 'ready' && 'جاهز للسفر ✅'}
-                        {!['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'].includes(activeOpFile.workflow_stage || '') && 'تم التحويل للعمليات'}
-                      </p>
-                    </div>
-                  );
-                }
                 return (
-                  <button
-                    onClick={() => setShowTransferAccountsModal(true)}
-                    className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
-                  </button>
+                  <>
+                    {activeOpFile && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                        <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
+                          <CheckCircle2 size={14} className="text-emerald-600" />
+                          {activeOpFile.workflow_stage === 'accounts' && 'تم التحويل لقسم الحسابات 💰'}
+                          {activeOpFile.workflow_stage === 'operations' && 'في قسم التشغيل ⚙️'}
+                          {activeOpFile.workflow_stage === 'visa' && 'في قسم التأشيرات 🛂'}
+                          {activeOpFile.workflow_stage === 'flight' && 'في قسم الطيران ✈️'}
+                          {activeOpFile.workflow_stage === 'ready' && 'جاهز للسفر ✅'}
+                          {!['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'].includes(activeOpFile.workflow_stage || '') && 'تم التحويل للعمليات'}
+                        </p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowTransferAccountsModal(true)}
+                      className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
+                    </button>
+                  </>
                 );
               })()}
             </div>
