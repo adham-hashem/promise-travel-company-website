@@ -72,6 +72,8 @@ export default function Payments() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterApproval, setFilterApproval] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientFilterStage, setClientFilterStage] = useState('');
   const [selectedPayment, setSelectedPayment] = useState<PayRow | null>(null);
   const [uploading, setUploading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -269,9 +271,11 @@ export default function Payments() {
     const ledger: Array<{
       date: string;
       desc: string;
-      debit: number;
-      credit: number;
+      amount: number;
+      type: 'مستحق' | 'مدفوع';
     }> = [];
+
+    let totalRequired = 0;
 
     family.forEach(member => {
       const pkg = member.packages || packages.find(p => p.id === member.requested_package_id);
@@ -281,47 +285,41 @@ export default function Payments() {
       if (memberBookings.length > 0) {
         memberBookings.forEach(booking => {
           const pkgName = booking.package?.name || booking.packages?.name || 'حجز';
+          const amt = Number(booking.total_amount || 0);
+          totalRequired += amt;
           ledger.push({
             date: booking.booking_date || booking.created_at,
-            desc: `تكلفة حجز (${pkgName}) للعميل: ${member.name} (${member.age_group || 'بالغ'})`,
-            debit: Number(booking.total_amount || 0),
-            credit: 0
+            desc: `قيمة البرنامج (${pkgName}) - ${member.name}`,
+            amount: amt,
+            type: 'مستحق'
           });
         });
       } else if (pkg) {
+        totalRequired += price;
         ledger.push({
           date: member.created_at || new Date().toISOString(),
-          desc: `تكلفة الباقة (${pkg.name}) للعميل: ${member.name} (${member.age_group || 'بالغ'})`,
-          debit: price,
-          credit: 0
+          desc: `قيمة البرنامج (${pkg.name}) - ${member.name}`,
+          amount: price,
+          type: 'مستحق'
         });
       }
     });
 
+    let totalPaid = 0;
     const familyPayments = payments.filter(p => familyIds.includes(p.customer_id) && p.approval_status !== 'مرفوض');
     familyPayments.forEach(p => {
+      const amt = Number(p.amount || 0);
+      totalPaid += amt;
       ledger.push({
         date: p.payment_date,
-        desc: `دفعة مالية (${p.payment_type || 'دفعة عادية'} - ${p.payment_method}) للعميل: ${p.customers?.name || '—'}`,
-        debit: 0,
-        credit: Number(p.amount || 0)
+        desc: p.payment_type || 'دفعة',
+        amount: amt,
+        type: 'مدفوع'
       });
     });
 
     ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    let runningBalance = 0;
-    const ledgerWithBalances = ledger.map(item => {
-      runningBalance += (item.debit - item.credit);
-      return {
-        ...item,
-        balance: runningBalance
-      };
-    });
-
-    const totalDebit = ledger.reduce((s, x) => s + x.debit, 0);
-    const totalCredit = ledger.reduce((s, x) => s + x.credit, 0);
-    const currentBalance = totalDebit - totalCredit;
+    const remaining = Math.max(0, totalRequired - totalPaid);
 
     const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -329,112 +327,65 @@ export default function Payments() {
 <meta charset="UTF-8">
 <title>كشف حساب مالي - ${customer.name}</title>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
-  .header { border-bottom: 2px solid #0c224f; padding-bottom: 15px; margin-bottom: 20px; }
-  h1 { font-size: 22px; color: #0c224f; margin: 0 0 5px 0; font-weight: 900; }
-  .company-info { font-size: 12px; color: #666; }
-  .statement-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; color: #854d0e; }
-  .client-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
-  .client-details table { width: 100%; border: none; }
-  .client-details td { border: none; padding: 4px 8px; font-size: 13px; }
-  .client-details td.label { font-weight: bold; color: #475569; width: 15%; }
-  table.ledger { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-  table.ledger th { background: #0c224f; color: white; padding: 10px; text-align: right; font-size: 12px; font-weight: bold; }
-  table.ledger td { padding: 10px; border: 1px solid #cbd5e1; font-size: 12px; }
-  .summary { float: left; width: 300px; background: #f8fafc; border: 2px solid #0c224f; border-radius: 8px; padding: 15px; }
-  .summary table { width: 100%; border-collapse: collapse; }
-  .summary td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
-  .summary tr:last-child td { border-bottom: none; font-weight: bold; font-size: 14px; color: #0c224f; }
-  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 15px; clear: both; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; margin: 40px; color: #1f2937; }
+  h3 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .info-item strong { color: #4b5563; display: inline-block; width: 100px; }
+  .summary-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
+  .summary-list li { margin-bottom: 8px; font-size: 15px; }
+  .summary-list strong { display: inline-block; width: 150px; color: #374151; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
+  th, td { padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb; }
+  th { background-color: #f9fafb; color: #374151; font-weight: bold; }
+  .type-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+  .type-m { background-color: #fef2f2; color: #991b1b; }
+  .type-p { background-color: #f0fdf4; color: #166534; }
+  .final-remaining { font-size: 20px; font-weight: bold; text-align: center; margin-top: 30px; padding: 20px; background-color: #f8fafc; border-radius: 8px; color: ${remaining > 0 ? '#b91c1c' : '#15803d'}; }
 </style>
 </head>
 <body>
-<div class="header">
-  <table style="width: 100%; border: none;">
-    <tr style="border: none;">
-      <td style="border: none; padding: 0;">
-        <h1>شركة بروميس للسياحة والسفر</h1>
-        <span class="company-info">رقم السجل التجاري: 124578 | هاتف: +201012484971</span>
-      </td>
-      <td style="border: none; padding: 0; text-align: left;">
-        <span style="font-size: 11px; color: #64748b;">تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')}</span>
-      </td>
-    </tr>
-  </table>
-</div>
 
-<div class="statement-title">كشف حساب مالي مجمع</div>
+  <h3>بيانات العميل</h3>
+  <div class="info-grid">
+    <div class="info-item"><strong>اسم العميل:</strong> ${customer.name}</div>
+    <div class="info-item"><strong>كود العميل:</strong> ${customer.client_code || '—'}</div>
+    <div class="info-item"><strong>الباقة:</strong> ${customer.packages?.name || '—'}</div>
+    <div class="info-item"><strong>تاريخ الكشف:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
+  </div>
 
-<div class="client-details">
+  <h3>ملخص الحساب</h3>
+  <ul class="summary-list">
+    <li><strong>إجمالي المطلوب:</strong> ${totalRequired.toLocaleString('ar-EG')} ج</li>
+    <li><strong>إجمالي المدفوع:</strong> ${totalPaid.toLocaleString('ar-EG')} ج</li>
+    <li><strong>المتبقي:</strong> ${remaining.toLocaleString('ar-EG')} ج</li>
+  </ul>
+
+  <h3>الحركات المالية</h3>
   <table>
-    <tr>
-      <td class="label">اسم العميل:</td>
-      <td>${customer.name}</td>
-      <td class="label">كود العميل:</td>
-      <td>${customer.client_code || '—'}</td>
-    </tr>
-    <tr>
-      <td class="label">الهاتف:</td>
-      <td dir="ltr" style="text-align: right;">${customer.phone || '—'}</td>
-      <td class="label">الخدمة:</td>
-      <td>${customer.service_type || '—'}</td>
-    </tr>
-    ${subCustomers.length > 0 ? `
-    <tr>
-      <td class="label">العملاء التابعين:</td>
-      <td colspan="3">${subCustomers.map(c => `${c.name} (${c.client_code || '—'})`).join(' ، ')}</td>
-    </tr>
-    ` : ''}
-  </table>
-</div>
-
-<table class="ledger">
-  <thead>
-    <tr>
-      <th style="width: 15%;">التاريخ</th>
-      <th style="width: 45%;">البيان</th>
-      <th style="width: 12%; text-align: left;">مدين (ج.م)</th>
-      <th style="width: 12%; text-align: left;">دائن (ج.م)</th>
-      <th style="width: 16%; text-align: left;">الرصيد التراكمي</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${ledgerWithBalances.map(item => `
+    <thead>
       <tr>
-        <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
-        <td>${item.desc}</td>
-        <td style="text-align: left; font-weight: ${item.debit > 0 ? 'bold' : 'normal'};">${item.debit > 0 ? item.debit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
-        <td style="text-align: left; font-weight: ${item.credit > 0 ? 'bold' : 'normal'};">${item.credit > 0 ? item.credit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
-        <td style="text-align: left; font-weight: bold; color: ${item.balance > 0 ? '#b91c1c' : '#15803d'};">
-          ${item.balance.toLocaleString('ar-EG')} ج.م
-        </td>
+        <th style="width: 20%;">التاريخ</th>
+        <th style="width: 40%;">البيان</th>
+        <th style="width: 20%;">المبلغ</th>
+        <th style="width: 20%;">النوع</th>
       </tr>
-    `).join('')}
-  </tbody>
-</table>
-
-<div class="summary">
-  <table>
-    <tr>
-      <td>إجمالي المستحقات (مدين):</td>
-      <td style="text-align: left; font-weight: bold;">${totalDebit.toLocaleString('ar-EG')} ج.م</td>
-    </tr>
-    <tr>
-      <td>إجمالي المدفوعات (دائن):</td>
-      <td style="text-align: left; font-weight: bold; color: #16a34a;">${totalCredit.toLocaleString('ar-EG')} ج.م</td>
-    </tr>
-    <tr>
-      <td>الرصيد الحالي:</td>
-      <td style="text-align: left; font-weight: 900; color: ${currentBalance > 0 ? '#dc2626' : '#15803d'};">
-        ${currentBalance.toLocaleString('ar-EG')} ج.م
-      </td>
-    </tr>
+    </thead>
+    <tbody>
+      ${ledger.map(item => `
+        <tr>
+          <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
+          <td>${item.desc}</td>
+          <td style="font-weight: bold;">${item.amount.toLocaleString('ar-EG')} ج</td>
+          <td><span class="type-badge ${item.type === 'مستحق' ? 'type-m' : 'type-p'}">${item.type}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
   </table>
-</div>
 
-<div class="footer">
-  شيت مالي إلكتروني صادر عن نظام شركة بروميس للسياحة والسفر. لا يعتبر فاتورة رسمية بدون ختم وتوقيع الشركة الإداري.
-</div>
+  <div class="final-remaining">
+    المتبقي: ${remaining.toLocaleString('ar-EG')} ج
+  </div>
+
 </body>
 </html>`;
 
@@ -749,6 +700,15 @@ export default function Payments() {
     return { total, paid, remaining, installmentsPaid, totalInstallments, nextInstallmentDate, currentAmount: selectedPayment.amount };
   })();
 
+  const filteredClients = transferredFiles.filter(file => {
+    if (clientFilterStage && file.workflow_stage !== clientFilterStage) return false;
+    if (clientSearch) {
+      const q = clientSearch.toLowerCase();
+      if (!file.customer?.name?.toLowerCase().includes(q) && !(file.customer?.client_code || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -768,204 +728,130 @@ export default function Payments() {
       </div>
 
       {/* Transferred Files to Accounts (all files at accounts stage or beyond) */}
-      {transferredFiles.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-50 via-gold-50/50 to-white rounded-2xl border border-gold-300 p-5 space-y-3.5 shadow-sm">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
-                2➜
-              </div>
-              <div>
-                <h3 className="font-bold text-navy-900 text-sm flex items-center gap-2">
-                  📥 ملفات قسم الحسابات والمراحل اللاحقة ({transferredFiles.length})
-                </h3>
-                <p className="text-xs text-gray-500">جميع الملفات المحوّلة للحسابات — يبقى العميل مرئياً في جميع المراحل</p>
-              </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3 bg-gradient-to-r from-navy-50 to-white">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center text-navy-900 font-bold">
+              <User size={18} />
             </div>
-            <button onClick={load} className="text-xs text-navy-700 bg-navy-50 px-3 py-1 rounded-full font-medium border border-navy-200 hover:bg-navy-100 transition-colors">
+            <div>
+              <h3 className="font-bold text-navy-900 text-sm flex items-center gap-2">
+                سجل العملاء المالي ({filteredClients.length})
+              </h3>
+              <p className="text-xs text-gray-500">متابعة الحسابات، الأرصدة، والمطلوب سداده</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute top-1/2 -translate-y-1/2 right-2.5 text-gray-400" />
+              <input value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="بحث باسم أو كود العميل..." className="form-input text-xs py-1.5 pr-8 w-full sm:w-48" />
+            </div>
+            <select value={clientFilterStage} onChange={(e) => setClientFilterStage(e.target.value)} className="form-input text-xs py-1.5 w-full sm:w-36">
+              <option value="">كل المراحل</option>
+              <option value="accounts">الحسابات</option>
+              <option value="operations">التشغيل</option>
+              <option value="visa">التأشيرة</option>
+              <option value="flight">الطيران</option>
+              <option value="ready">جاهز للسفر</option>
+              <option value="completed">مكتمل</option>
+            </select>
+            <button onClick={load} className="btn-outline text-xs py-1.5 px-3">
               🔄 تحديث
             </button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {transferredFiles.map((file) => {
-              const stageLabels: Record<string, { label: string; color: string; bg: string }> = {
-                accounts: { label: '💰 الحسابات', color: 'text-amber-700', bg: 'bg-amber-100 border-amber-300' },
-                operations: { label: '⚙️ التشغيل', color: 'text-blue-700', bg: 'bg-blue-100 border-blue-300' },
-                visa: { label: '🛂 التأشيرة', color: 'text-purple-700', bg: 'bg-purple-100 border-purple-300' },
-                flight: { label: '✈️ الطيران', color: 'text-cyan-700', bg: 'bg-cyan-100 border-cyan-300' },
-                ready: { label: '✅ جاهز للسفر', color: 'text-emerald-700', bg: 'bg-emerald-100 border-emerald-300' },
-                completed: { label: '🏁 مكتمل', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-300' },
-              };
-              const stageMeta = stageLabels[file.workflow_stage] || stageLabels.accounts;
-              // Find all sub-customers of this customer
-              const subCustomers = customersList.filter(c => c.parent_customer_id === file.customer_id);
-              
-              // Compute payment totals from linked payments (already aggregated in load())
-              const filePayments: any[] = file.payments || [];
-              const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-              
-              // Aggregate package prices for the family
-              const mainPkgPrice = file.customer?.packages 
-                ? calculateCustomerPackagePrice(file.customer, file.customer.packages) 
-                : 0;
-              const mainBookingTotal = Number(file.booking?.total_amount || 0) || mainPkgPrice;
-              
-              const familyBookingTotal = mainBookingTotal + subCustomers.reduce((sum, sc) => {
-                const subBooking = bookings.find(b => b.customer_id === sc.id);
-                const subPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
-                const subPkgPrice = subPkg ? calculateCustomerPackagePrice(sc, subPkg) : 0;
-                return sum + (Number(subBooking?.total_amount || 0) || subPkgPrice);
-              }, 0);
-
-              const bookingTotal = familyBookingTotal;
-              const paidPct = bookingTotal > 0 ? Math.min(100, Math.round((totalPaid / bookingTotal) * 100)) : 0;
-
-              return (
-                <div key={file.id} className="bg-white rounded-xl p-4 shadow-sm border border-gold-200 space-y-2.5 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-navy-900 text-sm">{file.customer?.name || 'عميل'}</span>
-                      {file.customer?.client_code && (
-                        <span className="text-[11px] font-mono text-gold-700 bg-gold-50 px-2 py-0.5 rounded border border-gold-200">
-                          {file.customer.client_code}
-                        </span>
-                      )}
-                    </div>
-                    {subCustomers.length > 0 && (
-                      <div className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-1.5 font-medium">
-                        👪 التابعين: {subCustomers.map(sc => `${sc.name} (${sc.client_code || 'بدون كود'})`).join('، ')}
-                      </div>
-                    )}
-                    {/* Stage badge */}
-                    <div className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stageMeta.bg} ${stageMeta.color}`}>
-                      {stageMeta.label}
-                    </div>
-                    <div className="text-xs text-gray-600 space-y-1">
-                      {file.customer?.phone && <p>📱 الهاتف: <span dir="ltr" className="font-semibold text-navy-800">{file.customer.phone}</span></p>}
-                      {file.customer?.service_type && <p>✈️ الخدمة: <span className="font-semibold text-navy-800">{file.customer.service_type}</span></p>}
-                      {/* Payment summary */}
-                      {(totalPaid > 0 || bookingTotal > 0) && (
-                        <div className="bg-navy-50 rounded-lg p-2 mt-1 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="text-navy-700 font-semibold text-[11px]">
-                              💳 مدفوع: {totalPaid.toLocaleString('ar-EG')} ج.م
-                              {bookingTotal > 0 && <span className="text-gray-500"> / {bookingTotal.toLocaleString('ar-EG')} ج.م ({paidPct}%)</span>}
-                            </p>
-                            <span className="text-[10px] text-gray-400">{filePayments.length} دفعة</span>
-                          </div>
-                          {bookingTotal > 0 && (
-                            <>
-                              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                <div className="bg-gold-500 h-1.5 rounded-full transition-all" style={{ width: `${paidPct}%` }} />
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] pt-1">
-                                <span className="text-gray-500 font-medium">المتبقي المطلوب:</span>
-                                <span className={bookingTotal - totalPaid > 0 ? "text-red-600 font-bold" : "text-emerald-700 font-bold"}>
-                                  {(bookingTotal - totalPaid).toLocaleString('ar-EG')} ج.م
-                                </span>
-                              </div>
-                              {file.customer?.packages?.name && (
-                                <div className="flex items-center justify-between text-[10px] text-gray-400 pt-0.5">
-                                  <span>الباقة المرتبطة:</span>
-                                  <span className="font-semibold text-navy-800">{file.customer.packages.name}</span>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          
-                          {/* List of payments for this file */}
-                          {filePayments.length > 0 && (
-                            <div className="pt-2 border-t border-gray-200/60 space-y-1.5 max-h-32 overflow-y-auto">
-                              {filePayments.map((p: any) => {
-                                const payerName = p.customer_id === file.customer_id ? '' : ` (${p.customers?.name || 'فرعي'})`;
-                                return (
-                                  <div key={p.id} className="flex items-center justify-between text-[10px] bg-white p-1 px-2 rounded border border-gray-100">
-                                    <span className="font-bold text-gray-700">{p.amount.toLocaleString('ar-EG')} ج.م ({p.payment_type}){payerName}</span>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-gray-400">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</span>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDelete(p);
-                                        }}
-                                        title="حذف الدفعة" 
-                                        className="text-red-500 hover:text-red-700 p-0.5"
-                                      >
-                                        <Trash2 size={11} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {file.notes && (
-                        <div className="mt-1 bg-amber-50/80 p-2 rounded-lg border border-amber-200 text-[11px] text-navy-900">
-                          <span className="font-bold text-amber-800 block">📝 ملاحظات:</span>
-                          <p className="line-clamp-2 leading-relaxed">{file.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 mt-2">
-                    <button
-                      onClick={() => {
-                        setForm({
-                          ...emptyForm,
-                          customer_id: file.customer_id,
-                          booking_id: file.booking_id || '',
-                          package_id: file.booking?.package_id || ''
-                        });
-                        setShowModal(true);
-                      }}
-                      className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
-                    >
-                      <Plus size={12} /> إضافة دفعة
-                    </button>
-                    <button
-                      onClick={() => printAccountStatement(file.customer)}
-                      className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-navy-500 hover:bg-navy-50"
-                      title="عرض وطباعة كشف الحساب المالي"
-                    >
-                      📄 كشف حساب
-                    </button>
-                    {file.customer?.client_type === 'فوج' ? (
-                      <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center font-medium bg-gray-50 rounded-lg border border-gray-200">
-                        عميل فوج (يُدار مجمعاً)
-                      </span>
-                    ) : (
-                      file.workflow_stage === 'accounts' && (
-                        <button
-                          onClick={() => setOpsTransferFile(file)}
-                          className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
-                        >
-                          🚀 تحويل للتشغيل
-                        </button>
-                      )
-                    )}
-                    {file.customer?.client_type !== 'فوج' && file.workflow_stage !== 'accounts' && (
-                      <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center">
-                        محوّل ✔
-                      </span>
-                    )}
-                    <button
-                      onClick={() => handleDeleteFile(file.id, file.customer?.name || '—')}
-                      title="حذف الملف نهائياً من الحسابات والتشغيل"
-                      className="p-1.5 rounded-lg border border-red-100 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors flex items-center justify-center flex-shrink-0"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
-      )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full data-table min-w-[1000px]">
+            <thead>
+              <tr>
+                <th>العميل</th>
+                <th>كود</th>
+                <th>النوع / الخدمة</th>
+                <th>الباقة</th>
+                <th>المطلوب</th>
+                <th>المدفوع</th>
+                <th>المتبقي</th>
+                <th>حالة الحساب</th>
+                <th>إجراءات سريعة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClients.map((file) => {
+                const subCustomers = customersList.filter(c => c.parent_customer_id === file.customer_id);
+                const filePayments: any[] = file.payments || [];
+                const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+                
+                const mainPkgPrice = file.customer?.packages ? calculateCustomerPackagePrice(file.customer, file.customer.packages) : 0;
+                const mainBookingTotal = Number(file.booking?.total_amount || 0) || mainPkgPrice;
+                
+                const bookingTotal = mainBookingTotal + subCustomers.reduce((sum, sc) => {
+                  const subBooking = bookings.find(b => b.customer_id === sc.id);
+                  const subPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
+                  const subPkgPrice = subPkg ? calculateCustomerPackagePrice(sc, subPkg) : 0;
+                  return sum + (Number(subBooking?.total_amount || 0) || subPkgPrice);
+                }, 0);
+
+                const remaining = Math.max(0, bookingTotal - totalPaid);
+                const isPaid = remaining === 0 && bookingTotal > 0;
+                
+                return (
+                  <tr key={file.id} className="hover:bg-gray-50/50">
+                    <td>
+                      <div className="font-semibold text-navy-900">{file.customer?.name || '—'}</div>
+                      {subCustomers.length > 0 && <div className="text-[10px] text-gray-500">+{subCustomers.length} تابعين</div>}
+                    </td>
+                    <td className="font-mono text-xs text-gray-600">{file.customer?.client_code || '—'}</td>
+                    <td>
+                      <span className="badge bg-gray-100 text-gray-600 font-medium">
+                        {file.customer?.client_type === 'فوج' ? 'فوج' : file.customer?.service_type || '—'}
+                      </span>
+                    </td>
+                    <td className="text-sm font-medium text-gray-800">{file.customer?.packages?.name || '—'}</td>
+                    <td className="font-bold text-navy-800">{bookingTotal.toLocaleString('ar-EG')} ج.م</td>
+                    <td className="font-bold text-emerald-600">{totalPaid.toLocaleString('ar-EG')} ج.م</td>
+                    <td className="font-bold text-red-600">{remaining.toLocaleString('ar-EG')} ج.م</td>
+                    <td>
+                      <span className={`badge ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {isPaid ? 'مدفوع بالكامل' : 'مدفوع جزئياً / غير مدفوع'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <button onClick={() => setDetailCustomer(file.customer)} title="عرض التفاصيل" className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
+                          <Eye size={15} />
+                        </button>
+                        <button onClick={() => { setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '', package_id: file.booking?.package_id || '' }); setShowModal(true); }} title="إضافة دفعة" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600">
+                          <Plus size={15} />
+                        </button>
+                        <button onClick={() => printAccountStatement(file.customer)} title="كشف الحساب" className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600">
+                          <FileText size={15} />
+                        </button>
+                        {file.customer?.client_type !== 'فوج' && file.workflow_stage === 'accounts' && (
+                          <button onClick={() => setOpsTransferFile(file)} title="تحويل للتشغيل" className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600">
+                            <Plane size={15} />
+                          </button>
+                        )}
+                        <button onClick={() => handleDeleteFile(file.id, file.customer?.name || '—')} title="حذف الملف" className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredClients.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-gray-500">لا يوجد عملاء مطابقين للبحث.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
