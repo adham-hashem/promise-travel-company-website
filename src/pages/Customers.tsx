@@ -246,29 +246,29 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                       <div className="flex items-center gap-1.5">
                         {(() => {
                           const activeOp = c.operation_files?.find(o => o.workflow_stage !== 'completed');
-                          const stageLabels: Record<string, string> = {
-                            accounts: '💰 الحسابات',
-                            operations: '⚙️ التشغيل',
-                            visa: '🛂 التأشيرة',
-                            flight: '✈️ الطيران',
-                            ready: '✅ جاهز'
-                          };
+                          if (activeOp) {
+                            const stageLabels: Record<string, string> = {
+                              accounts: '💰 الحسابات',
+                              operations: '⚙️ التشغيل',
+                              visa: '🛂 التأشيرة',
+                              flight: '✈️ الطيران',
+                              ready: '✅ جاهز'
+                            };
+                            return (
+                              <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-bold whitespace-nowrap">
+                                {stageLabels[activeOp.workflow_stage] || 'محوّل ✔'}
+                              </span>
+                            );
+                          }
                           return (
-                            <>
-                              {activeOp && (
-                                <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-bold whitespace-nowrap text-center">
-                                  {stageLabels[activeOp.workflow_stage] || 'محوّل ✔'}
-                                </span>
-                              )}
-                              <button
-                                onClick={() => setTransferCustomer(c)}
-                                className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
-                                title="تحويل ملف العميل إلى قسم الحسابات"
-                              >
-                                <ArrowRightLeft size={13} />
-                                تحويل للحسابات
-                              </button>
-                            </>
+                            <button
+                              onClick={() => setTransferCustomer(c)}
+                              className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
+                              title="تحويل ملف العميل إلى قسم الحسابات"
+                            >
+                              <ArrowRightLeft size={13} />
+                              تحويل للحسابات
+                            </button>
                           );
                         })()}
                         <button
