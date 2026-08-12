@@ -199,7 +199,12 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
     const parentId = accountMethod === 'linked' ? parentCustomerId : null;
     await supabase.from('customers').update({ parent_customer_id: parentId }).eq('id', customer.id);
 
-    const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
+    const { data: existingOp } = await supabase
+      .from('operation_files')
+      .select('id')
+      .eq('customer_id', customer.id)
+      .neq('workflow_stage', 'completed')
+      .maybeSingle();
     const payload = {
       customer_id: customer.id,
       workflow_stage: 'accounts',
@@ -830,27 +835,32 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
 
             {/* Stage 2 -> Stage 3 Transfer Button */}
             <div className="pt-3 border-t border-gray-100">
-              {opFiles.length > 0 ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                  <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-emerald-600" />
-                    {opFiles[0].workflow_stage === 'accounts' && 'تم التحويل لقسم الحسابات 💰'}
-                    {opFiles[0].workflow_stage === 'operations' && 'في قسم التشغيل ⚙️'}
-                    {opFiles[0].workflow_stage === 'visa' && 'في قسم التأشيرات 🛂'}
-                    {opFiles[0].workflow_stage === 'flight' && 'في قسم الطيران ✈️'}
-                    {opFiles[0].workflow_stage === 'ready' && 'جاهز للسفر ✅'}
-                    {opFiles[0].workflow_stage === 'completed' && 'ملف مكتمل 🏁'}
-                    {!['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'].includes(opFiles[0].workflow_stage || '') && 'تم التحويل للعمليات'}
-                  </p>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowTransferAccountsModal(true)}
-                  className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
-                </button>
-              )}
+              {(() => {
+                const activeOpFile = opFiles.find(o => o.workflow_stage !== 'completed');
+                if (activeOpFile) {
+                  return (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                      <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-600" />
+                        {activeOpFile.workflow_stage === 'accounts' && 'تم التحويل لقسم الحسابات 💰'}
+                        {activeOpFile.workflow_stage === 'operations' && 'في قسم التشغيل ⚙️'}
+                        {activeOpFile.workflow_stage === 'visa' && 'في قسم التأشيرات 🛂'}
+                        {activeOpFile.workflow_stage === 'flight' && 'في قسم الطيران ✈️'}
+                        {activeOpFile.workflow_stage === 'ready' && 'جاهز للسفر ✅'}
+                        {!['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'].includes(activeOpFile.workflow_stage || '') && 'تم التحويل للعمليات'}
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => setShowTransferAccountsModal(true)}
+                    className="w-full btn-gold text-xs py-2.5 flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Wallet size={14} /> تحويل ملف العميل إلى قسم الحسابات
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -244,33 +244,33 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5">
-                        {c.operation_files && c.operation_files.length > 0 ? (
-                          (() => {
-                            const op = c.operation_files[0];
+                        {(() => {
+                          const activeOp = c.operation_files?.find(o => o.workflow_stage !== 'completed');
+                          if (activeOp) {
                             const stageLabels: Record<string, string> = {
                               accounts: '💰 الحسابات',
                               operations: '⚙️ التشغيل',
                               visa: '🛂 التأشيرة',
                               flight: '✈️ الطيران',
-                              ready: '✅ جاهز',
-                              completed: '🏁 مكتمل'
+                              ready: '✅ جاهز'
                             };
                             return (
                               <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-bold whitespace-nowrap">
-                                {stageLabels[op.workflow_stage] || 'محوّل ✔'}
+                                {stageLabels[activeOp.workflow_stage] || 'محوّل ✔'}
                               </span>
                             );
-                          })()
-                        ) : (
-                          <button
-                            onClick={() => setTransferCustomer(c)}
-                            className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
-                            title="تحويل ملف العميل إلى قسم الحسابات"
-                          >
-                            <ArrowRightLeft size={13} />
-                            تحويل للحسابات
-                          </button>
-                        )}
+                          }
+                          return (
+                            <button
+                              onClick={() => setTransferCustomer(c)}
+                              className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
+                              title="تحويل ملف العميل إلى قسم الحسابات"
+                            >
+                              <ArrowRightLeft size={13} />
+                              تحويل للحسابات
+                            </button>
+                          );
+                        })()}
                         <button
                           onClick={() => onNavigate('customer-details', c.id)}
                           className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600 transition-colors"
@@ -388,7 +388,12 @@ function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAcc
     const parentId = accountMethod === 'linked' ? parentCustomerId : null;
     await supabase.from('customers').update({ parent_customer_id: parentId }).eq('id', customer.id);
 
-    const { data: existingOp } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id).maybeSingle();
+    const { data: existingOp } = await supabase
+      .from('operation_files')
+      .select('id')
+      .eq('customer_id', customer.id)
+      .neq('workflow_stage', 'completed')
+      .maybeSingle();
     const payload = {
       customer_id: customer.id,
       workflow_stage: 'accounts',
