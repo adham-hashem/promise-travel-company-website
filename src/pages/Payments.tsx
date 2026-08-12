@@ -78,12 +78,33 @@ export default function Payments() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Balance calculations for the modal
-  const customerPayments = form.customer_id
-    ? payments.filter(p => p.customer_id === form.customer_id && p.id !== editId && p.approval_status !== 'مرفوض')
+  const selectedCust = form.customer_id ? customersList.find(c => c.id === form.customer_id) : null;
+  const familyIds = selectedCust ? (selectedCust.parent_customer_id 
+    ? [selectedCust.parent_customer_id, ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id).map(c => c.id)]
+    : [selectedCust.id, ...customersList.filter(c => c.parent_customer_id === selectedCust.id).map(c => c.id)]
+  ) : [];
+  
+  const customerPayments = familyIds.length > 0
+    ? payments.filter(p => familyIds.includes(p.customer_id) && p.id !== editId && p.approval_status !== 'مرفوض')
     : [];
   const totalPaidByCustomer = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  
   const selectedPkg = form.package_id ? packages.find(p => p.id === form.package_id) : null;
-  const packagePrice = selectedPkg ? Number(selectedPkg.price || 0) : 0;
+  
+  const familyMembers = selectedCust ? (selectedCust.parent_customer_id
+    ? [customersList.find(c => c.id === selectedCust.parent_customer_id), ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id)]
+    : [selectedCust, ...customersList.filter(c => c.parent_customer_id === selectedCust.id)]
+  ) : [];
+  
+  const familyPackagePrice = familyMembers.reduce((sum, member) => {
+    if (!member) return sum;
+    const pkg = member.id === form.customer_id
+      ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
+      : (member.packages || packages.find(p => p.id === member.requested_package_id));
+    return sum + calculateCustomerPackagePrice(member, pkg);
+  }, 0);
+
+  const packagePrice = familyPackagePrice;
   const remainingBalance = Math.max(0, packagePrice - totalPaidByCustomer);
 
   const [transferredFiles, setTransferredFiles] = useState<any[]>([]);
@@ -129,16 +150,35 @@ export default function Payments() {
   }, [detailCustomer]);
 
   useEffect(() => {
-    if (!form.customer_id || !form.package_id || !form.amount) return;
-    const customerPayments = payments.filter(p => p.customer_id === form.customer_id && p.id !== editId && p.approval_status !== 'مرفوض');
+    if (!form.customer_id || !form.amount) return;
+    const selectedCust = customersList.find(c => c.id === form.customer_id);
+    if (!selectedCust) return;
+    
+    const familyIds = selectedCust.parent_customer_id 
+      ? [selectedCust.parent_customer_id, ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id).map(c => c.id)]
+      : [selectedCust.id, ...customersList.filter(c => c.parent_customer_id === selectedCust.id).map(c => c.id)];
+      
+    const customerPayments = payments.filter(p => familyIds.includes(p.customer_id) && p.id !== editId && p.approval_status !== 'مرفوض');
     const totalPaid = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const pkg = packages.find(p => p.id === form.package_id);
-    const cust = customersList.find(c => c.id === form.customer_id);
-    const pkgPrice = pkg ? calculateCustomerPackagePrice(cust, pkg) : 0;
+    
+    const familyMembers = selectedCust.parent_customer_id
+      ? [customersList.find(c => c.id === selectedCust.parent_customer_id), ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id)]
+      : [selectedCust, ...customersList.filter(c => c.parent_customer_id === selectedCust.id)];
+      
+    const selectedPkg = form.package_id ? packages.find(p => p.id === form.package_id) : null;
+    
+    const familyPackagePrice = familyMembers.reduce((sum, member) => {
+      if (!member) return sum;
+      const pkg = member.id === form.customer_id
+        ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
+        : (member.packages || packages.find(p => p.id === member.requested_package_id));
+      return sum + calculateCustomerPackagePrice(member, pkg);
+    }, 0);
+    
     const currentAmt = parseFloat(form.amount) || 0;
     
-    if (pkgPrice > 0) {
-      if (totalPaid + currentAmt >= pkgPrice) {
+    if (familyPackagePrice > 0) {
+      if (totalPaid + currentAmt >= familyPackagePrice) {
         setForm(f => f.status !== 'مدفوع بالكامل' ? { ...f, status: 'مدفوع بالكامل' } : f);
       } else if (totalPaid + currentAmt > 0) {
         setForm(f => f.status !== 'مدفوع جزئياً' ? { ...f, status: 'مدفوع جزئياً' } : f);
@@ -146,7 +186,7 @@ export default function Payments() {
         setForm(f => f.status !== 'غير مدفوع' ? { ...f, status: 'غير مدفوع' } : f);
       }
     }
-  }, [form.customer_id, form.package_id, form.amount, editId, payments, packages]);
+  }, [form.customer_id, form.package_id, form.amount, editId, payments, packages, customersList]);
 
   const load = async () => {
     setLoading(true);
@@ -158,15 +198,23 @@ export default function Payments() {
         .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
         .order('created_at', { ascending: false }),
       supabase.from('packages').select('*').eq('is_active', true).order('name', { ascending: true }),
-      supabase.from('customers').select('id, name, age_group, room_type_makkah, room_type_madinah, requested_package_id').order('name', { ascending: true }),
+      supabase.from('customers').select('id, name, age_group, room_type_makkah, room_type_madinah, requested_package_id, parent_customer_id, packages(*)').order('name', { ascending: true }),
     ]);
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
     const rawFiles = (opsData || []) as any[];
-    const filesWithPayments = rawFiles.map((f: any) => ({
-      ...f,
-      payments: allPayments.filter((p) => p.customer_id === f.customer_id),
-    }));
+    
+    // Filter out sub-accounts and aggregate payments
+    const filesWithPayments = rawFiles
+      .filter((f: any) => !f.customer?.parent_customer_id)
+      .map((f: any) => {
+        const subCustomerIds = (custData || []).filter((c: any) => c.parent_customer_id === f.customer_id).map((c: any) => c.id);
+        return {
+          ...f,
+          payments: allPayments.filter((p) => p.customer_id === f.customer_id || subCustomerIds.includes(p.customer_id)),
+        };
+      });
+
     setPayments(allPayments);
     setBookings(allBookings);
     setPackages(pkgData || []);
@@ -529,13 +577,27 @@ export default function Payments() {
                 completed: { label: '🏁 مكتمل', color: 'text-gray-700', bg: 'bg-gray-100 border-gray-300' },
               };
               const stageMeta = stageLabels[file.workflow_stage] || stageLabels.accounts;
-              // Compute payment totals from linked payments
+              // Find all sub-customers of this customer
+              const subCustomers = customersList.filter(c => c.parent_customer_id === file.customer_id);
+              
+              // Compute payment totals from linked payments (already aggregated in load())
               const filePayments: any[] = file.payments || [];
               const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-              const packagePrice = file.customer?.packages 
+              
+              // Aggregate package prices for the family
+              const mainPkgPrice = file.customer?.packages 
                 ? calculateCustomerPackagePrice(file.customer, file.customer.packages) 
                 : 0;
-              const bookingTotal = Number(file.booking?.total_amount || 0) || packagePrice;
+              const mainBookingTotal = Number(file.booking?.total_amount || 0) || mainPkgPrice;
+              
+              const familyBookingTotal = mainBookingTotal + subCustomers.reduce((sum, sc) => {
+                const subBooking = bookings.find(b => b.customer_id === sc.id);
+                const subPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
+                const subPkgPrice = subPkg ? calculateCustomerPackagePrice(sc, subPkg) : 0;
+                return sum + (Number(subBooking?.total_amount || 0) || subPkgPrice);
+              }, 0);
+
+              const bookingTotal = familyBookingTotal;
               const paidPct = bookingTotal > 0 ? Math.min(100, Math.round((totalPaid / bookingTotal) * 100)) : 0;
 
               return (
@@ -549,6 +611,11 @@ export default function Payments() {
                         </span>
                       )}
                     </div>
+                    {subCustomers.length > 0 && (
+                      <div className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-1.5 font-medium">
+                        👪 التابعين: {subCustomers.map(sc => `${sc.name} (${sc.client_code || 'بدون كود'})`).join('، ')}
+                      </div>
+                    )}
                     {/* Stage badge */}
                     <div className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${stageMeta.bg} ${stageMeta.color}`}>
                       {stageMeta.label}
@@ -589,24 +656,27 @@ export default function Payments() {
                           {/* List of payments for this file */}
                           {filePayments.length > 0 && (
                             <div className="pt-2 border-t border-gray-200/60 space-y-1.5 max-h-32 overflow-y-auto">
-                              {filePayments.map((p: any) => (
-                                <div key={p.id} className="flex items-center justify-between text-[10px] bg-white p-1 px-2 rounded border border-gray-100">
-                                  <span className="font-bold text-gray-700">{p.amount.toLocaleString('ar-EG')} ج.م ({p.payment_type})</span>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-gray-400">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</span>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(p);
-                                      }}
-                                      title="حذف الدفعة" 
-                                      className="text-red-500 hover:text-red-700 p-0.5"
-                                    >
-                                      <Trash2 size={11} />
-                                    </button>
+                              {filePayments.map((p: any) => {
+                                const payerName = p.customer_id === file.customer_id ? '' : ` (${p.customers?.name || 'فرعي'})`;
+                                return (
+                                  <div key={p.id} className="flex items-center justify-between text-[10px] bg-white p-1 px-2 rounded border border-gray-100">
+                                    <span className="font-bold text-gray-700">{p.amount.toLocaleString('ar-EG')} ج.م ({p.payment_type}){payerName}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-gray-400">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</span>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDelete(p);
+                                        }}
+                                        title="حذف الدفعة" 
+                                        className="text-red-500 hover:text-red-700 p-0.5"
+                                      >
+                                        <Trash2 size={11} />
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -635,16 +705,21 @@ export default function Payments() {
                     >
                       <Plus size={12} /> إضافة دفعة
                     </button>
-                    {/* Only show transfer to ops if still in accounts stage */}
-                    {file.workflow_stage === 'accounts' && (
-                      <button
-                        onClick={() => setOpsTransferFile(file)}
-                        className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
-                      >
-                        🚀 تحويل للتشغيل
-                      </button>
+                    {file.customer?.client_type === 'فوج' ? (
+                      <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center font-medium bg-gray-50 rounded-lg border border-gray-200">
+                        عميل فوج (يُدار مجمعاً)
+                      </span>
+                    ) : (
+                      file.workflow_stage === 'accounts' && (
+                        <button
+                          onClick={() => setOpsTransferFile(file)}
+                          className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-gold-500 hover:bg-gold-50"
+                        >
+                          🚀 تحويل للتشغيل
+                        </button>
+                      )
                     )}
-                    {file.workflow_stage !== 'accounts' && (
+                    {file.customer?.client_type !== 'فوج' && file.workflow_stage !== 'accounts' && (
                       <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center">
                         محوّل ✔
                       </span>
@@ -1063,6 +1138,47 @@ export default function Payments() {
                 </div>
               </div>
 
+              {/* Family Accounts Section */}
+              {(detailCustomer.parent_customer_id || customersList.some(c => c.parent_customer_id === detailCustomer.id)) && (
+                <div>
+                  <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
+                    👨‍👩‍👧‍👦 الحسابات العائلية المرتبطة
+                  </h4>
+                  {detailCustomer.parent_customer_id ? (
+                    (() => {
+                      const parentCust = customersList.find(c => c.id === detailCustomer.parent_customer_id);
+                      return (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+                          <p className="text-xs font-bold text-amber-900">🔗 تابع للحساب الرئيسي للعائلة:</p>
+                          <p className="text-xs text-gray-700 mt-1">{parentCust?.name || '—'} ({parentCust?.client_code || 'بدون كود'})</p>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    (() => {
+                      const subCusts = customersList.filter(c => c.parent_customer_id === detailCustomer.id);
+                      return (
+                        <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
+                          <p className="text-xs font-bold text-indigo-900">👪 أفراد العائلة المرتبطين بهذا الحساب الرئيسي:</p>
+                          <div className="space-y-1.5">
+                            {subCusts.map(sc => {
+                              const scPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
+                              const scPrice = scPkg ? calculateCustomerPackagePrice(sc, scPkg) : 0;
+                              return (
+                                <div key={sc.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 pb-1">
+                                  <span>{sc.name} ({sc.client_code || 'بدون كود'}) - {sc.age_group || 'بالغ'}</span>
+                                  <span className="font-semibold text-navy-800">{scPrice.toLocaleString('ar-EG')} ج.م</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              )}
+
               {/* Section: Uploaded Documents */}
               <div>
                 <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
@@ -1211,6 +1327,63 @@ function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOp
         status: 'مكتمل',
         notes: notes || 'تم اعتماد ملف العميل مالياً وتحويله من قسم الحسابات إلى التشغيل',
       });
+    }
+
+    // Sync sub-customers to operations stage if they are currently in accounts stage
+    try {
+      const { data: subCusts } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('parent_customer_id', file.customer_id);
+
+      if (subCusts && subCusts.length > 0) {
+        const subCustIds = subCusts.map(c => c.id);
+        const { data: subOps } = await supabase
+          .from('operation_files')
+          .select('id, customer_id')
+          .in('customer_id', subCustIds)
+          .eq('workflow_stage', 'accounts');
+
+        if (subOps && subOps.length > 0) {
+          const subOpIds = subOps.map(o => o.id);
+          const { error: subErr1 } = await supabase
+            .from('operation_files')
+            .update({
+              workflow_stage: 'operations',
+              file_status: 'قيد التجهيز',
+              financially_approved: true,
+              assigned_to: targetEmpId || null,
+              notes: updatedNotes,
+            })
+            .in('id', subOpIds);
+
+          if (subErr1) {
+            await supabase
+              .from('operation_files')
+              .update({
+                workflow_stage: 'operations',
+                file_status: 'قيد التجهيز',
+                assigned_to: targetEmpId || null,
+                notes: updatedNotes,
+              })
+              .in('id', subOpIds);
+          }
+
+          const timelines = subOps.map(o => ({
+            customer_id: o.customer_id,
+            booking_id: null,
+            stage: 'operations',
+            stage_label: 'قسم التشغيل',
+            department: 'الحسابات',
+            employee_id: targetEmpId || null,
+            status: 'مكتمل',
+            notes: notes ? `تم اعتماد حساب العائلة الرئيسي وتحويله: ${notes}` : 'تم اعتماد حساب العائلة الرئيسي وتحويله من قسم الحسابات إلى التشغيل',
+          }));
+          await supabase.from('workflow_timeline').insert(timelines);
+        }
+      }
+    } catch (e) {
+      console.error('Error syncing sub-accounts transfer to operations:', e);
     }
 
     if (targetEmpId) {

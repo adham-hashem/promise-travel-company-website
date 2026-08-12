@@ -224,7 +224,7 @@ export default function TravelGroups({}: Props) {
             const ext = passport.file_path.split('.').pop() || 'pdf';
             downloadQueue.push({
               path: passport.file_path,
-              name: `${cCode} - ${cName}.${ext}`,
+              name: `${cCode} - ${cName} - Passport.${ext}`,
               folder: type === 'all' ? 'Passports' : undefined
             });
           } else {
@@ -240,7 +240,7 @@ export default function TravelGroups({}: Props) {
             const ext = photo.file_path.split('.').pop() || 'jpg';
             downloadQueue.push({
               path: photo.file_path,
-              name: `${cCode} - ${cName}.${ext}`,
+              name: `${cCode} - ${cName} - Photo.${ext}`,
               folder: type === 'all' ? 'Personal Photos' : undefined
             });
           } else {

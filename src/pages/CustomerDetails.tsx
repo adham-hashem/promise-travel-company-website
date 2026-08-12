@@ -4,7 +4,7 @@ import {
   MessageCircle, Calendar, CheckCircle, Plus, Clock, Hash,
   Plane, CreditCard as CardIcon, FileText, CreditCard, Wallet, Receipt,
   CheckCircle2, AlertCircle, Loader2, Hotel as HotelIcon, FileCheck, GitCommit, Plane as PlaneIcon,
-  Eye, Download, Layers,
+  Eye, Download, Layers, Edit2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent } from '../types';
@@ -43,6 +43,34 @@ interface FinSummary {
   totalRemaining: number;
   invoiceCount: number;
 }
+
+const calculateCustomerPackagePrice = (cust: any, pkg: any) => {
+  if (!pkg) return 0;
+  let price = Number(pkg.price || 0);
+  const roomType = (cust?.room_type_makkah || cust?.room_type_madinah || 'ثنائي').toLowerCase();
+  
+  let selectedRoomPrice = 0;
+  if (roomType.includes('ثنائ') || roomType.includes('double')) {
+    selectedRoomPrice = Number(pkg.price_double || 0);
+  } else if (roomType.includes('ثلاث') || roomType.includes('triple')) {
+    selectedRoomPrice = Number(pkg.price_triple || 0);
+  } else if (roomType.includes('رباع') || roomType.includes('quad')) {
+    selectedRoomPrice = Number(pkg.price_quad || 0);
+  }
+  
+  if (selectedRoomPrice > 0) {
+    price = selectedRoomPrice;
+  }
+  
+  const ageGroup = cust?.age_group || 'بالغ';
+  if (ageGroup === 'طفل' && pkg.price_child > 0) {
+    price = Number(pkg.price_child);
+  } else if (ageGroup === 'رضيع' && pkg.price_infant > 0) {
+    price = Number(pkg.price_infant);
+  }
+  
+  return price;
+};
 
 export default function CustomerDetails({ customerId, onNavigate }: Props) {
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -222,30 +250,35 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
       setLogs((logsRes.data as CommunicationLog[]) || []);
 
       let financialIds = [customerId];
+      let familyMembers: any[] = [];
       if (custData) {
+        familyMembers.push(custData);
         if (custData.parent_customer_id) {
           const { data: parentData } = await supabase
             .from('customers')
-            .select('id, name, client_code')
+            .select('*, packages(*)')
             .eq('id', custData.parent_customer_id)
             .maybeSingle();
           setParentCustomer(parentData || null);
           if (parentData) {
+            familyMembers.push(parentData);
             const { data: siblingData } = await supabase
               .from('customers')
-              .select('id, name, client_code')
+              .select('*, packages(*)')
               .eq('parent_customer_id', parentData.id);
             const sList = siblingData || [];
+            familyMembers.push(...sList);
             financialIds = [parentData.id, ...sList.map(c => c.id)];
           }
         } else {
           setParentCustomer(null);
           const { data: childrenData } = await supabase
             .from('customers')
-            .select('id, name, client_code')
+            .select('*, packages(*)')
             .eq('parent_customer_id', customerId);
           const cList = childrenData || [];
           setChildren(cList);
+          familyMembers.push(...cList);
           financialIds = [customerId, ...cList.map(c => c.id)];
         }
       }
@@ -282,7 +315,13 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
         .maybeSingle();
       setTravelGroup(tgData ? tgData.travel_groups : null);
 
-      const packagePrice = Number(custRes.data?.packages?.price || 0);
+      // Deduplicate unique family members
+      const uniqueFamily = Array.from(new Map(familyMembers.map(m => [m?.id, m])).values()).filter(Boolean);
+      const groupPackagePrice = uniqueFamily.reduce((sum, member) => {
+        return sum + calculateCustomerPackagePrice(member, member.packages);
+      }, 0);
+
+      const packagePrice = groupPackagePrice;
       const totalBookings = (bkRes.data as Booking[])?.reduce((s, b) => s + Number(b.total_amount || 0), 0) || 0;
       const totalCost = totalBookings > 0 ? totalBookings : packagePrice;
       const totalPaid = (payRes.data as Payment[])?.reduce((s, p) => s + Number(p.amount || 0), 0) || 0;
