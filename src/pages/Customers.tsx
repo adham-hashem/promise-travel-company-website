@@ -91,31 +91,43 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     if (!deleteTarget) return;
     setDeleting(true);
 
-    const [{ data: hasFlight }, { data: hasOp }, { data: hasPayment }] = await Promise.all([
+    const [{ data: hasFlight }, { data: hasPayment }] = await Promise.all([
       supabase.from('flight_tickets').select('id').eq('customer_id', deleteTarget.id).limit(1),
-      supabase.from('operation_files').select('id').eq('customer_id', deleteTarget.id).limit(1),
       supabase.from('payments').select('id').eq('customer_id', deleteTarget.id).limit(1)
     ]);
 
     if (hasFlight && hasFlight.length > 0) {
-      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في قسم الطيران. يجب حذفه من المراحل التالية أولاً.");
-      setDeleting(false);
-      setDeleteTarget(null);
-      return;
-    }
-
-    if (hasOp && hasOp.length > 0) {
-      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في قسم التشغيل. يجب حذفه من المراحل التالية أولاً.");
+      alert("لا يمكن حذف العميل لأنه لا يزال مسجلاً له تذاكر طيران في قسم الطيران. يجب حذف تذاكر الطيران الخاصة به أولاً لضمان سلامة البيانات.");
       setDeleting(false);
       setDeleteTarget(null);
       return;
     }
 
     if (hasPayment && hasPayment.length > 0) {
-      alert("لا يمكن حذف العميل من هذه المرحلة لأنه لا يزال موجوداً في الحسابات - المدفوعات. يجب حذفه من المراحل التالية أولاً.");
+      alert("لا يمكن حذف العميل لأنه مسجل له حركات مالية (مدفوعات) في قسم الحسابات. يجب حذف مدفوعات العميل أولاً لضمان سلامة القيود الحسابية.");
       setDeleting(false);
       setDeleteTarget(null);
       return;
+    }
+
+    try {
+      // 1. Get all operation files for the customer
+      const { data: opFiles } = await supabase.from('operation_files').select('id').eq('customer_id', deleteTarget.id);
+      const opFileIds = (opFiles || []).map(f => f.id);
+      
+      // 2. Cascade delete linked logs, timelines, and files
+      if (opFileIds.length > 0) {
+        await supabase.from('operation_logs').delete().in('file_id', opFileIds);
+        await supabase.from('workflow_timeline').delete().eq('customer_id', deleteTarget.id);
+        await supabase.from('operation_files').delete().eq('customer_id', deleteTarget.id);
+      }
+
+      // 3. Cascade delete bookings, docs, and visa applications
+      await supabase.from('bookings').delete().eq('customer_id', deleteTarget.id);
+      await supabase.from('docs').delete().eq('customer_id', deleteTarget.id);
+      await supabase.from('visa_applications').delete().eq('customer_id', deleteTarget.id);
+    } catch (err) {
+      console.error('Error cascading customer delete:', err);
     }
 
     await supabase.from('customers').delete().eq('id', deleteTarget.id);
@@ -126,7 +138,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     setCustomers(customers.filter(c => c.id !== deleteTarget.id));
     setDeleteTarget(null);
     setDeleting(false);
-    alert('تم حذف العميل من المرحلة الحالية بنجاح.');
+    alert('تم حذف العميل وكافة سجلاته التشغيلية غير المالية بنجاح.');
   };
 
   return (

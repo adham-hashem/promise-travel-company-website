@@ -203,17 +203,55 @@ export default function Payments() {
     const allPayments = (payData as PayRow[]) || [];
     const allBookings = (bkData as Booking[]) || [];
     const rawFiles = (opsData || []) as any[];
-    
-    // Filter out sub-accounts and aggregate payments
-    const filesWithPayments = rawFiles
-      .filter((f: any) => !f.customer?.parent_customer_id)
-      .map((f: any) => {
-        const subCustomerIds = (custData || []).filter((c: any) => c.parent_customer_id === f.customer_id).map((c: any) => c.id);
-        return {
-          ...f,
-          payments: allPayments.filter((p) => p.customer_id === f.customer_id || subCustomerIds.includes(p.customer_id)),
-        };
-      });
+
+    // Group files by parent (financial owner) customer
+    const groupedByParentId: Record<string, any[]> = {};
+    rawFiles.forEach((f: any) => {
+      if (!f.customer) return;
+      const parentId = f.customer.parent_customer_id || f.customer_id;
+      if (!groupedByParentId[parentId]) {
+        groupedByParentId[parentId] = [];
+      }
+      groupedByParentId[parentId].push(f);
+    });
+
+    const filesWithPayments = Object.keys(groupedByParentId).map((parentId) => {
+      const familyFiles = groupedByParentId[parentId];
+      // Try to find the parent file in the family files
+      let mainFile = familyFiles.find((f: any) => f.customer_id === parentId);
+      
+      // If the parent itself does not have an operation file, construct a mock file using parent details
+      if (!mainFile) {
+        const parentCust = (custData || []).find((c: any) => c.id === parentId);
+        if (parentCust) {
+          // If any family member is in accounts stage, default to accounts. Otherwise use the first child's stage
+          const hasAccountsStage = familyFiles.some((f: any) => f.workflow_stage === 'accounts');
+          const workflowStage = hasAccountsStage ? 'accounts' : familyFiles[0]?.workflow_stage || 'accounts';
+          
+          mainFile = {
+            id: `mock-${parentCust.id}`,
+            customer_id: parentCust.id,
+            workflow_stage: workflowStage,
+            file_status: 'جديد',
+            notes: 'حساب مالي مجمع للعائلة',
+            customer: parentCust,
+            booking: null,
+            created_at: familyFiles[0]?.created_at || new Date().toISOString()
+          };
+        } else {
+          // Fallback to first child's file
+          mainFile = familyFiles[0];
+        }
+      }
+
+      const subCustomerIds = (custData || []).filter((c: any) => c.parent_customer_id === parentId).map((c: any) => c.id);
+      const allFamilyCustomerIds = [parentId, ...subCustomerIds];
+
+      return {
+        ...mainFile,
+        payments: allPayments.filter((p) => allFamilyCustomerIds.includes(p.customer_id) && p.approval_status !== 'مرفوض'),
+      };
+    });
 
     setPayments(allPayments);
     setBookings(allBookings);
@@ -1473,50 +1511,54 @@ function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOp
       ? `${file.notes ? file.notes + ' | ' : ''}ملاحظات اعتماد قسم الحسابات: ${notes}`
       : file.notes;
 
-    // Try update with financially_approved first, fallback without it
+    const isMock = String(file.id).startsWith('mock-');
     let updateError: any = null;
-    const { error: err1 } = await supabase
-      .from('operation_files')
-      .update({
-        workflow_stage: 'operations',
-        file_status: 'قيد التجهيز',
-        financially_approved: true,
-        assigned_to: targetEmpId || null,
-        notes: updatedNotes,
-      })
-      .eq('id', file.id);
 
-    if (err1) {
-      // Retry without financially_approved in case column doesn't exist
-      const { error: err2 } = await supabase
+    if (!isMock) {
+      // Try update with financially_approved first, fallback without it
+      const { error: err1 } = await supabase
         .from('operation_files')
         .update({
           workflow_stage: 'operations',
           file_status: 'قيد التجهيز',
+          financially_approved: true,
           assigned_to: targetEmpId || null,
           notes: updatedNotes,
         })
         .eq('id', file.id);
-      updateError = err2;
-    }
 
-    if (updateError) {
-      alert(`فشل التحويل للتشغيل: ${updateError.message}`);
-      setTransferring(false);
-      return;
-    }
+      if (err1) {
+        // Retry without financially_approved in case column doesn't exist
+        const { error: err2 } = await supabase
+          .from('operation_files')
+          .update({
+            workflow_stage: 'operations',
+            file_status: 'قيد التجهيز',
+            assigned_to: targetEmpId || null,
+            notes: updatedNotes,
+          })
+          .eq('id', file.id);
+        updateError = err2;
+      }
 
-    if (file.customer_id) {
-      await supabase.from('workflow_timeline').insert({
-        customer_id: file.customer_id,
-        booking_id: file.booking_id || null,
-        stage: 'operations',
-        stage_label: 'قسم التشغيل',
-        department: 'الحسابات',
-        employee_id: targetEmpId || null,
-        status: 'مكتمل',
-        notes: notes || 'تم اعتماد ملف العميل مالياً وتحويله من قسم الحسابات إلى التشغيل',
-      });
+      if (updateError) {
+        alert(`فشل التحويل للتشغيل: ${updateError.message}`);
+        setTransferring(false);
+        return;
+      }
+
+      if (file.customer_id) {
+        await supabase.from('workflow_timeline').insert({
+          customer_id: file.customer_id,
+          booking_id: file.booking_id || null,
+          stage: 'operations',
+          stage_label: 'قسم التشغيل',
+          department: 'الحسابات',
+          employee_id: targetEmpId || null,
+          status: 'مكتمل',
+          notes: notes || 'تم اعتماد ملف العميل مالياً وتحويله من قسم الحسابات إلى التشغيل',
+        });
+      }
     }
 
     // Sync sub-customers to operations stage if they are currently in accounts stage
