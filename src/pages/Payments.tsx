@@ -223,7 +223,190 @@ export default function Payments() {
     setLoading(false);
   };
 
+  const printAccountStatement = (customer: any) => {
+    const subCustomers = customersList.filter(c => c.parent_customer_id === customer.id);
+    const family = [customer, ...subCustomers];
+    const familyIds = family.map(c => c.id);
 
+    const ledger: Array<{
+      date: string;
+      desc: string;
+      debit: number;
+      credit: number;
+    }> = [];
+
+    family.forEach(member => {
+      const pkg = member.packages || packages.find(p => p.id === member.requested_package_id);
+      const price = pkg ? calculateCustomerPackagePrice(member, pkg) : 0;
+      const memberBookings = bookings.filter(b => b.customer_id === member.id);
+      
+      if (memberBookings.length > 0) {
+        memberBookings.forEach(booking => {
+          const pkgName = booking.package?.name || booking.packages?.name || 'حجز';
+          ledger.push({
+            date: booking.booking_date || booking.created_at,
+            desc: `تكلفة حجز (${pkgName}) للعميل: ${member.name} (${member.age_group || 'بالغ'})`,
+            debit: Number(booking.total_amount || 0),
+            credit: 0
+          });
+        });
+      } else if (pkg) {
+        ledger.push({
+          date: member.created_at || new Date().toISOString(),
+          desc: `تكلفة الباقة (${pkg.name}) للعميل: ${member.name} (${member.age_group || 'بالغ'})`,
+          debit: price,
+          credit: 0
+        });
+      }
+    });
+
+    const familyPayments = payments.filter(p => familyIds.includes(p.customer_id) && p.approval_status !== 'مرفوض');
+    familyPayments.forEach(p => {
+      ledger.push({
+        date: p.payment_date,
+        desc: `دفعة مالية (${p.payment_type || 'دفعة عادية'} - ${p.payment_method}) للعميل: ${p.customers?.name || '—'}`,
+        debit: 0,
+        credit: Number(p.amount || 0)
+      });
+    });
+
+    ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let runningBalance = 0;
+    const ledgerWithBalances = ledger.map(item => {
+      runningBalance += (item.debit - item.credit);
+      return {
+        ...item,
+        balance: runningBalance
+      };
+    });
+
+    const totalDebit = ledger.reduce((s, x) => s + x.debit, 0);
+    const totalCredit = ledger.reduce((s, x) => s + x.credit, 0);
+    const currentBalance = totalDebit - totalCredit;
+
+    const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>كشف حساب مالي - ${customer.name}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
+  .header { border-bottom: 2px solid #0c224f; padding-bottom: 15px; margin-bottom: 20px; }
+  h1 { font-size: 22px; color: #0c224f; margin: 0 0 5px 0; font-weight: 900; }
+  .company-info { font-size: 12px; color: #666; }
+  .statement-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; color: #854d0e; }
+  .client-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
+  .client-details table { width: 100%; border: none; }
+  .client-details td { border: none; padding: 4px 8px; font-size: 13px; }
+  .client-details td.label { font-weight: bold; color: #475569; width: 15%; }
+  table.ledger { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+  table.ledger th { background: #0c224f; color: white; padding: 10px; text-align: right; font-size: 12px; font-weight: bold; }
+  table.ledger td { padding: 10px; border: 1px solid #cbd5e1; font-size: 12px; }
+  .summary { float: left; width: 300px; background: #f8fafc; border: 2px solid #0c224f; border-radius: 8px; padding: 15px; }
+  .summary table { width: 100%; border-collapse: collapse; }
+  .summary td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
+  .summary tr:last-child td { border-bottom: none; font-weight: bold; font-size: 14px; color: #0c224f; }
+  .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 15px; clear: both; }
+</style>
+</head>
+<body>
+<div class="header">
+  <table style="width: 100%; border: none;">
+    <tr style="border: none;">
+      <td style="border: none; padding: 0;">
+        <h1>شركة بروميس للسياحة والسفر</h1>
+        <span class="company-info">رقم السجل التجاري: 124578 | هاتف: +201012484971</span>
+      </td>
+      <td style="border: none; padding: 0; text-align: left;">
+        <span style="font-size: 11px; color: #64748b;">تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')}</span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="statement-title">كشف حساب مالي مجمع</div>
+
+<div class="client-details">
+  <table>
+    <tr>
+      <td class="label">اسم العميل:</td>
+      <td>${customer.name}</td>
+      <td class="label">كود العميل:</td>
+      <td>${customer.client_code || '—'}</td>
+    </tr>
+    <tr>
+      <td class="label">الهاتف:</td>
+      <td dir="ltr" style="text-align: right;">${customer.phone || '—'}</td>
+      <td class="label">الخدمة:</td>
+      <td>${customer.service_type || '—'}</td>
+    </tr>
+    ${subCustomers.length > 0 ? `
+    <tr>
+      <td class="label">العملاء التابعين:</td>
+      <td colspan="3">${subCustomers.map(c => `${c.name} (${c.client_code || '—'})`).join(' ، ')}</td>
+    </tr>
+    ` : ''}
+  </table>
+</div>
+
+<table class="ledger">
+  <thead>
+    <tr>
+      <th style="width: 15%;">التاريخ</th>
+      <th style="width: 45%;">البيان</th>
+      <th style="width: 12%; text-align: left;">مدين (ج.م)</th>
+      <th style="width: 12%; text-align: left;">دائن (ج.م)</th>
+      <th style="width: 16%; text-align: left;">الرصيد التراكمي</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${ledgerWithBalances.map(item => `
+      <tr>
+        <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
+        <td>${item.desc}</td>
+        <td style="text-align: left; font-weight: ${item.debit > 0 ? 'bold' : 'normal'};">${item.debit > 0 ? item.debit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
+        <td style="text-align: left; font-weight: ${item.credit > 0 ? 'bold' : 'normal'};">${item.credit > 0 ? item.credit.toLocaleString('ar-EG') + ' ج.م' : '—'}</td>
+        <td style="text-align: left; font-weight: bold; color: ${item.balance > 0 ? '#b91c1c' : '#15803d'};">
+          ${item.balance.toLocaleString('ar-EG')} ج.م
+        </td>
+      </tr>
+    `).join('')}
+  </tbody>
+</table>
+
+<div class="summary">
+  <table>
+    <tr>
+      <td>إجمالي المستحقات (مدين):</td>
+      <td style="text-align: left; font-weight: bold;">${totalDebit.toLocaleString('ar-EG')} ج.م</td>
+    </tr>
+    <tr>
+      <td>إجمالي المدفوعات (دائن):</td>
+      <td style="text-align: left; font-weight: bold; color: #16a34a;">${totalCredit.toLocaleString('ar-EG')} ج.م</td>
+    </tr>
+    <tr>
+      <td>الرصيد الحالي:</td>
+      <td style="text-align: left; font-weight: 900; color: ${currentBalance > 0 ? '#dc2626' : '#15803d'};">
+        ${currentBalance.toLocaleString('ar-EG')} ج.م
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="footer">
+  شيت مالي إلكتروني صادر عن نظام شركة بروميس للسياحة والسفر. لا يعتبر فاتورة رسمية بدون ختم وتوقيع الشركة الإداري.
+</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      win.print();
+    }
+  };
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -690,7 +873,7 @@ export default function Payments() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-2 border-t border-gray-100 mt-2">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 mt-2">
                     <button
                       onClick={() => {
                         setForm({
@@ -704,6 +887,13 @@ export default function Payments() {
                       className="btn-gold text-[11px] py-1.5 flex-1 justify-center gap-1 shadow-xs"
                     >
                       <Plus size={12} /> إضافة دفعة
+                    </button>
+                    <button
+                      onClick={() => printAccountStatement(file.customer)}
+                      className="btn-outline text-[11px] py-1.5 flex-1 justify-center gap-1 hover:border-navy-500 hover:bg-navy-50"
+                      title="عرض وطباعة كشف الحساب المالي"
+                    >
+                      📄 كشف حساب
                     </button>
                     {file.customer?.client_type === 'فوج' ? (
                       <span className="text-[11px] text-gray-500 py-1.5 flex-1 text-center font-medium bg-gray-50 rounded-lg border border-gray-200">

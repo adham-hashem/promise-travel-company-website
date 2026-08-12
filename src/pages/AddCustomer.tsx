@@ -475,7 +475,19 @@ export default function AddCustomer({ onNavigate }: Props) {
                     <option value="">اختر الباقة</option>
                     {packages
                       .filter((p) => !form.service_type || p.type === form.service_type)
-                      .map((p) => <option key={p.id} value={p.id}>{p.name} — {p.price.toLocaleString('ar-EG')} ج.م</option>)}
+                      .map((p) => {
+                        let finalPrice = p.price;
+                        if (form.age_group === 'طفل' && p.price_child > 0) {
+                          finalPrice = p.price_child;
+                        } else if (form.age_group === 'رضيع' && p.price_infant > 0) {
+                          finalPrice = p.price_infant;
+                        }
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {finalPrice.toLocaleString('ar-EG')} ج.م
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
               </div>
