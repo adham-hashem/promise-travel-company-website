@@ -8,6 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { compressImage } from '../lib/imageCompressor';
 import type { Payment, PaymentMethod, Booking, PaymentProof } from '../types';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
+import ApprovalRequestsManager from '../components/ApprovalRequestsManager';
+import FinancialNotifications from '../components/FinancialNotifications';
 
 const emptyForm = {
   booking_id: '',
@@ -319,7 +321,22 @@ export default function Payments() {
     });
 
     ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    let currentBalance = 0;
+    const ledgerWithBalance = ledger.map(item => {
+      if (item.type === 'مستحق') {
+        currentBalance += item.amount;
+      } else {
+        currentBalance -= item.amount;
+      }
+      return { ...item, balance: currentBalance };
+    });
+
     const remaining = Math.max(0, totalRequired - totalPaid);
+
+    const parentCustomerText = customer.parent_customer_id 
+      ? `<div class="info-item"><strong>الحساب الرئيسي:</strong> ${customersList.find(c => c.id === customer.parent_customer_id)?.name || '—'}</div>`
+      : '';
 
     const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -327,63 +344,85 @@ export default function Payments() {
 <meta charset="UTF-8">
 <title>كشف حساب مالي - ${customer.name}</title>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; margin: 40px; color: #1f2937; }
-  h3 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px; }
+  @media print {
+    @page { margin: 0; }
+    body { margin-top: 5cm !important; margin-bottom: 2cm !important; margin-left: 2cm !important; margin-right: 2cm !important; }
+  }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; margin: 40px; color: #000; background: #fff; }
+  .header-title { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 30px; color: #111827; }
+  h3 { color: #111827; border-bottom: 1px solid #000; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; font-size: 16px; }
   .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-  .info-item strong { color: #4b5563; display: inline-block; width: 100px; }
-  .summary-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
-  .summary-list li { margin-bottom: 8px; font-size: 15px; }
-  .summary-list strong { display: inline-block; width: 150px; color: #374151; }
+  .info-item strong { display: inline-block; width: 120px; font-weight: bold; }
+  .summary-list { display: flex; justify-content: space-between; background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+  .summary-item { text-align: center; flex: 1; }
+  .summary-item strong { display: block; margin-bottom: 5px; color: #4b5563; }
+  .summary-item span { font-size: 18px; font-weight: bold; }
   table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-  th, td { padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb; }
-  th { background-color: #f9fafb; color: #374151; font-weight: bold; }
-  .type-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-  .type-m { background-color: #fef2f2; color: #991b1b; }
-  .type-p { background-color: #f0fdf4; color: #166534; }
-  .final-remaining { font-size: 20px; font-weight: bold; text-align: center; margin-top: 30px; padding: 20px; background-color: #f8fafc; border-radius: 8px; color: ${remaining > 0 ? '#b91c1c' : '#15803d'}; }
+  th, td { padding: 10px; text-align: right; border: 1px solid #000; }
+  th { background-color: #f3f4f6; font-weight: bold; }
+  .final-remaining { font-size: 18px; font-weight: bold; text-align: left; margin-top: 20px; }
+  .footer-text { margin-top: 50px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 20px; }
 </style>
 </head>
 <body>
+
+  <div class="header-title">كشف معاملات حساب</div>
 
   <h3>بيانات العميل</h3>
   <div class="info-grid">
     <div class="info-item"><strong>اسم العميل:</strong> ${customer.name}</div>
     <div class="info-item"><strong>كود العميل:</strong> ${customer.client_code || '—'}</div>
+    ${parentCustomerText}
     <div class="info-item"><strong>الباقة:</strong> ${customer.packages?.name || '—'}</div>
-    <div class="info-item"><strong>تاريخ الكشف:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
+    <div class="info-item"><strong>تاريخ الإصدار:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
   </div>
 
   <h3>ملخص الحساب</h3>
-  <ul class="summary-list">
-    <li><strong>إجمالي المطلوب:</strong> ${totalRequired.toLocaleString('ar-EG')} ج</li>
-    <li><strong>إجمالي المدفوع:</strong> ${totalPaid.toLocaleString('ar-EG')} ج</li>
-    <li><strong>المتبقي:</strong> ${remaining.toLocaleString('ar-EG')} ج</li>
-  </ul>
+  <div class="summary-list">
+    <div class="summary-item">
+      <strong>إجمالي المطلوب</strong>
+      <span>${totalRequired.toLocaleString('ar-EG')} ج.م</span>
+    </div>
+    <div class="summary-item">
+      <strong>إجمالي المدفوع</strong>
+      <span>${totalPaid.toLocaleString('ar-EG')} ج.م</span>
+    </div>
+    <div class="summary-item">
+      <strong>إجمالي المتبقي</strong>
+      <span>${remaining.toLocaleString('ar-EG')} ج.م</span>
+    </div>
+  </div>
 
-  <h3>الحركات المالية</h3>
+  <h3>جدول المعاملات</h3>
   <table>
     <thead>
       <tr>
-        <th style="width: 20%;">التاريخ</th>
+        <th style="width: 15%;">التاريخ</th>
         <th style="width: 40%;">البيان</th>
-        <th style="width: 20%;">المبلغ</th>
-        <th style="width: 20%;">النوع</th>
+        <th style="width: 15%;">المبلغ</th>
+        <th style="width: 15%;">نوع المعاملة</th>
+        <th style="width: 15%;">الرصيد</th>
       </tr>
     </thead>
     <tbody>
-      ${ledger.map(item => `
+      ${ledgerWithBalance.map(item => `
         <tr>
           <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
           <td>${item.desc}</td>
-          <td style="font-weight: bold;">${item.amount.toLocaleString('ar-EG')} ج</td>
-          <td><span class="type-badge ${item.type === 'مستحق' ? 'type-m' : 'type-p'}">${item.type}</span></td>
+          <td>${item.amount.toLocaleString('ar-EG')}</td>
+          <td>${item.type}</td>
+          <td dir="ltr" style="text-align: right;">${item.balance.toLocaleString('ar-EG')}</td>
         </tr>
       `).join('')}
     </tbody>
   </table>
 
   <div class="final-remaining">
-    المتبقي: ${remaining.toLocaleString('ar-EG')} ج
+    الرصيد المستحق: ${remaining.toLocaleString('ar-EG')} ج.م
+  </div>
+
+  <div class="footer-text">
+    هذا المستند صادر من شركة Promise للسياحة لبيان المعاملات المالية المسجلة على حساب العميل حتى تاريخ إصدار الكشف.
   </div>
 
 </body>
@@ -498,11 +537,25 @@ export default function Payments() {
       return;
     }
 
-    if (!confirm('هل أنت متأكد من حذف هذه الدفعة نهائياً؟')) return;
-    if (p.booking_id) await syncBookingPayment(p.booking_id, p.amount, true);
-    await supabase.from('payments').delete().eq('id', p.id);
-    setPayments(payments.filter(x => x.id !== p.id));
-    alert('تم حذف الدفعة بنجاح.');
+    const reason = prompt('يرجى إدخال سبب طلب الحذف/الإلغاء لهذه المعاملة المالية (مطلوب اعتماد الإدارة):');
+    if (!reason) return;
+
+    try {
+      const { error } = await supabase.from('approval_requests').insert({
+        type: 'delete_payment',
+        record_id: p.id,
+        record_type: 'payments',
+        reason: reason,
+        status: 'pending',
+        record_details: p,
+        requested_by: profile?.id || null
+      });
+
+      if (error) throw error;
+      alert('تم إرسال طلب الحذف/الإلغاء إلى الإدارة للاعتماد. لن يتم تنفيذ الحذف حتى توافق الإدارة.');
+    } catch (err: any) {
+      alert('حدث خطأ أثناء إرسال الطلب: ' + err.message);
+    }
   };
 
   const handleDeleteFile = async (fileId: string, customerName: string) => {
@@ -711,6 +764,9 @@ export default function Payments() {
 
   return (
     <div className="space-y-5">
+      <ApprovalRequestsManager />
+      <FinancialNotifications />
+      
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="section-title">المدفوعات والحسابات</h2>

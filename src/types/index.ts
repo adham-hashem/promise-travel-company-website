@@ -434,6 +434,36 @@ export interface Payment {
   user_profiles?: Employee;
 }
 
+export interface FinancialInstallment {
+  id: string;
+  customer_id: string;
+  amount: number;
+  due_date: string;
+  status: 'مستحق' | 'مدفوع' | 'متأخر' | 'ملغي';
+  notes?: string;
+  payment_id?: string;
+  created_at: string;
+  updated_at: string;
+  customers?: Customer;
+  payments?: Payment;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  type: string;
+  record_id: string;
+  record_type: string;
+  requested_by?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at: string;
+  record_details?: any;
+  requester?: Employee;
+  reviewer?: Employee;
+}
+
 export interface PaymentProof {
   id: string;
   payment_id: string;
