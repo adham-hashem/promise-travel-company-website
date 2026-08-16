@@ -941,9 +941,14 @@ export default function Payments() {
             </thead>
             <tbody>
               {filtered.map(p => (
-                <tr key={p.id} className="cursor-pointer hover:bg-gray-50/50" onClick={() => setSelectedPayment(p)}>
+                <tr key={p.id} className={`cursor-pointer hover:bg-gray-50/50 ${p.customers?.is_vip ? 'bg-gold-50/50' : ''}`} onClick={() => setSelectedPayment(p)}>
                   <td className="font-mono text-xs text-gray-500">#{p.id.slice(0, 8)}</td>
-                  <td className="font-semibold text-gray-800">{p.customers?.name || '—'}</td>
+                  <td className="font-semibold text-gray-800">
+                      <div className="flex items-center gap-2">
+                        {p.customers?.name || '؟'}
+                        {p.customers?.is_vip && <span className="text-[10px] bg-gold-100 text-gold-700 px-1.5 py-0.5 rounded font-bold border border-gold-200">VIP</span>}
+                      </div>
+                    </td>
                   <td className="text-sm text-gray-600 font-semibold">{p.packages?.name || '—'}</td>
                   <td><span className="badge bg-navy-50 text-navy-700 text-xs">{p.payment_type || 'دفعة عادية'}</span></td>
                   <td className="font-bold text-navy-900">{fmt(p.amount)} ج.م</td>
@@ -1632,3 +1637,6 @@ function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOp
     </div>
   );
 }
+
+
+

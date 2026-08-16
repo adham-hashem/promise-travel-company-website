@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { compressImage } from '../lib/imageCompressor';
 import type { VIPTrip, Customer, VIPTripLog } from '../types';
 
 interface VIPDetailsProps {
@@ -23,6 +24,11 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
   // Customer Add Form State
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', age_group: 'بالغ' });
+  const [docUploads, setDocUploads] = useState<Record<string, { file: File | null; preview: string }>>({
+    passport_image: { file: null, preview: '' },
+    personal_photo: { file: null, preview: '' },
+    national_id_image: { file: null, preview: '' }
+  });
 
   // Execution Items
   const executionItems = [
@@ -67,7 +73,7 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
         name: newCustomer.name,
         phone: newCustomer.phone,
         age_group: newCustomer.age_group,
-        client_type: 'VIP',
+        client_type: 'فردي',
         is_vip: true,
         vip_trip_id: tripId,
         status: 'جديد',
@@ -77,6 +83,44 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
       
       if (error) throw error;
       
+      // Handle File Uploads in Background
+      const docTypes = [
+        { id: 'passport_image', label: 'جواز السفر' },
+        { id: 'personal_photo', label: 'الصورة الشخصية' },
+        { id: 'national_id_image', label: 'بطاقة الهوية' }
+      ];
+
+      const uploadPromises = docTypes.map(async (d) => {
+        const doc = docUploads[d.id];
+        if (!doc.file) return;
+        const compressedFile = await compressImage(doc.file);
+        const ext = (compressedFile.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+        const docTypeKey: Record<string, string> = {
+          'passport_image': 'passport',
+          'personal_photo': 'photo',
+          'national_id_image': 'national_id'
+        };
+        const safeDocType = docTypeKey[d.id] || 'document';
+        const fileName = `${data.id}/${safeDocType}_${Date.now()}.${ext}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
+          
+        if (uploadError) throw uploadError;
+        
+        await supabase.from('documents').insert({
+          customer_id: data.id,
+          document_type: d.label,
+          file_path: fileName,
+          uploaded_by: profile?.id
+        });
+      });
+
+      Promise.all(uploadPromises).catch(err => {
+        console.error('Error during VIP customer background upload:', err);
+      });
+
       // Log event
       await supabase.from('vip_trip_logs').insert({
         trip_id: tripId,
@@ -87,6 +131,11 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
 
       setShowAddCustomer(false);
       setNewCustomer({ name: '', phone: '', age_group: 'بالغ' });
+      setDocUploads({
+        passport_image: { file: null, preview: '' },
+        personal_photo: { file: null, preview: '' },
+        national_id_image: { file: null, preview: '' }
+      });
       loadTripDetails();
     } catch (err: any) {
       alert('خطأ في الإضافة: ' + err.message);
@@ -108,6 +157,18 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
       loadTripDetails();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('حجم الملف يجب أن لا يتجاوز 10 ميجابايت');
+        return;
+      }
+      const preview = URL.createObjectURL(file);
+      setDocUploads(prev => ({ ...prev, [type]: { file, preview } }));
     }
   };
 
@@ -288,8 +349,46 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
                       <option value="رضيع">رضيع</option>
                     </select>
                   </div>
-                </div>
-                <div className="flex justify-end gap-3 mt-4">
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="col-span-full">
+                      <h5 className="font-bold text-navy-800 border-b pb-2 mb-2">المستندات</h5>
+                    </div>
+                    {[
+                      { id: 'passport_image', label: 'جواز السفر' },
+                      { id: 'personal_photo', label: 'صورة شخصية' },
+                      { id: 'national_id_image', label: 'بطاقة الهوية' }
+                    ].map(doc => (
+                      <div key={doc.id} className="bg-white p-3 rounded-xl border border-gray-100 flex flex-col items-center justify-center gap-2">
+                        <label className="text-sm font-bold text-gray-700">{doc.label}</label>
+                        <input 
+                          type="file" 
+                          id={`doc_${doc.id}`}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={e => handleFileUpload(e, doc.id)}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => document.getElementById(`doc_${doc.id}`)?.click()}
+                          className="btn-outline w-full py-2 text-xs flex justify-center items-center gap-2"
+                        >
+                          <Upload size={14} /> اختار ملف
+                        </button>
+                        {docUploads[doc.id]?.preview && (
+                          <div className="w-full relative mt-2 rounded overflow-hidden h-20">
+                            <img src={docUploads[doc.id].preview} alt="preview" className="w-full h-full object-cover" />
+                            <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5">
+                              <CheckCircle2 size={12} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end gap-3 mt-6">
                   <button type="button" onClick={() => setShowAddCustomer(false)} className="btn-outline">إلغاء</button>
                   <button type="submit" className="btn-gold">حفظ وإضافة</button>
                 </div>
