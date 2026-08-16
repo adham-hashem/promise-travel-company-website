@@ -36,7 +36,7 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
           .from('vip_trips')
           .select('*, assigned_employee:user_profiles!vip_trips_assigned_employee_id_fkey(*), customers(count)')
           .order('created_at', { ascending: false }),
-        supabase.from('user_profiles').select('*').eq('is_active', true)
+        supabase.from('employees').select('*').eq('is_active', true)
       ]);
 
       if (tripsRes.data) {
