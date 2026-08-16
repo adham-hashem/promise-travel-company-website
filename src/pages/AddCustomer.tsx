@@ -276,9 +276,13 @@ export default function AddCustomer({ onNavigate }: Props) {
           status: 'مرفوع',
         });
       });
-      await Promise.all(uploadPromises);
+      
+      // Fire and forget uploads in background to avoid blocking the UI
+      Promise.all(uploadPromises).catch(err => {
+        console.error('Error during background upload:', err);
+      });
 
-      setTimeout(() => onNavigate('customer-details', custId), 2000);
+      setTimeout(() => onNavigate('customer-details', custId), 200);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع');
     } finally {

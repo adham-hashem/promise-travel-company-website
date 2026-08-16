@@ -65,7 +65,7 @@ const NAV_SECTIONS: NavSection[] = [
     icon: Crown,
     anyPermission: ['vip_management_access'],
     items: [
-      { id: 'vip-dashboard', label: 'لوحة عملاء VIP', icon: Crown, permissionKey: 'vip_management_access' },
+      { id: 'vip-trips', label: 'لوحة رحلات VIP', icon: Crown, permissionKey: 'vip_management_access' },
     ],
   },
   {
@@ -134,7 +134,7 @@ const NAV_SECTIONS: NavSection[] = [
 const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   home: ['dashboard', 'client-search', 'tasks', 'calendar'],
   workflow: ['inquiries', 'customers', 'customer-add', 'customer-details', 'revenue', 'payments', 'operations', 'flight-tickets', 'sales-portal'],
-  vip: ['vip-dashboard', 'vip-details'],
+  vip: ['vip-trips', 'vip-details'],
   accounting_more: ['installments', 'expenses', 'commissions', 'invoices', 'profit'],
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
   internal: ['internal-trips', 'internal-groups', 'internal-bookings', 'internal-customers', 'internal-reports'],

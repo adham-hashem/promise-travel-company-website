@@ -740,3 +740,31 @@ export interface GroupRoom {
   gender?: 'رجال' | 'نساء' | 'عائلة';
   created_at: string;
 }
+
+export interface VIPTrip {
+  id: string;
+  trip_number: number;
+  name: string;
+  assigned_employee_id?: string;
+  departure_date?: string;
+  return_date?: string;
+  destination?: string;
+  total_price: number;
+  status: string;
+  progress_percentage: number;
+  execution_details: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  assigned_employee?: Employee;
+  customers?: Customer[];
+}
+
+export interface VIPTripLog {
+  id: string;
+  trip_id: string;
+  user_id?: string;
+  action: string;
+  details?: string;
+  created_at: string;
+  user?: Employee;
+}

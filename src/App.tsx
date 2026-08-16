@@ -36,7 +36,7 @@ import SuperAdminPanel from './pages/SuperAdminPanel';
 import SalesAgentPortal from './pages/SalesAgentPortal';
 import TravelGroups from './pages/TravelGroups';
 import InternalGroups from './pages/InternalGroups';
-import VIPDashboard from './pages/VIPDashboard';
+import VIPTrips from './pages/VIPTrips';
 import VIPDetails from './pages/VIPDetails';
 import QuotationForm from './pages/QuotationForm';
 import Layout from './components/Layout';
@@ -76,7 +76,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   visa: 'bookings_view',
   'flight-tickets': 'bookings_view',
   'super-admin': 'settings_access',
-  'vip-dashboard': 'vip_management_access',
+  'vip-trips': 'vip_management_access',
   'vip-details': 'vip_management_access',
 };
 */
@@ -241,8 +241,8 @@ function AppInner() {
       {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
       {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
       {currentPage === 'internal-groups' && canAccessPage('internal-groups') && <InternalGroups onNavigate={navigate} />}
-      {currentPage === 'vip-dashboard' && canAccessPage('vip-dashboard') && <VIPDashboard onNavigate={navigate} />}
-      {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails customerId={selectedCustomerId} onNavigate={navigate} />}
+      {currentPage === 'vip-trips' && canAccessPage('vip-trips') && <VIPTrips onNavigate={navigate} />}
+      {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails tripId={selectedCustomerId} onNavigate={navigate} />}
       {currentPage === 'quotation-form' && canAccessPage('quotation-form') && <QuotationForm />}
     </Layout></ErrorBoundary>
   );
