@@ -1,16 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import {
   FileCheck, Search, Loader2, Hash, User, Plane, Hotel as HotelIcon,
   Calendar, CheckCircle2, AlertCircle, FileText, CreditCard, Wallet,
-  Download, Eye, ChevronRight, Globe, Clock, X, Upload,
+  Filter, Download, Eye, ChevronRight, Globe, Clock, X, Upload,
   Trash2, UserCheck, Flag, Users, MessageSquare, Phone, Mail,
-  Package, Shield, FilePlus, Briefcase, Undo2,
+  Package, Ticket, Shield, FilePlus, Briefcase,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { compressImage } from '../lib/imageCompressor';
-import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 
 interface OpDoc {
   id: string;
@@ -37,7 +34,7 @@ interface OpFile {
   pax_count?: number;
   special_requests?: string | null;
   created_at: string;
-  customer: { id: string; name: string; client_code: string | null; phone: string; email: string | null; documents_status: string | null; service_type?: string | null; packages?: any | null } | null;
+  customer: { id: string; name: string; client_code: string | null; phone: string; email: string | null; documents_status: string | null } | null;
   booking: { id: string; status: string; payment_status: string; total_amount: number | null; paid_amount: number | null; package_name: string | null; source: string | null; destination: string | null; pax_count: number | null } | null;
   hotel: { name: string; city: string } | null;
   assigned_employee?: { id: string; name: string } | null;
@@ -68,19 +65,6 @@ const workflowStages = [
   { key: 'completed', label: 'مكتمل', icon: CheckCircle2 },
 ];
 
-const getWorkflowStages = (serviceType?: string) => {
-  if (serviceType === 'سياحة داخلية') {
-    return [
-      { key: 'new', label: 'جديد', icon: FileCheck },
-      { key: 'accounts', label: 'الحسابات', icon: Wallet },
-      { key: 'operations', label: 'التشغيل', icon: Briefcase },
-      { key: 'ready', label: 'جاهز للسفر', icon: CheckCircle2 },
-      { key: 'completed', label: 'مكتمل', icon: CheckCircle2 },
-    ];
-  }
-  return workflowStages;
-};
-
 const opDocTypes = ['تذكرة مؤكدة', 'فاوتشر فندق', 'فاوتشر نقل', 'تأمين سفر', 'نسخة التأشيرة', 'برنامج الرحلة', 'مستند إضافي'];
 
 const fileStatusOptions = ['جديد', 'قيد التجهيز', 'مستندات ناقصة', 'جاهز للسفر', 'مكتمل', 'مغلق'];
@@ -107,181 +91,26 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const [newDocType, setNewDocType] = useState(opDocTypes[0]);
   const [newNotes, setNewNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [showFlightTransferModal, setShowFlightTransferModal] = useState(false);
-  const [targetFlightEmpId, setTargetFlightEmpId] = useState('');
-  const [flightTransferNotes, setFlightTransferNotes] = useState('');
-  const [flightTransferring, setFlightTransferring] = useState(false);
   const docFileRef = useRef<HTMLInputElement>(null);
-
-  // Compute financial summary for selected operation file
-  const packagePrice = selected ? Number(selected.customer?.packages?.price || 0) : 0;
-  const bookingTotal = selected ? (Number(selected.booking?.total_amount || 0) || packagePrice) : 0;
-  const totalPaid = selected ? payments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0) : 0;
-  const remaining = Math.max(0, bookingTotal - totalPaid);
-  let payStatus = selected?.booking?.payment_status || 'غير مدفوع';
-  if (selected && !selected.booking?.payment_status && bookingTotal > 0) {
-    if (totalPaid >= bookingTotal) payStatus = 'مدفوع بالكامل';
-    else if (totalPaid > 0) payStatus = 'مدفوع جزئياً';
-  }
 
   useEffect(() => {
     load();
     loadEmployees();
   }, []);
 
-  const handleSendToFlight = async () => {
-    if (!selected) return;
-    setFlightTransferring(true);
-    const updatedNotes = flightTransferNotes
-      ? `${selected.notes ? selected.notes + ' | ' : ''}ملاحظات قسم التشغيل للطيران: ${flightTransferNotes}`
-      : selected.notes;
-
-    const { data, error: updateErr } = await supabase
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
       .from('operation_files')
-      .update({
-        workflow_stage: 'flight',
-        file_status: 'جاهز للسفر',
-        assigned_to: targetFlightEmpId || selected.assigned_to || null,
-        notes: updatedNotes,
-      })
-      .eq('id', selected.id)
       .select(`
         *,
         customer:customers(*),
-        booking:bookings(*, package:packages(name, type)),
+        booking:bookings(*),
         hotel:hotels(*),
-        internal_trip:internal_trips(name, destination)
-      `)
-      .single();
-
-    if (updateErr) {
-      alert(`فشل التحويل لقسم الطيران: ${updateErr.message}`);
-      setFlightTransferring(false);
-      return;
-    }
-
-    if (data) {
-      const emp = targetFlightEmpId
-        ? employees.find((e) => e.id === targetFlightEmpId) || null
-        : selected.assigned_employee;
-      
-      const r = data as any;
-      let packageName = '-';
-      if (r.booking?.package?.name) {
-        packageName = r.booking.package.name;
-      } else if (r.internal_trip?.name) {
-        packageName = r.internal_trip.name;
-      }
-
-      let destination = '-';
-      if (r.booking?.package?.type) {
-        destination = r.booking.package.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
-      } else if (r.internal_trip?.destination) {
-        destination = r.internal_trip.destination;
-      }
-
-      const updated = {
-        ...r,
-        assigned_employee: emp,
-        booking: r.booking ? {
-          ...r.booking,
-          package_name: packageName,
-          destination: destination
-        } : {
-          package_name: packageName,
-          destination: destination
-        }
-      } as unknown as OpFile;
-
-      setSelected(updated);
-      setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
-    }
-
-    if (selected.customer?.id) {
-      await supabase.from('workflow_timeline').insert({
-        customer_id: selected.customer.id,
-        stage: 'flight',
-        stage_label: 'قسم الطيران',
-        department: 'التشغيل',
-        employee_id: targetFlightEmpId || null,
-        status: 'مكتمل',
-        notes: flightTransferNotes || 'تم تحويل الملف من قسم التشغيل إلى مسؤول الطيران',
-      });
-    }
-
-    if (targetFlightEmpId) {
-      await supabase.from('notifications').insert({
-        employee_id: targetFlightEmpId,
-        type: 'task_assigned',
-        title: 'ملف جديد محول من قسم التشغيل لإصدار التذاكر',
-        body: `العميل: ${selected.customer?.name || '—'} - ملاحظات التشغيل: ${flightTransferNotes}`,
-      });
-    }
-
-    setFlightTransferring(false);
-    setShowFlightTransferModal(false);
-    setFlightTransferNotes('');
-    setTargetFlightEmpId('');
-  };
-
-  const load = async () => {
-    setLoading(true);
-    // Use simple select without named FK hint — avoids failure if FK constraint name differs in remote DB
-    const { data, error } = await supabase
-      .from('operation_files')
-      .select(`
-        *,
-        customer:customers(*, packages(*)),
-        booking:bookings(*, package:packages(name, type)),
-        hotel:hotels(*),
-        internal_trip:internal_trips(name, destination)
+        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
       `)
       .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('[OperationsDashboard] load error:', error.message);
-    }
-
-    // Load employees separately to enrich assigned_to
-    const { data: empData } = await supabase.from('employees').select('id, name').eq('is_active', true);
-    const empMap: Record<string, { id: string; name: string }> = {};
-    (empData || []).forEach((e: any) => { empMap[e.id] = e; });
-
-    const rows = ((data as unknown as any[]) || [])
-      .filter((r: any) => r.customer?.client_type !== 'فوج')
-      .map((r: any) => {
-      let packageName = '-';
-      if (r.booking?.package?.name) {
-        packageName = r.booking.package.name;
-      } else if (r.customer?.packages?.name) {
-        packageName = r.customer.packages.name;
-      } else if (r.internal_trip?.name) {
-        packageName = r.internal_trip.name;
-      }
-
-      let destination = '-';
-      if (r.booking?.package?.type) {
-        destination = r.booking.package.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
-      } else if (r.customer?.packages?.type) {
-        destination = r.customer.packages.type === 'حج' ? 'مكة والمدينة (حج)' : 'مكة والمدينة (عمرة)';
-      } else if (r.internal_trip?.destination) {
-        destination = r.internal_trip.destination;
-      }
-
-      return {
-        ...r,
-        assigned_employee: r.assigned_to ? (empMap[r.assigned_to] || null) : null,
-        booking: r.booking ? {
-          ...r.booking,
-          package_name: packageName,
-          destination: destination
-        } : {
-          package_name: packageName,
-          destination: destination
-        }
-      };
-    });
-
+    const rows = (data as unknown as OpFile[]) || [];
     setFiles(rows);
     setStats({
       total: rows.length,
@@ -318,43 +147,24 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       setCustomerDocs(custDocs || []);
     }
     // Load payments
-    if (f.customer?.id) {
-      const { data: payData } = await supabase
-        .from('payments')
-        .select('*, user_profiles(*)')
-        .eq('customer_id', f.customer.id)
-        .order('payment_date', { ascending: false });
-      setPayments(payData || []);
-    } else if (f.booking?.id) {
+    if (f.booking?.id) {
       const { data: payData } = await supabase
         .from('payments')
         .select('*, user_profiles(*)')
         .eq('booking_id', f.booking.id)
         .order('payment_date', { ascending: false });
       setPayments(payData || []);
-    } else {
-      setPayments([]);
-    }
       // Load invoices
-      if (f.customer?.id) {
-        const { data: invData } = await supabase
-          .from('invoices')
-          .select('*, hotel:hotels(name)')
-          .eq('customer_id', f.customer.id)
-          .order('created_at', { ascending: false });
-        setInvoices(invData || []);
-      } else {
-        setInvoices([]);
-      }
+      const { data: invData } = await supabase
+        .from('invoices')
+        .select('*, hotel:hotels(name)')
+        .eq('customer_id', f.customer?.id)
+        .order('created_at', { ascending: false });
+      setInvoices(invData || []);
+    }
   };
 
   const filtered = files.filter((f) => {
-    // Hide archived by default unless search is active
-    if ((f as any).is_archived && !search) return false;
-
-    // By default, do not show 'accounts' stage files in the Operations Dashboard unless stageFilter is set to 'accounts' or search is active
-    if (f.workflow_stage === 'accounts' && stageFilter !== 'accounts' && !search) return false;
-
     if (statusFilter && f.file_status !== statusFilter) return false;
     if (stageFilter && f.workflow_stage !== stageFilter) return false;
     const q = search.toLowerCase();
@@ -370,62 +180,9 @@ export default function OperationsDashboard({ onNavigate }: Props) {
   const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
   const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('ar-EG') : '—';
 
-  const handleExportExcel = () => {
-    const data = filtered.map(f => ({
-      'كود العميل': f.customer?.client_code || '—',
-      'اسم العميل': f.customer?.name || '—',
-      'الهاتف': f.customer?.phone || '—',
-      'البرنامج / الباقة': f.booking?.package_name || '—',
-      'الوجهة': f.booking?.destination || '—',
-      'تاريخ السفر': f.travel_date ? new Date(f.travel_date).toLocaleDateString('ar-EG') : '—',
-      'تاريخ العودة': f.return_date ? new Date(f.return_date).toLocaleDateString('ar-EG') : '—',
-      'حالة الملف': f.file_status,
-      'المرحلة': workflowStages.find(w => w.key === f.workflow_stage)?.label || f.workflow_stage || '—',
-      'الموظف المسؤول': f.assigned_employee?.name || '—',
-    }));
-    exportToExcel(data, 'ملفات_التشغيل');
-  };
-
-  const handleExportPDF = () => {
-    const headers = ['الكود', 'العميل', 'الهاتف', 'الباقة', 'الوجهة', 'تاريخ السفر', 'حالة الملف', 'المرحلة', 'المسؤول'];
-    const rows = filtered.map(f => [
-      f.customer?.client_code || '—',
-      f.customer?.name || '—',
-      f.customer?.phone || '—',
-      f.booking?.package_name || '—',
-      f.booking?.destination || '—',
-      f.travel_date ? new Date(f.travel_date).toLocaleDateString('ar-EG') : '—',
-      f.file_status,
-      workflowStages.find(w => w.key === f.workflow_stage)?.label || f.workflow_stage || '—',
-      f.assigned_employee?.name || '—',
-    ]);
-    exportToPDF('تقرير ملفات التشغيل والمتابعة', headers, rows);
-  };
-
   const updateFile = async (updates: Record<string, any>) => {
     if (!selected) return;
     setSaving(true);
-
-    // Auto-archive customer and files when workflow stage is 'completed' or status is 'مكتمل'
-    if (updates.workflow_stage === 'completed' || updates.file_status === 'مكتمل') {
-      updates.is_archived = true;
-      if (selected.customer_id) {
-        await supabase.from('customers').update({ is_archived: true }).eq('id', selected.customer_id);
-        await supabase.from('vip_requests').update({ is_archived: true }).eq('customer_id', selected.customer_id);
-      }
-    } else if (
-      (updates.workflow_stage && updates.workflow_stage !== 'completed') ||
-      (updates.file_status && updates.file_status !== 'مكتمل' && updates.file_status !== 'مغلق')
-    ) {
-      if (selected.is_archived) {
-        updates.is_archived = false;
-        if (selected.customer_id) {
-          await supabase.from('customers').update({ is_archived: false }).eq('id', selected.customer_id);
-          await supabase.from('vip_requests').update({ is_archived: false }).eq('customer_id', selected.customer_id);
-        }
-      }
-    }
-
     const { data } = await supabase
       .from('operation_files')
       .update(updates)
@@ -434,15 +191,12 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         *,
         customer:customers(*),
         booking:bookings(*),
-        hotel:hotels(*)
+        hotel:hotels(*),
+        assigned_employee:employees!operation_files_assigned_to_fkey(id, name)
       `)
       .single();
     if (data) {
-      // Attach assigned_employee from employees list
-      const emp = updates.assigned_to
-        ? employees.find((e) => e.id === updates.assigned_to) || null
-        : selected.assigned_employee;
-      const updated = { ...(data as unknown as OpFile), assigned_employee: emp } as OpFile;
+      const updated = data as unknown as OpFile;
       setSelected(updated);
       setFiles(files.map((f) => (f.id === updated.id ? updated : f)));
       setStats((s) => ({
@@ -455,51 +209,6 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setSaving(false);
   };
 
-  const deleteFile = async () => {
-    if (!selected) return;
-    const confirmDelete = window.confirm('هل أنت متأكد من إزالة هذا العميل من قسم التشغيل؟ (سيتم الاحتفاظ بالملف والمدفوعات في قسم الحسابات)');
-    if (!confirmDelete) return;
-    
-    setSaving(true);
-    const { error } = await supabase
-      .from('operation_files')
-      .update({ workflow_stage: 'accounts', file_status: 'جديد' })
-      .eq('id', selected.id);
-      
-    if (error) {
-      alert(`فشل إزالة الملف: ${error.message}`);
-      setSaving(false);
-      return;
-    }
-    
-    setFiles(files.map(f => f.id === selected.id ? { ...f, workflow_stage: 'accounts', file_status: 'جديد' } : f));
-    setSelected(null);
-    setSaving(false);
-    alert('تمت إزالة العميل من قسم التشغيل وإرجاعه للحسابات بنجاح.');
-  };
-
-  const handleDeleteFile = async (file: OpFile) => {
-    const { data: hasFlight } = await supabase.from('flight_tickets').select('id').eq('customer_id', file.customer?.id || '').limit(1);
-
-    if (hasFlight && hasFlight.length > 0) {
-      alert("لا يمكن إزالة الملف لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
-      return;
-    }
-
-    if (!confirm('هل أنت متأكد من إزالة هذا العميل من قسم التشغيل؟ (سيتم الاحتفاظ به في الحسابات)')) return;
-    setSaving(true);
-    const { error } = await supabase.from('operation_files').update({ workflow_stage: 'accounts', file_status: 'جديد' }).eq('id', file.id);
-    if (error) {
-      alert(`فشل إزالة الملف: ${error.message}`);
-      setSaving(false);
-      return;
-    }
-    setFiles(files.map(f => f.id === file.id ? { ...f, workflow_stage: 'accounts', file_status: 'جديد' } : f));
-    if (selected?.id === file.id) setSelected(null);
-    setSaving(false);
-    alert('تمت إزالة العميل من قسم التشغيل بنجاح.');
-  };
-
   const uploadOpDoc = async (file: File) => {
     if (!selected) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -508,10 +217,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       return;
     }
     setUploadingDoc(true);
-    const compressedFile = await compressImage(file);
-    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const filePath = `op-docs/${selected.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
+    const filePath = `op-docs/${selected.id}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploadingDoc(false); return; }
     const { data } = await supabase
       .from('operation_file_documents')
@@ -519,8 +226,8 @@ export default function OperationsDashboard({ onNavigate }: Props) {
         operation_file_id: selected.id,
         doc_type: newDocType,
         file_path: filePath,
-        file_name: compressedFile.name,
-        file_size: compressedFile.size,
+        file_name: file.name,
+        file_size: file.size,
         uploaded_by: profile?.id || null,
       })
       .select('*')
@@ -535,24 +242,13 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setOpDocs(opDocs.filter((d) => d.id !== doc.id));
   };
 
-  const activeStages = selected ? getWorkflowStages(selected.customer?.service_type) : workflowStages;
-  const currentStageIndex = selected ? activeStages.findIndex((s) => s.key === (selected.workflow_stage || 'new')) : 0;
+  const currentStageIndex = selected ? workflowStages.findIndex((s) => s.key === (selected.workflow_stage || 'new')) : 0;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="section-title">لوحة التشغيل</h2>
-          <p className="section-subtitle">ملفات التشغيل — إدارة كاملة للعمليات، المستندات، الحسابات، التأشيرات، والطيران</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-            <Download size={14} /> Excel
-          </button>
-          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
-            <Download size={14} /> PDF
-          </button>
-        </div>
+      <div>
+        <h2 className="section-title">لوحة التشغيل</h2>
+        <p className="section-subtitle">ملفات التشغيل — إدارة كاملة للعمليات، المستندات، الحسابات، التأشيرات، والطيران</p>
       </div>
 
       {/* Stats */}
@@ -587,7 +283,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث برقم الملف (OP-1001)، كود العميل (CL-1001)، أو الاسم..."
-            className="form-input !pr-10"
+            className="form-input pr-10"
           />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="form-input sm:w-40">
@@ -643,16 +339,16 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                           {f.assigned_employee?.name && <span className="flex items-center gap-1"><UserCheck size={11} /> {f.assigned_employee.name}</span>}
                         </div>
                         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_status === 'مرفوضة' && (
+                          {f.visa_status === 'مرفوضة' && (
                             <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-lg"><AlertCircle size={11} /> تأشيرة مرفوضة</span>
                           )}
-                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_status === 'تمت الموافقة' && (
+                          {f.visa_status === 'تمت الموافقة' && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><CheckCircle2 size={11} /> تأشيرة معتمدة</span>
                           )}
-                          {f.customer?.service_type !== 'سياحة داخلية' && (f.visa_status === 'قيد التقديم' || f.visa_status === 'قيد المراجعة') && (
+                          {(f.visa_status === 'قيد التقديم' || f.visa_status === 'قيد المراجعة') && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg"><Clock size={11} /> {f.visa_status}</span>
                           )}
-                          {f.customer?.service_type !== 'سياحة داخلية' && f.visa_upload_status === 'Uploaded' && (
+                          {f.visa_upload_status === 'Uploaded' && (
                             <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><FileCheck size={11} /> ملف التأشيرة</span>
                           )}
                           {f.workflow_stage === 'flight' && (
@@ -704,17 +400,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     </div>
 
                     {/* Status */}
-                    <div className="flex items-center gap-2.5 flex-shrink-0">
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await handleDeleteFile(f);
-                          }}
-                          className="text-[11px] py-1.5 px-2.5 rounded-lg border border-red-200 text-red-600 bg-white hover:bg-red-50 hover:border-red-400 transition-colors flex items-center gap-1 font-bold shadow-xs"
-                          title="حذف الملف"
-                        >
-                          <Trash2 size={11} /> حذف
-                        </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`badge text-xs ${sc.bg} ${sc.color}`}>{f.file_status}</span>
                       <ChevronRight size={16} className="text-gray-300" />
                     </div>
@@ -727,7 +413,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
       </div>
 
       {/* Detail Modal */}
-      {selected && createPortal(
+      {selected && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelected(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
@@ -753,110 +439,23 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               <div>
                 <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Briefcase size={15} className="text-gold-500" /> مسار العمل (Workflow Pipeline)</h4>
                 <div className="flex items-center gap-1 overflow-x-auto pb-2">
-                  {activeStages.map((stage, i) => {
+                  {workflowStages.map((stage, i) => {
                     const Icon = stage.icon;
                     const isDone = i <= currentStageIndex;
                     const isCurrent = i === currentStageIndex;
-                    // Allow reverting any completed stage except the very first one
-                    const canRevert = isDone && i > 0;
                     return (
                       <div key={stage.key} className="flex items-center gap-1 flex-shrink-0">
-                        <div className={`relative flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl transition-all group ${isCurrent ? 'bg-navy-100 ring-2 ring-navy-400' : isDone ? 'bg-emerald-50' : 'bg-gray-50'}`}>
+                        <div className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-xl transition-all ${isCurrent ? 'bg-navy-100 ring-2 ring-navy-400' : isDone ? 'bg-emerald-50' : 'bg-gray-50'}`}>
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isDone ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
                             {isDone ? <CheckCircle2 size={14} /> : <Icon size={13} />}
                           </div>
                           <span className={`text-xs font-medium ${isDone ? 'text-emerald-700' : 'text-gray-400'}`}>{stage.label}</span>
-                          {canRevert && (
-                            <button
-                              title={`إلغاء مرحلة "${stage.label}" وجميع المراحل اللاحقة`}
-                              onClick={async () => {
-                                const prevStage = activeStages[i - 1];
-                                const confirmMsg = `هل أنت متأكد؟ هل تريد إلغاء مرحلة "${stage.label}" وإرجاع العميل إلى مرحلة "${prevStage.label}"؟\n\nسيتم أيضاً إلغاء جميع المراحل اللاحقة تلقائياً.`;
-                                if (!window.confirm(confirmMsg)) return;
-                                await updateFile({ workflow_stage: prevStage.key });
-                              }}
-                              className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
-                            >
-                              <X size={11} />
-                            </button>
-                          )}
                         </div>
-                        {i < activeStages.length - 1 && <div className={`w-4 h-0.5 ${i < currentStageIndex ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
+                        {i < workflowStages.length - 1 && <div className={`w-4 h-0.5 ${i < currentStageIndex ? 'bg-emerald-400' : 'bg-gray-200'}`} />}
                       </div>
                     );
                   })}
                 </div>
-                {/* Send to Aviation Banner */}
-                {selected.customer?.service_type !== 'سياحة داخلية' && (!selected.workflow_stage || ['new', 'accounts', 'operations', 'visa'].includes(selected.workflow_stage)) && selected.file_status !== 'بانتظار استكمال التشغيل' && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-cyan-50/80 p-3.5 rounded-xl border border-cyan-200 mt-3 gap-2">
-                    <div>
-                      <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
-                        <Plane size={15} className="text-cyan-600" />
-                        تحويل الملف إلى مسؤول قسم الطيران (Aviation Transfer)
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        كتابة ملاحظات موظف التشغيل وإرسال الملف مباشرة لمسؤول الطيران لإصدار التذاكر
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setFlightTransferNotes(selected.notes || '');
-                        setShowFlightTransferModal(true);
-                      }}
-                      className="btn-gold text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                    >
-                      <Plane size={14} /> تحويل للطيران + ملاحظات
-                    </button>
-                  </div>
-                )}
-                
-                {/* Close file as Ready to Travel (after returning from Aviation) */}
-                {selected.customer?.service_type !== 'سياحة داخلية' && selected.workflow_stage === 'operations' && selected.file_status === 'بانتظار استكمال التشغيل' && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 mt-3 gap-2">
-                    <div>
-                      <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <CheckCircle2 size={15} className="text-emerald-600" />
-                        إغلاق الملف كـ (مكتمل وجاهز للسفر)
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        التأكيد على استكمال جميع الإجراءات (تأشيرات، فنادق، طيران) ليكون الملف جاهزاً
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (!window.confirm('هل أنت متأكد من إنهاء كافة إجراءات هذا الملف وجعله جاهزاً للسفر؟')) return;
-                        await updateFile({ workflow_stage: 'ready', file_status: 'جاهز للسفر' });
-                      }}
-                      className="btn-gold !bg-emerald-600 hover:!bg-emerald-700 text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                    >
-                      <CheckCircle2 size={14} /> ملف مكتمل وجاهز للسفر
-                    </button>
-                  </div>
-                )}
-
-                {/* For domestic trips: show finish button directly in operations stage */}
-                {selected.customer?.service_type === 'سياحة داخلية' && selected.workflow_stage === 'operations' && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200 mt-3 gap-2">
-                    <div>
-                      <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <CheckCircle2 size={15} className="text-emerald-600" />
-                        إنهاء ملف الرحلة الداخلية وجعله جاهزاً للسفر
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        بما أن الرحلة داخلية (سياحة داخلية)، لا تتطلب إجراءات طيران وتذاكر. يمكنك إنهاء الملف مباشرة.
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (!window.confirm('هل أنت متأكد من إنهاء إجراءات هذه الرحلة الداخلية وجعلها جاهزة للسفر؟')) return;
-                        await updateFile({ workflow_stage: 'ready', file_status: 'جاهز للسفر' });
-                      }}
-                      className="btn-gold !bg-emerald-600 hover:!bg-emerald-700 text-xs py-2 px-3 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                    >
-                      <CheckCircle2 size={14} /> ملف مكتمل وجاهز للسفر
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Customer + Booking info */}
@@ -888,10 +487,10 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Wallet size={15} className="text-gold-500" /> الملخص المالي</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { label: 'إجمالي الحجز', value: fmt(bookingTotal), color: 'text-navy-900' },
-                    { label: 'المدفوع', value: fmt(totalPaid), color: 'text-emerald-600' },
-                    { label: 'المتبقي', value: fmt(remaining), color: 'text-red-600' },
-                    { label: 'حالة الدفع', value: payStatus, color: 'text-navy-700' },
+                    { label: 'إجمالي الحجز', value: fmt(Number(selected.booking?.total_amount || 0)), color: 'text-navy-900' },
+                    { label: 'المدفوع', value: fmt(Number(selected.booking?.paid_amount || 0)), color: 'text-emerald-600' },
+                    { label: 'المتبقي', value: fmt(Math.max(0, Number(selected.booking?.total_amount || 0) - Number(selected.booking?.paid_amount || 0))), color: 'text-red-600' },
+                    { label: 'حالة الدفع', value: selected.booking?.payment_status || '—', color: 'text-navy-700' },
                   ].map((r) => (
                     <div key={r.label} className="bg-gray-50 rounded-xl p-3">
                       <p className="text-xs text-gray-400 mb-1">{r.label}</p>
@@ -918,25 +517,23 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               </div>
 
               {/* Visa status */}
-              {selected.customer?.service_type !== 'سياحة داخلية' && (
-                <div className="bg-gray-50 rounded-2xl p-4">
-                  <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Shield size={15} className="text-gold-500" /> حالة التأشيرة</h4>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {selected.visa_status === 'تمت الموافقة' ? (
-                      <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><CheckCircle2 size={14} /> تمت الموافقة</span>
-                    ) : selected.visa_status === 'مرفوضة' ? (
-                      <span className="badge bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={14} /> مرفوضة</span>
-                    ) : selected.visa_status ? (
-                      <span className="badge bg-amber-100 text-amber-700 flex items-center gap-1"><Clock size={14} /> {selected.visa_status}</span>
-                    ) : (
-                      <span className="badge bg-gray-100 text-gray-500">لم يتم التقديم</span>
-                    )}
-                    {selected.visa_upload_status === 'Uploaded' && (
-                      <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><FileCheck size={14} /> ملف التأشيرة مرفوع</span>
-                    )}
-                  </div>
+              <div className="bg-gray-50 rounded-2xl p-4">
+                <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><Shield size={15} className="text-gold-500" /> حالة التأشيرة</h4>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {selected.visa_status === 'تمت الموافقة' ? (
+                    <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><CheckCircle2 size={14} /> تمت الموافقة</span>
+                  ) : selected.visa_status === 'مرفوضة' ? (
+                    <span className="badge bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={14} /> مرفوضة</span>
+                  ) : selected.visa_status ? (
+                    <span className="badge bg-amber-100 text-amber-700 flex items-center gap-1"><Clock size={14} /> {selected.visa_status}</span>
+                  ) : (
+                    <span className="badge bg-gray-100 text-gray-500">لم يتم التقديم</span>
+                  )}
+                  {selected.visa_upload_status === 'Uploaded' && (
+                    <span className="badge bg-emerald-100 text-emerald-700 flex items-center gap-1"><FileCheck size={14} /> ملف التأشيرة مرفوع</span>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Customer documents */}
               <div>
@@ -1018,19 +615,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
               )}
 
               {/* Assignment + Status + Priority controls */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="form-label text-gold-600 font-bold">مرحلة ملف العمل</label>
-                  <select
-                    value={selected.workflow_stage || 'accounts'}
-                    onChange={(e) => updateFile({ workflow_stage: e.target.value })}
-                    className="form-input border-gold-300 font-bold text-navy-900 bg-white"
-                  >
-                    {activeStages.map((stage) => (
-                      <option key={stage.key} value={stage.key}>{stage.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="form-label">الموظف المسؤول</label>
                   <select
@@ -1153,91 +738,18 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                 )}
               </div>
 
-              {/* Delete and Navigation actions */}
-              <div className="pt-4 border-t border-red-100 flex items-center justify-between mt-4">
+              {/* Navigate to customer */}
+              {onNavigate && selected.customer?.id && (
                 <button
-                  onClick={deleteFile}
-                  disabled={saving}
-                  className="btn-outline !border-amber-200 !text-amber-700 hover:!bg-amber-50 text-xs py-2 px-4 flex items-center gap-1.5 font-bold"
+                  onClick={() => onNavigate('customer-details', selected.customer!.id)}
+                  className="text-xs text-navy-600 font-semibold hover:underline flex items-center gap-1"
                 >
-                  <Undo2 size={14} /> إزالة من التشغيل وإرجاع للحسابات
+                  عرض ملف العميل الكامل <ChevronRight size={12} />
                 </button>
-                {onNavigate && selected.customer?.id && (
-                  <button
-                    onClick={() => onNavigate('customer-details', selected.customer!.id)}
-                    className="text-xs text-navy-600 font-semibold hover:underline flex items-center gap-1"
-                  >
-                    عرض ملف العميل الكامل <ChevronRight size={12} />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Transfer to Flight Modal */}
-      {showFlightTransferModal && selected && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4" dir="rtl" onClick={() => setShowFlightTransferModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 space-y-4 border border-cyan-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 text-cyan-600 border-b border-gray-100 pb-3">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-100 flex items-center justify-center">
-                <Plane size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-navy-900 text-base">تحويل الملف إلى قسم الطيران</h3>
-                <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{selected.customer?.name || '—'}</span></p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="form-label font-bold text-navy-900 text-xs">اختر مسؤول الطيران المستلم:</label>
-                <select
-                  value={targetFlightEmpId}
-                  onChange={(e) => setTargetFlightEmpId(e.target.value)}
-                  className="form-input text-xs"
-                >
-                  <option value="">— جميع موظفي ومسؤولي قسم الطيران —</option>
-                  {employees.map((e) => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="form-label font-bold text-navy-900 text-xs">
-                  ملاحظات وتوجيهات موظف التشغيل إلى مسؤول الطيران <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={flightTransferNotes}
-                  onChange={(e) => setFlightTransferNotes(e.target.value)}
-                  className="form-input text-xs resize-none"
-                  rows={4}
-                  placeholder="اكتب ملاحظات التشغيل (مثال: درجات السفر المطلوب إصدارها، تفاصيل أرقام الجوازات والمواعيد، طلبات الوجبات أو المقاعد...)"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleSendToFlight}
-                disabled={flightTransferring}
-                className="btn-gold flex-1 justify-center text-xs py-2.5"
-              >
-                {flightTransferring ? 'جارٍ الإرسال...' : 'تأكيد وإرسال إلى قسم الطيران'}
-              </button>
-              <button
-                onClick={() => setShowFlightTransferModal(false)}
-                className="btn-outline flex-1 justify-center text-xs py-2.5"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );

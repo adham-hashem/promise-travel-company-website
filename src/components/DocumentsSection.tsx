@@ -5,14 +5,12 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { compressImage } from '../lib/imageCompressor';
 import type { DocumentRecord, DocType, DocStatus } from '../types';
 
 interface Props {
   customerId?: string;
   bookingId?: string;
   customerName?: string;
-  onDocsChange?: (docs: DocumentRecord[]) => void;
 }
 
 const docTypes: { id: DocType; label: string; icon: typeof FileText }[] = [
@@ -30,7 +28,7 @@ const statusConfig: Record<DocStatus, { label: string; class: string; icon: type
   'مرفوض': { label: 'مرفوض', class: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-export default function DocumentsSection({ customerId, bookingId, customerName, onDocsChange }: Props) {
+export default function DocumentsSection({ customerId, bookingId, customerName }: Props) {
   const { profile, can } = useAuth();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,13 +45,11 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
 
   useEffect(() => {
     (async () => {
-      let query = supabase.from('documents').select('*, customers(*), bookings(*), uploader:user_profiles!documents_uploaded_by_fkey(id, name), reviewer:user_profiles!documents_reviewed_by_fkey(id, name)');
+      let query = supabase.from('documents').select('*, customers(*), bookings(*), user_profiles(*)');
       if (customerId) query = query.eq('customer_id', customerId);
       else if (bookingId) query = query.eq('booking_id', bookingId);
       const { data } = await query.order('created_at', { ascending: false });
-      const loadedDocs = (data as DocumentRecord[]) || [];
-      setDocs(loadedDocs);
-      if (onDocsChange) onDocsChange(loadedDocs);
+      setDocs((data as DocumentRecord[]) || []);
       setLoading(false);
     })();
   }, [customerId, bookingId]);
@@ -61,19 +57,9 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
-    const compressedFile = await compressImage(file);
-    const ext = (compressedFile.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '');
-    // Sanitize doc type to ASCII-safe key
-    const docTypeKey: Record<string, string> = {
-      'جواز سفر': 'passport',
-      'بطاقة رقم قومي': 'national_id',
-      'صورة شخصية': 'personal_photo',
-      'تأشيرة': 'visa',
-      'مستند إضافي': 'extra_doc',
-    };
-    const safeDocType = docTypeKey[uploadType] || 'document';
-    const filePath = `${customerId || bookingId}/${Date.now()}_${safeDocType}.${ext}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
+    const ext = file.name.split('.').pop();
+    const filePath = `${customerId || bookingId}/${Date.now()}_${uploadType}.${ext}`;
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
 
     // Generate doc sub-code if customer has a client_code
@@ -92,17 +78,15 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
       uploaded_by: profile?.id || null,
       doc_type: uploadType,
       file_path: filePath,
-      file_name: compressedFile.name,
-      file_size: compressedFile.size,
+      file_name: file.name,
+      file_size: file.size,
       status: 'مرفوع',
       doc_number: docNumber,
-    }).select('*, customers(*), bookings(*)').single();
+    }).select('*, customers(*), bookings(*), user_profiles(*)').single();
 
     if (insertErr) { alert('فشل حفظ المستند: ' + insertErr.message); setUploading(false); return; }
     if (data) {
-      const newDocs = [data as DocumentRecord, ...docs];
-      setDocs(newDocs);
-      if (onDocsChange) onDocsChange(newDocs);
+      setDocs([data as DocumentRecord, ...docs]);
       // Notify operations employees
       await notifyOperationsStaff(data as DocumentRecord);
     }
@@ -136,12 +120,8 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
       review_notes: notes || null,
       reviewed_by: profile?.id || null,
       reviewed_at: new Date().toISOString(),
-    }).eq('id', doc.id).select('*, customers(*), bookings(*)').single();
-    if (data) {
-      const updatedDocs = docs.map(d => d.id === doc.id ? (data as DocumentRecord) : d);
-      setDocs(updatedDocs);
-      if (onDocsChange) onDocsChange(updatedDocs);
-    }
+    }).eq('id', doc.id).select('*, customers(*), bookings(*), user_profiles(*)').single();
+    if (data) setDocs(docs.map(d => d.id === doc.id ? (data as DocumentRecord) : d));
     setReviewingId(null);
     setReviewNotes('');
   };

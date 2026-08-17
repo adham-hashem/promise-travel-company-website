@@ -28,26 +28,24 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [custRes, bookRes, empRes, itRes, itbRes, expRes, payRes] = await Promise.all([
+      const [custRes, bookRes, empRes, itRes, itbRes, expRes, pkgRes] = await Promise.all([
         supabase.from('customers').select('status, created_at, source, service_type'),
-        supabase.from('bookings').select('status, total_amount, booking_date, package_id, payment_status, num_travelers, package:packages(name, cost_price)'),
+        supabase.from('bookings').select('status, total_amount, booking_date, package_id, payment_status, package:packages(name, cost_price)'),
         supabase.from('employees').select('name, target_percentage, bookings_count').order('target_percentage', { ascending: false }).limit(5),
         supabase.from('internal_trips').select('status'),
         supabase.from('internal_trip_bookings').select('booking_status, total_amount'),
         supabase.from('expenses').select('amount, expense_date, category'),
-        supabase.from('payments').select('amount, status, approval_status, payment_date'),
+        supabase.from('packages').select('id, name'),
       ]);
 
       const customers = (custRes.data as Array<{ status: string; created_at: string; source: string | null; service_type: string | null }>) || [];
-      const bookings = (bookRes.data as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; num_travelers?: number; package: { name: string; cost_price: number | null } | null }>) || [];
+      const bookings = (bookRes.data as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; package: { name: string; cost_price: number | null } | null }>) || [];
       const expenses = (expRes.data as Array<{ amount: number; expense_date: string; category: string }>) || [];
-      const payments = (payRes.data as Array<{ amount: number; status: string; approval_status?: string; payment_date: string }>) || [];
 
       const now = new Date();
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      
-      const totalRevenue = payments.filter((p) => p.approval_status === 'معتمد' || p.status === 'مكتمل' || p.status === 'معتمد').reduce((s, p) => s + Number(p.amount || 0), 0);
-      const totalCost = bookings.filter((b) => b.status === 'مؤكد').reduce((s, b) => s + Number(b.package?.cost_price || 0) * Number(b.num_travelers || 1), 0);
+      const totalRevenue = bookings.filter((b) => b.status === 'مؤكد').reduce((s, b) => s + Number(b.total_amount || 0), 0);
+      const totalCost = bookings.filter((b) => b.status === 'مؤكد').reduce((s, b) => s + Number(b.package?.cost_price || 0), 0);
       const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
       setStats({
@@ -96,13 +94,11 @@ export default function Dashboard() {
 
       // Monthly data
       const monthMap = new Map<number, { sales: number; expenses: number }>();
-      payments.forEach((p) => {
-        if ((p.approval_status === 'معتمد' || p.status === 'مكتمل' || p.status === 'معتمد') && p.payment_date) {
-          const m = new Date(p.payment_date).getMonth();
-          const row = monthMap.get(m) || { sales: 0, expenses: 0 };
-          row.sales += Number(p.amount || 0);
-          monthMap.set(m, row);
-        }
+      bookings.forEach((b) => {
+        const m = new Date(b.booking_date).getMonth();
+        const row = monthMap.get(m) || { sales: 0, expenses: 0 };
+        row.sales += Number(b.total_amount || 0);
+        monthMap.set(m, row);
       });
       expenses.forEach((e) => {
         const m = new Date(e.expense_date).getMonth();
@@ -127,6 +123,11 @@ export default function Dashboard() {
   }, []);
 
   const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
+  const statusColors: Record<string, string> = {
+    جديد: 'bg-blue-100 text-blue-700', مهتم: 'bg-amber-100 text-amber-700',
+    متابعة: 'bg-purple-100 text-purple-700', 'تم الحجز': 'bg-green-100 text-green-700',
+    مكتمل: 'bg-emerald-100 text-emerald-700', ملغي: 'bg-red-100 text-red-700',
+  };
 
   const statCards = [
     { label: 'إجمالي العملاء', value: String(stats.totalCustomers), icon: Users, color: 'from-navy-800 to-navy-600' },

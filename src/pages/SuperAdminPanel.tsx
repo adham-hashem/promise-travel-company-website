@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { ALL_PAGES, PERMISSION_GROUPS, getDefaultPagePermissions, type Permissions } from '../lib/permissions';
+import { PERMISSION_GROUPS, type Permissions } from '../lib/permissions';
 
 interface ProfileItem {
   id: string;
@@ -17,7 +17,6 @@ interface ProfileItem {
   role: string;
   status: string;
   permissions: Permissions;
-  page_permissions?: Record<string, boolean>;
   created_at: string;
   employee_id?: string; // linked employees.id if exists
 }
@@ -209,18 +208,9 @@ export default function SuperAdminPanel() {
   const handleSelectUser = (p: ProfileItem) => {
     setSelectedAdmin(p);
     setMessage('');
-    const roleDefaults = getDefaultPagePermissions(p.role);
-    const pages: Record<string, boolean> = {};
-    ALL_PAGES.forEach((pg) => {
-      if (p.page_permissions && pg.key in p.page_permissions) {
-        // Use explicitly saved value
-        pages[pg.key] = p.page_permissions[pg.key];
-      } else {
-        // Fall back to role defaults (tasks=true, dashboard/client-search=false unless role has them)
-        pages[pg.key] = roleDefaults[pg.key] ?? false;
-      }
-    });
-    setPagePerms(pages);
+    // Permissions now handled via actionPerms only
+      setPagePerms({});
+      
     setActionPerms({ ...p.permissions });
   };
 
@@ -241,7 +231,6 @@ export default function SuperAdminPanel() {
       .from('user_profiles')
       .update({
         permissions: actionPerms,
-        page_permissions: pagePerms,
       })
       .eq('id', selectedAdmin.id);
 

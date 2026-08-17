@@ -21,11 +21,10 @@ export default function Login() {
     const err = await signIn(email, password);
     setLoading(false);
     if (err) {
-      const lower = err.toLowerCase();
-      if (lower.includes('invalid login credentials') || lower.includes('invalid_credentials') || lower.includes('grant') || lower.includes('bad request')) {
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة، أو لم يتم تأكيد الحساب بعد');
-      } else if (lower.includes('email not confirmed')) {
-        setError('يرجى تأكيد البريد الإلكتروني في حسابك على Supabase أو تعطيل إجبار التأكيد');
+      if (err.includes('Invalid login credentials') || err.includes('invalid_credentials')) {
+        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      } else if (err.includes('Email not confirmed')) {
+        setError('يرجى تأكيد البريد الإلكتروني أولاً');
       } else {
         setError(err);
       }
@@ -59,7 +58,7 @@ export default function Login() {
                 <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3.5 text-navy-400" />
                 <input
                   type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="admin@promise.com"
                   className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pr-10 pl-4 text-white placeholder-navy-400 text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent transition-all"
                 />
               </div>

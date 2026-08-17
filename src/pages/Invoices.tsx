@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FileText, Plus, Search, Printer, Download, Eye,
-  Pencil, Trash2, X, CheckCircle, Clock, AlertCircle, Phone,
+  Pencil, Trash2, X, CheckCircle, Clock, AlertCircle,
+  User, Phone, Package, Building2, DollarSign,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import { useAuth } from '../contexts/AuthContext';
 import type { Invoice, InvoicePaymentStatus, InvoiceServiceType, Customer, Hotel } from '../types';
 
@@ -21,7 +21,22 @@ const paymentStatusIcons: Record<InvoicePaymentStatus, React.ElementType> = {
 
 const SERVICE_TYPES: InvoiceServiceType[] = ['حج', 'عمرة', 'رحلة داخلية', 'أخرى'];
 
-
+const MOCK_INVOICES: Invoice[] = [
+  {
+    id: '1', invoice_number: 'INV-001', customer_id: undefined, booking_id: undefined, hotel_id: undefined,
+    service_type: 'عمرة', package_name: 'باقة عمرة مميزة', total_amount: 15000, paid_amount: 10000,
+    payment_status: 'مدفوع جزئياً', notes: '',
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    customers: { id: '1', name: 'أحمد محمد علي', phone: '01012345678', status: 'تم الحجز', clients_count: 0, bookings_count: 0, target_percentage: 0, is_active: true, created_at: '' } as any,
+  },
+  {
+    id: '2', invoice_number: 'INV-002', customer_id: undefined, booking_id: undefined, hotel_id: undefined,
+    service_type: 'حج', package_name: 'باقة حج اقتصادية', total_amount: 30000, paid_amount: 30000,
+    payment_status: 'مدفوع بالكامل', notes: '',
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    customers: { id: '2', name: 'فاطمة إبراهيم', phone: '01098765432', status: 'مكتمل', clients_count: 0, bookings_count: 0, target_percentage: 0, is_active: true, created_at: '' } as any,
+  },
+];
 
 function generateInvoicePlaceholder(): string {
   return 'سيتم التوليد تلقائياً';
@@ -70,9 +85,8 @@ function InvoiceModal({ invoice, customers, hotels, onClose, onSave }: InvoiceMo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const { client_code, ...restForm } = form;
     const payload = {
-      ...restForm,
+      ...form,
       invoice_number: subCode || form.invoice_number,
       payment_status: paymentStatus,
       customer_id: form.customer_id || null,
@@ -298,6 +312,7 @@ export default function Invoices() {
   const [showModal, setShowModal] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -306,9 +321,9 @@ export default function Invoices() {
       supabase.from('customers').select('id, name, phone').order('name'),
       supabase.from('hotels').select('id, name, city').eq('status', 'نشط'),
     ]);
-    setInvoices((invRes.data as Invoice[]) || []);
-    setCustomers((custRes.data as unknown as Customer[]) ?? []);
-    setHotels((hotelRes.data as unknown as Hotel[]) ?? []);
+    setInvoices(invRes.data?.length ? invRes.data : MOCK_INVOICES);
+    setCustomers(custRes.data ?? []);
+    setHotels(hotelRes.data ?? []);
     setLoading(false);
   };
 
@@ -345,12 +360,9 @@ export default function Invoices() {
         .status-partial { background: #fef9c3; color: #ca8a04; }
         .status-unpaid { background: #fee2e2; color: #dc2626; }
       </style></head><body>
-      <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover;" />
-        <div style="text-align: right;">
-          <div class="title" style="margin-bottom: 5px;">PROMISE - فاتورة</div>
-          <div class="inv-num" style="margin: 0;">${inv.invoice_number} | ${new Date(inv.created_at).toLocaleDateString('ar-EG')}</div>
-        </div>
+      <div class="header">
+        <div class="title">PROMISE - فاتورة</div>
+        <div class="inv-num">${inv.invoice_number} | ${new Date(inv.created_at).toLocaleDateString('ar-EG')}</div>
       </div>
       ${inv.customers ? `<div class="section"><div class="section-title">بيانات العميل</div>
         ${inv.customers.client_code ? `<div class="row"><span class="label">كود العميل</span><span class="value" style="font-family:monospace;color:#1e3a5f;font-weight:bold">${inv.customers.client_code}</span></div>` : ''}
@@ -379,40 +391,6 @@ export default function Invoices() {
     return matchSearch && matchStatus;
   });
 
-  const handleExport = (type: 'pdf' | 'excel') => {
-    const data = filtered.map(inv => ({
-      'رقم الفاتورة': inv.invoice_number,
-      'اسم العميل': inv.customers?.name || '—',
-      'رقم الهاتف': inv.customers?.phone || '—',
-      'نوع الخدمة': inv.service_type || '—',
-      'اسم الباقة / الخدمة': inv.package_name || '—',
-      'الإجمالي': inv.total_amount,
-      'المدفوع': inv.paid_amount,
-      'المتبقي': inv.total_amount - inv.paid_amount,
-      'حالة الدفع': inv.payment_status,
-      'تاريخ الفاتورة': new Date(inv.created_at).toLocaleDateString('ar-EG'),
-    }));
-
-    if (type === 'pdf') {
-      const headers = ['رقم الفاتورة', 'اسم العميل', 'رقم الهاتف', 'نوع الخدمة', 'الباقة', 'الإجمالي', 'المدفوع', 'المتبقي', 'حالة الدفع', 'التاريخ'];
-      const rows = filtered.map(inv => [
-        inv.invoice_number,
-        inv.customers?.name || '—',
-        inv.customers?.phone || '—',
-        inv.service_type || '—',
-        inv.package_name || '—',
-        `${inv.total_amount} ج.م`,
-        `${inv.paid_amount} ج.م`,
-        `${inv.total_amount - inv.paid_amount} ج.م`,
-        inv.payment_status,
-        new Date(inv.created_at).toLocaleDateString('ar-EG'),
-      ]);
-      exportToPDF('تقرير_الفواتير', headers, rows);
-    } else {
-      exportToExcel(data, 'تقرير_الفواتير');
-    }
-  };
-
   const stats = {
     total: invoices.length,
     unpaid: invoices.filter(i => i.payment_status === 'غير مدفوع').length,
@@ -429,21 +407,11 @@ export default function Invoices() {
           <h1 className="text-2xl font-bold text-navy-900">الفواتير</h1>
           <p className="text-gray-500 text-sm mt-0.5">إدارة وطباعة فواتير العملاء</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2">
-            <button onClick={() => handleExport('excel')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير Excel">
-              <Download size={14} className="text-emerald-600" /> Excel
-            </button>
-            <button onClick={() => handleExport('pdf')} className="btn-outline py-2 text-xs flex items-center gap-1.5" title="تصدير PDF">
-              <Download size={14} className="text-red-500" /> PDF
-            </button>
-          </div>
-          {can('invoices_add') && (
-            <button onClick={() => { setEditInvoice(null); setShowModal(true); }} className="btn-gold">
-              <Plus size={18} /> إنشاء فاتورة
-            </button>
-          )}
-        </div>
+        {can('invoices_add') && (
+          <button onClick={() => { setEditInvoice(null); setShowModal(true); }} className="btn-gold">
+            <Plus size={18} /> إنشاء فاتورة
+          </button>
+        )}
       </div>
 
       {/* Stats */}

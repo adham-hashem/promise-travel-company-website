@@ -1,19 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, Loader2, X, Wallet, Upload, Eye,
-  Download, CheckCircle2, XCircle, FileText, Clock, Search, Package, User, Plane,
+  Download, CheckCircle2, XCircle, FileText, Clock, Search,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { compressImage } from '../lib/imageCompressor';
 import type { Payment, PaymentMethod, Booking, PaymentProof } from '../types';
-import { exportToExcel, exportToPDF } from '../lib/exportUtils';
-import ApprovalRequestsManager from '../components/ApprovalRequestsManager';
-import FinancialNotifications from '../components/FinancialNotifications';
+import { exportToExcel } from '../lib/export';
 
 const emptyForm = {
   booking_id: '',
-  package_id: '',
   customer_id: '',
   amount: '',
   payment_method: 'كاش' as PaymentMethod,
@@ -33,40 +29,10 @@ interface PayRow extends Payment {
   payment_proofs?: PaymentProof[];
 }
 
-const calculateCustomerPackagePrice = (cust: any, pkg: any) => {
-  if (!pkg) return 0;
-  let price = Number(pkg.price || 0);
-  const roomType = (cust?.room_type_makkah || cust?.room_type_madinah || 'ثنائي').toLowerCase();
-  
-  let selectedRoomPrice = 0;
-  if (roomType.includes('ثنائ') || roomType.includes('double')) {
-    selectedRoomPrice = Number(pkg.price_double || 0);
-  } else if (roomType.includes('ثلاث') || roomType.includes('triple')) {
-    selectedRoomPrice = Number(pkg.price_triple || 0);
-  } else if (roomType.includes('رباع') || roomType.includes('quad')) {
-    selectedRoomPrice = Number(pkg.price_quad || 0);
-  }
-  
-  if (selectedRoomPrice > 0) {
-    price = selectedRoomPrice;
-  }
-  
-  const ageGroup = cust?.age_group || 'بالغ';
-  if (ageGroup === 'طفل' && pkg.price_child > 0) {
-    price = Number(pkg.price_child);
-  } else if (ageGroup === 'رضيع' && pkg.price_infant > 0) {
-    price = Number(pkg.price_infant);
-  }
-  
-  return price;
-};
-
 export default function Payments() {
   const { profile } = useAuth();
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [packages, setPackages] = useState<any[]>([]);
-  const [customersList, setCustomersList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -74,377 +40,30 @@ export default function Payments() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterApproval, setFilterApproval] = useState('');
-  const [clientSearch, setClientSearch] = useState('');
-  const [clientFilterStage, setClientFilterStage] = useState('');
   const [selectedPayment, setSelectedPayment] = useState<PayRow | null>(null);
   const [uploading, setUploading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Balance calculations for the modal
-  const selectedCust = form.customer_id ? customersList.find(c => c.id === form.customer_id) : null;
-  const familyIds = selectedCust ? (selectedCust.parent_customer_id 
-    ? [selectedCust.parent_customer_id, ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id).map(c => c.id)]
-    : [selectedCust.id, ...customersList.filter(c => c.parent_customer_id === selectedCust.id).map(c => c.id)]
-  ) : [];
-  
-  const customerPayments = familyIds.length > 0
-    ? payments.filter(p => familyIds.includes(p.customer_id) && p.id !== editId && p.approval_status !== 'مرفوض')
-    : [];
-  const totalPaidByCustomer = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-  
-  const selectedPkg = form.package_id ? packages.find(p => p.id === form.package_id) : null;
-  
-  const familyMembers = selectedCust ? (selectedCust.parent_customer_id
-    ? [customersList.find(c => c.id === selectedCust.parent_customer_id), ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id)]
-    : [selectedCust, ...customersList.filter(c => c.parent_customer_id === selectedCust.id)]
-  ) : [];
-  
-  const familyPackagePrice = familyMembers.reduce((sum, member) => {
-    if (!member) return sum;
-    const pkg = member.id === form.customer_id
-      ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
-      : (member.packages || packages.find(p => p.id === member.requested_package_id));
-    return sum + calculateCustomerPackagePrice(member, pkg);
-  }, 0);
-
-  const packagePrice = familyPackagePrice;
-  const remainingBalance = Math.max(0, packagePrice - totalPaidByCustomer);
-
-  const [transferredFiles, setTransferredFiles] = useState<any[]>([]);
-  const [opsTransferFile, setOpsTransferFile] = useState<any | null>(null);
-  const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
-  const [detailDocs, setDetailDocs] = useState<any[]>([]);
-  const [loadingDetailDocs, setLoadingDetailDocs] = useState(false);
-
-  const getPaymentStatusText = (p: PayRow) => {
-    if (!p.packages && !p.bookings) return p.status;
-    const totalAmount = p.bookings ? Number(p.bookings.total_amount || 0) : (p.packages ? Number(p.packages.price || 0) : 0);
-    if (totalAmount <= 0) return p.status;
-
-    // Calculate total paid by this customer for this package
-    const customerPayments = payments.filter(pay => pay.customer_id === p.customer_id && pay.package_id === p.package_id && pay.approval_status !== 'مرفوض');
-    const totalPaid = customerPayments.reduce((sum, pay) => sum + Number(pay.amount || 0), 0);
-    const remaining = Math.max(0, totalAmount - totalPaid);
-
-    if (remaining <= 0) {
-      return 'مدفوع بالكامل';
-    } else {
-      return `مدفوع جزء وهناك باقي ${remaining.toLocaleString('ar-EG')} ج.م`;
-    }
-  };
-
   useEffect(() => {
     load();
   }, []);
 
-  useEffect(() => {
-    if (!detailCustomer) {
-      setDetailDocs([]);
-      return;
-    }
-    setLoadingDetailDocs(true);
-    supabase.from('documents')
-      .select('*')
-      .eq('customer_id', detailCustomer.id)
-      .then(({ data }) => {
-        setDetailDocs(data || []);
-        setLoadingDetailDocs(false);
-      });
-  }, [detailCustomer]);
-
-  useEffect(() => {
-    if (!form.customer_id || !form.amount) return;
-    const selectedCust = customersList.find(c => c.id === form.customer_id);
-    if (!selectedCust) return;
-    
-    const familyIds = selectedCust.parent_customer_id 
-      ? [selectedCust.parent_customer_id, ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id).map(c => c.id)]
-      : [selectedCust.id, ...customersList.filter(c => c.parent_customer_id === selectedCust.id).map(c => c.id)];
-      
-    const customerPayments = payments.filter(p => familyIds.includes(p.customer_id) && p.id !== editId && p.approval_status !== 'مرفوض');
-    const totalPaid = customerPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    
-    const familyMembers = selectedCust.parent_customer_id
-      ? [customersList.find(c => c.id === selectedCust.parent_customer_id), ...customersList.filter(c => c.parent_customer_id === selectedCust.parent_customer_id)]
-      : [selectedCust, ...customersList.filter(c => c.parent_customer_id === selectedCust.id)];
-      
-    const selectedPkg = form.package_id ? packages.find(p => p.id === form.package_id) : null;
-    
-    const familyPackagePrice = familyMembers.reduce((sum, member) => {
-      if (!member) return sum;
-      const pkg = member.id === form.customer_id
-        ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
-        : (member.packages || packages.find(p => p.id === member.requested_package_id));
-      return sum + calculateCustomerPackagePrice(member, pkg);
-    }, 0);
-    
-    const currentAmt = parseFloat(form.amount) || 0;
-    
-    if (familyPackagePrice > 0) {
-      if (totalPaid + currentAmt >= familyPackagePrice) {
-        setForm(f => f.status !== 'مدفوع بالكامل' ? { ...f, status: 'مدفوع بالكامل' } : f);
-      } else if (totalPaid + currentAmt > 0) {
-        setForm(f => f.status !== 'مدفوع جزئياً' ? { ...f, status: 'مدفوع جزئياً' } : f);
-      } else {
-        setForm(f => f.status !== 'غير مدفوع' ? { ...f, status: 'غير مدفوع' } : f);
-      }
-    }
-  }, [form.customer_id, form.package_id, form.amount, editId, payments, packages, customersList]);
-
   const load = async () => {
     setLoading(true);
-    const [{ data: payData }, { data: bkData }, { data: opsData }, { data: pkgData }, { data: custData }] = await Promise.all([
-      supabase.from('payments').select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').order('payment_date', { ascending: false }),
-      supabase.from('bookings').select('*, customers(*), package:packages(*)').order('created_at', { ascending: false }),
-      supabase.from('operation_files')
-        .select('*, customer:customers(*, packages(*)), booking:bookings(*)')
-        .in('workflow_stage', ['accounts', 'operations', 'visa', 'flight', 'ready', 'completed'])
-        .order('created_at', { ascending: false }),
-      supabase.from('packages').select('*').eq('is_active', true).order('name', { ascending: true }),
-      supabase.from('customers').select('id, name, age_group, room_type_makkah, room_type_madinah, requested_package_id, parent_customer_id, packages(*)').order('name', { ascending: true }),
+    const [{ data: payData }, { data: bkData }] = await Promise.all([
+      supabase.from('payments').select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').order('payment_date', { ascending: false }),
+      supabase.from('bookings').select('*, customers(*)').order('created_at', { ascending: false }),
     ]);
-    const allPayments = (payData as PayRow[]) || [];
-    const allBookings = (bkData as Booking[]) || [];
-    const rawFiles = (opsData || []) as any[];
-
-    // Group files by parent (financial owner) customer
-    const groupedByParentId: Record<string, any[]> = {};
-    rawFiles.forEach((f: any) => {
-      if (!f.customer) return;
-      const parentId = f.customer.parent_customer_id || f.customer_id;
-      if (!groupedByParentId[parentId]) {
-        groupedByParentId[parentId] = [];
-      }
-      groupedByParentId[parentId].push(f);
-    });
-
-    const filesWithPayments = Object.keys(groupedByParentId).map((parentId) => {
-      const familyFiles = groupedByParentId[parentId];
-      // Try to find the parent file in the family files
-      let mainFile = familyFiles.find((f: any) => f.customer_id === parentId);
-      
-      // If the parent itself does not have an operation file, construct a mock file using parent details
-      if (!mainFile) {
-        const parentCust = (custData || []).find((c: any) => c.id === parentId);
-        if (parentCust) {
-          // If any family member is in accounts stage, default to accounts. Otherwise use the first child's stage
-          const hasAccountsStage = familyFiles.some((f: any) => f.workflow_stage === 'accounts');
-          const workflowStage = hasAccountsStage ? 'accounts' : familyFiles[0]?.workflow_stage || 'accounts';
-          
-          mainFile = {
-            id: `mock-${parentCust.id}`,
-            customer_id: parentCust.id,
-            workflow_stage: workflowStage,
-            file_status: 'جديد',
-            notes: 'حساب مالي مجمع للعائلة',
-            customer: parentCust,
-            booking: null,
-            created_at: familyFiles[0]?.created_at || new Date().toISOString()
-          };
-        } else {
-          // Fallback to first child's file
-          mainFile = familyFiles[0];
-        }
-      }
-
-      const subCustomerIds = (custData || []).filter((c: any) => c.parent_customer_id === parentId).map((c: any) => c.id);
-      const allFamilyCustomerIds = [parentId, ...subCustomerIds];
-
-      return {
-        ...mainFile,
-        payments: allPayments.filter((p) => allFamilyCustomerIds.includes(p.customer_id) && p.approval_status !== 'مرفوض'),
-      };
-    });
-
-    setPayments(allPayments);
-    setBookings(allBookings);
-    setPackages(pkgData || []);
-    setCustomersList(custData || []);
-    setTransferredFiles(filesWithPayments);
+    setPayments((payData as PayRow[]) || []);
+    setBookings((bkData as Booking[]) || []);
     setLoading(false);
   };
 
-  const printAccountStatement = (customer: any) => {
-    const subCustomers = customersList.filter(c => c.parent_customer_id === customer.id);
-    const family = [customer, ...subCustomers];
-    const familyIds = family.map(c => c.id);
-
-    const ledger: Array<{
-      date: string;
-      desc: string;
-      amount: number;
-      type: 'مستحق' | 'مدفوع';
-    }> = [];
-
-    let totalRequired = 0;
-
-    family.forEach(member => {
-      const pkg = member.packages || packages.find(p => p.id === member.requested_package_id);
-      const price = pkg ? calculateCustomerPackagePrice(member, pkg) : 0;
-      const memberBookings = bookings.filter(b => b.customer_id === member.id);
-      
-      if (memberBookings.length > 0) {
-        memberBookings.forEach(booking => {
-          const pkgName = booking.package?.name || booking.packages?.name || 'حجز';
-          const amt = Number(booking.total_amount || 0);
-          totalRequired += amt;
-          ledger.push({
-            date: booking.booking_date || booking.created_at,
-            desc: `قيمة البرنامج (${pkgName}) - ${member.name}`,
-            amount: amt,
-            type: 'مستحق'
-          });
-        });
-      } else if (pkg) {
-        totalRequired += price;
-        ledger.push({
-          date: member.created_at || new Date().toISOString(),
-          desc: `قيمة البرنامج (${pkg.name}) - ${member.name}`,
-          amount: price,
-          type: 'مستحق'
-        });
-      }
-    });
-
-    let totalPaid = 0;
-    const familyPayments = payments.filter(p => familyIds.includes(p.customer_id) && p.approval_status !== 'مرفوض');
-    familyPayments.forEach(p => {
-      const amt = Number(p.amount || 0);
-      totalPaid += amt;
-      ledger.push({
-        date: p.payment_date,
-        desc: p.payment_type || 'دفعة',
-        amount: amt,
-        type: 'مدفوع'
-      });
-    });
-
-    ledger.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    let currentBalance = 0;
-    const ledgerWithBalance = ledger.map(item => {
-      if (item.type === 'مستحق') {
-        currentBalance += item.amount;
-      } else {
-        currentBalance -= item.amount;
-      }
-      return { ...item, balance: currentBalance };
-    });
-
-    const remaining = Math.max(0, totalRequired - totalPaid);
-
-    const parentCustomerText = customer.parent_customer_id 
-      ? `<div class="info-item"><strong>الحساب الرئيسي:</strong> ${customersList.find(c => c.id === customer.parent_customer_id)?.name || '—'}</div>`
-      : '';
-
-    const html = `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="UTF-8">
-<title>كشف حساب مالي - ${customer.name}</title>
-<style>
-  @media print {
-    @page { margin: 0; }
-    body { margin-top: 5cm !important; margin-bottom: 2cm !important; margin-left: 2cm !important; margin-right: 2cm !important; }
-  }
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; margin: 40px; color: #000; background: #fff; }
-  .header-title { text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 30px; color: #111827; }
-  h3 { color: #111827; border-bottom: 1px solid #000; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; font-size: 16px; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-  .info-item strong { display: inline-block; width: 120px; font-weight: bold; }
-  .summary-list { display: flex; justify-content: space-between; background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-  .summary-item { text-align: center; flex: 1; }
-  .summary-item strong { display: block; margin-bottom: 5px; color: #4b5563; }
-  .summary-item span { font-size: 18px; font-weight: bold; }
-  table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-  th, td { padding: 10px; text-align: right; border: 1px solid #000; }
-  th { background-color: #f3f4f6; font-weight: bold; }
-  .final-remaining { font-size: 18px; font-weight: bold; text-align: left; margin-top: 20px; }
-  .footer-text { margin-top: 50px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 20px; }
-</style>
-</head>
-<body>
-
-  <div class="header-title">كشف معاملات حساب</div>
-
-  <h3>بيانات العميل</h3>
-  <div class="info-grid">
-    <div class="info-item"><strong>اسم العميل:</strong> ${customer.name}</div>
-    <div class="info-item"><strong>كود العميل:</strong> ${customer.client_code || '—'}</div>
-    ${parentCustomerText}
-    <div class="info-item"><strong>الباقة:</strong> ${customer.packages?.name || '—'}</div>
-    <div class="info-item"><strong>تاريخ الإصدار:</strong> ${new Date().toLocaleDateString('ar-EG')}</div>
-  </div>
-
-  <h3>ملخص الحساب</h3>
-  <div class="summary-list">
-    <div class="summary-item">
-      <strong>إجمالي المطلوب</strong>
-      <span>${totalRequired.toLocaleString('ar-EG')} ج.م</span>
-    </div>
-    <div class="summary-item">
-      <strong>إجمالي المدفوع</strong>
-      <span>${totalPaid.toLocaleString('ar-EG')} ج.م</span>
-    </div>
-    <div class="summary-item">
-      <strong>إجمالي المتبقي</strong>
-      <span>${remaining.toLocaleString('ar-EG')} ج.م</span>
-    </div>
-  </div>
-
-  <h3>جدول المعاملات</h3>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 15%;">التاريخ</th>
-        <th style="width: 40%;">البيان</th>
-        <th style="width: 15%;">المبلغ</th>
-        <th style="width: 15%;">نوع المعاملة</th>
-        <th style="width: 15%;">الرصيد</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${ledgerWithBalance.map(item => `
-        <tr>
-          <td>${new Date(item.date).toLocaleDateString('ar-EG')}</td>
-          <td>${item.desc}</td>
-          <td>${item.amount.toLocaleString('ar-EG')}</td>
-          <td>${item.type}</td>
-          <td dir="ltr" style="text-align: right;">${item.balance.toLocaleString('ar-EG')}</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
-
-  <div class="final-remaining">
-    الرصيد المستحق: ${remaining.toLocaleString('ar-EG')} ج.م
-  </div>
-
-  <div class="footer-text">
-    هذا المستند صادر من شركة Promise للسياحة لبيان المعاملات المالية المسجلة على حساب العميل حتى تاريخ إصدار الكشف.
-  </div>
-
-</body>
-</html>`;
-
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.print();
-    }
-  };
-
-  const openAdd = () => {
-    setForm(emptyForm);
-    setEditId(null);
-    setShowModal(true);
-  };
+  const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (p: PayRow) => {
     setForm({
       booking_id: p.booking_id || '',
-      package_id: p.package_id || '',
       customer_id: p.customer_id || '',
       amount: String(p.amount),
       payment_method: p.payment_method,
@@ -454,6 +73,11 @@ export default function Payments() {
       payment_type: p.payment_type || 'دفعة عادية',
     });
     setEditId(p.id); setShowModal(true);
+  };
+
+  const onBookingChange = (bookingId: string) => {
+    const bk = bookings.find(b => b.id === bookingId);
+    setForm({ ...form, booking_id: bookingId, customer_id: bk?.customer_id || '' });
   };
 
   const syncBookingPayment = async (bookingId: string, deltaAmount: number, isDelete: boolean) => {
@@ -485,7 +109,6 @@ export default function Payments() {
     }
     const payload = {
       booking_id: form.booking_id || null,
-      package_id: form.package_id || null,
       customer_id: form.customer_id || null,
       amount: parseFloat(form.amount),
       payment_method: form.payment_method,
@@ -496,86 +119,26 @@ export default function Payments() {
       payment_type: form.payment_type,
     };
     if (editId) {
-      const { data, error } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
-      if (error) { alert(`خطأ في تحديث الدفعة: ${error.message}`); setSaving(false); return; }
+      const { data } = await supabase.from('payments').update(payload).eq('id', editId).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
       if (data) {
         setPayments(payments.map(p => p.id === editId ? (data as PayRow) : p));
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
-        if (form.customer_id && form.package_id) {
-          await supabase.from('customers').update({ requested_package_id: form.package_id }).eq('id', form.customer_id);
-        }
       }
     } else {
-      const { data, error } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), packages(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)').single();
-      if (error) { alert(`خطأ في إضافة الدفعة: ${error.message}`); setSaving(false); return; }
+      const { data } = await supabase.from('payments').insert(payload).select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)').single();
       if (data) {
         setPayments([data as PayRow, ...payments]);
         if (form.booking_id) await syncBookingPayment(form.booking_id, parseFloat(form.amount), false);
-        if (form.customer_id && form.package_id) {
-          await supabase.from('customers').update({ requested_package_id: form.package_id }).eq('id', form.customer_id);
-        }
       }
     }
-    setSaving(false);
-    setShowModal(false);
-    // Reload to refresh transferred files' payment counts
-    load();
+    setSaving(false); setShowModal(false);
   };
 
   const handleDelete = async (p: PayRow) => {
-    const [{ data: hasFlight }, { data: hasOp }] = await Promise.all([
-      supabase.from('flight_tickets').select('id').eq('customer_id', p.customer_id).limit(1),
-      supabase.from('operation_files').select('id').eq('customer_id', p.customer_id).limit(1)
-    ]);
-
-    if (hasFlight && hasFlight.length > 0) {
-      alert("لا يمكن حذف الدفعة لأن العميل موجود في قسم الطيران. يجب حذفه من المراحل اللاحقة أولاً.");
-      return;
-    }
-    if (hasOp && hasOp.length > 0) {
-      alert("لا يمكن حذف الدفعة لأن العميل موجود في قسم التشغيل. يجب حذفه من المراحل اللاحقة أولاً.");
-      return;
-    }
-
-    const reason = prompt('يرجى إدخال سبب طلب الحذف/الإلغاء لهذه المعاملة المالية (مطلوب اعتماد الإدارة):');
-    if (!reason) return;
-
-    try {
-      const { error } = await supabase.from('approval_requests').insert({
-        type: 'delete_payment',
-        record_id: p.id,
-        record_type: 'payments',
-        reason: reason,
-        status: 'pending',
-        record_details: p,
-        requested_by: profile?.id || null
-      });
-
-      if (error) throw error;
-      alert('تم إرسال طلب الحذف/الإلغاء إلى الإدارة للاعتماد. لن يتم تنفيذ الحذف حتى توافق الإدارة.');
-    } catch (err: any) {
-      alert('حدث خطأ أثناء إرسال الطلب: ' + err.message);
-    }
-  };
-
-  const handleDeleteFile = async (fileId: string, customerName: string) => {
-    if (!confirm(`هل أنت متأكد من حذف ملف العميل "${customerName}" نهائياً من الحسابات والتشغيل؟`)) return;
-    
-    setSaving(true);
-    const { error } = await supabase
-      .from('operation_files')
-      .delete()
-      .eq('id', fileId);
-      
-    if (error) {
-      alert('فشل الحذف: ' + error.message);
-      setSaving(false);
-      return;
-    }
-    
-    setTransferredFiles(prev => prev.filter(f => f.id !== fileId));
-    setSaving(false);
-    alert('تم حذف الملف بنجاح.');
+    if (!confirm('هل أنت متأكد من حذف هذه الدفعة؟')) return;
+    if (p.booking_id) await syncBookingPayment(p.booking_id, p.amount, true);
+    await supabase.from('payments').delete().eq('id', p.id);
+    setPayments(payments.filter(x => x.id !== p.id));
   };
 
   const uploadProof = async (file: File) => {
@@ -586,14 +149,12 @@ export default function Payments() {
       return;
     }
     setUploading(true);
-    const compressedFile = await compressImage(file);
-    const cleanFileName = compressedFile.name.replace(/[^\x00-\x7F]/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
-    const filePath = `payment-proofs/${selectedPayment.id}/${Date.now()}-${cleanFileName}`;
-    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
+    const filePath = `payment-proofs/${selectedPayment.id}/${Date.now()}-${file.name}`;
+    const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
     const { data } = await supabase
       .from('payment_proofs')
-      .insert({ payment_id: selectedPayment.id, file_path: filePath, file_name: compressedFile.name, file_size: compressedFile.size, status: 'مرفوع', uploaded_by: profile?.id || null })
+      .insert({ payment_id: selectedPayment.id, file_path: filePath, file_name: file.name, file_size: file.size, status: 'مرفوع', uploaded_by: profile?.id || null })
       .select('*')
       .single();
     if (data) {
@@ -614,7 +175,7 @@ export default function Payments() {
         status: 'مدفوع بالكامل',
       })
       .eq('id', p.id)
-      .select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)')
+      .select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)')
       .single();
     if (data) {
       setPayments(payments.map(x => x.id === p.id ? (data as PayRow) : x));
@@ -631,7 +192,7 @@ export default function Payments() {
         rejection_reason: rejectionReason,
       })
       .eq('id', p.id)
-      .select('*, customers(*), bookings(*), user_profiles!payments_employee_id_fkey(*), payment_proofs(*)')
+      .select('*, customers(*), bookings(*), user_profiles(*), payment_proofs(*)')
       .single();
     if (data) {
       setPayments(payments.map(x => x.id === p.id ? (data as PayRow) : x));
@@ -653,17 +214,6 @@ export default function Payments() {
   const printReceipt = (p: PayRow) => {
     const w = window.open('', '_blank', 'width=400,height=600');
     if (!w) return;
-
-    const printedStatus = getPaymentStatusText(p);
-
-    const customerPayments = payments.filter(
-      (x) => x.customer_id === p.customer_id && x.approval_status !== 'مرفوض'
-    );
-    const totalPaid = customerPayments.reduce((sum, x) => sum + Number(x.amount || 0), 0);
-    const packagePrice = Number(p.packages?.price || p.customers?.packages?.price || 0);
-    const bookingTotal = Number(p.bookings?.total_amount || 0) || packagePrice;
-    const remaining = Math.max(0, bookingTotal - totalPaid);
-
     w.document.write(`
       <html dir="rtl"><head><meta charset="utf-8"><title>إيصال دفع</title>
       <style>
@@ -675,20 +225,15 @@ export default function Payments() {
         .total{margin-top:20px;padding:15px;background:#f9f9f9;border-radius:10px;text-align:center;font-size:20px;font-weight:900;}
         .foot{margin-top:30px;text-align:center;font-size:11px;color:#999;}
       </style></head><body>
-      <div style="text-align: center; margin-bottom: 10px;">
-        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; display: inline-block;" />
-      </div>
       <div class="logo">PROMISE</div><div class="sub">بروميس للسياحة والسفر</div>
-      <h3 style="text-align:center;margin-bottom:20px; margin-top:0;">إيصال استلام دفعة</h3>
+      <h3 style="text-align:center;margin-bottom:20px;">إيصال استلام دفعة</h3>
       <div class="row"><span class="label">رقم العملية</span><span class="val">#${p.id.slice(0, 8)}</span></div>
       <div class="row"><span class="label">اسم العميل</span><span class="val">${p.customers?.name || '—'}</span></div>
       <div class="row"><span class="label">نوع العملية</span><span class="val">${p.payment_type || 'دفعة عادية'}</span></div>
       <div class="row"><span class="label">رقم الحجز</span><span class="val">${p.booking_id ? '#' + p.booking_id.slice(0, 8) : '—'}</span></div>
       <div class="row"><span class="label">طريقة الدفع</span><span class="val">${p.payment_method}</span></div>
       <div class="row"><span class="label">التاريخ</span><span class="val">${new Date(p.payment_date).toLocaleDateString('ar-EG')}</span></div>
-      <div class="row"><span class="label">إجمالي المدفوع</span><span class="val">${fmt(totalPaid)} ج.م</span></div>
-      <div class="row"><span class="label">المتبقي المطلوب</span><span class="val">${fmt(remaining)} ج.م</span></div>
-      <div class="row"><span class="label">الحالة</span><span class="val">${printedStatus}</span></div>
+      <div class="row"><span class="label">الحالة</span><span class="val">${p.status}</span></div>
       <div class="total">${fmt(p.amount)} ج.م</div>
       <div class="foot">شكراً لتعاملكم مع Promise Travel<br>هذا الإيصال صالح كدفعة وليس تأكيداً نهائياً للحجز</div>
       </body></html>`);
@@ -696,29 +241,13 @@ export default function Payments() {
     w.print();
   };
 
-  const handleExportExcel = () => {
-    const data = filtered.map((p, i) => ({
+  const handleExport = () => {
+    exportToExcel(payments.map((p, i) => ({
       '#': i + 1, 'العميل': p.customers?.name || '—', 'نوع العملية': p.payment_type || 'دفعة عادية',
       'رقم الحجز': p.booking_id?.slice(0, 8) || '—',
       'المبلغ': p.amount, 'الطريقة': p.payment_method, 'التاريخ': new Date(p.payment_date).toLocaleDateString('ar-EG'),
-      'الحالة': getPaymentStatusText(p), 'الاعتماد': p.approval_status || 'بانتظار الاعتماد',
-    }));
-    exportToExcel(data, 'المدفوعات');
-  };
-
-  const handleExportPDF = () => {
-    const headers = ['#', 'العميل', 'نوع العملية', 'المبلغ', 'الطريقة', 'التاريخ', 'الحالة', 'الاعتماد'];
-    const rows = filtered.map((p, i) => [
-      i + 1,
-      p.customers?.name || '—',
-      p.payment_type || 'دفعة عادية',
-      `${p.amount} ج.م`,
-      p.payment_method,
-      new Date(p.payment_date).toLocaleDateString('ar-EG'),
-      getPaymentStatusText(p),
-      p.approval_status || 'بانتظار الاعتماد',
-    ]);
-    exportToPDF('تقرير المدفوعات والحسابات', headers, rows);
+      'الحالة': p.status, 'الاعتماد': p.approval_status || 'بانتظار الاعتماد',
+    })), 'المدفوعات');
   };
 
   const filtered = payments.filter(p => {
@@ -753,161 +282,18 @@ export default function Payments() {
     return { total, paid, remaining, installmentsPaid, totalInstallments, nextInstallmentDate, currentAmount: selectedPayment.amount };
   })();
 
-  const filteredClients = transferredFiles.filter(file => {
-    if (clientFilterStage && file.workflow_stage !== clientFilterStage) return false;
-    if (clientSearch) {
-      const q = clientSearch.toLowerCase();
-      if (!file.customer?.name?.toLowerCase().includes(q) && !(file.customer?.client_code || '').toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
-
   return (
     <div className="space-y-5">
-      <ApprovalRequestsManager />
-      <FinancialNotifications />
-      
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="section-title">المدفوعات والحسابات</h2>
           <p className="section-subtitle">إدارة الدفعات، إثبات الدفع، واعتماد الحسابات</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-            <Download size={14} /> Excel
-          </button>
-          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
-            <Download size={14} /> PDF
-          </button>
+          <button onClick={handleExport} className="btn-outline">تصدير</button>
           <button onClick={openAdd} className="btn-gold"><Plus size={16} /> إضافة دفعة</button>
         </div>
       </div>
-
-      {/* Transferred Files to Accounts (all files at accounts stage or beyond) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3 bg-gradient-to-r from-navy-50 to-white">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-navy-100 flex items-center justify-center text-navy-900 font-bold">
-              <User size={18} />
-            </div>
-            <div>
-              <h3 className="font-bold text-navy-900 text-sm flex items-center gap-2">
-                سجل العملاء المالي ({filteredClients.length})
-              </h3>
-              <p className="text-xs text-gray-500">متابعة الحسابات، الأرصدة، والمطلوب سداده</p>
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative">
-              <Search size={14} className="absolute top-1/2 -translate-y-1/2 right-2.5 text-gray-400" />
-              <input value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} placeholder="بحث باسم أو كود العميل..." className="form-input text-xs py-1.5 pr-8 w-full sm:w-48" />
-            </div>
-            <select value={clientFilterStage} onChange={(e) => setClientFilterStage(e.target.value)} className="form-input text-xs py-1.5 w-full sm:w-36">
-              <option value="">كل المراحل</option>
-              <option value="accounts">الحسابات</option>
-              <option value="operations">التشغيل</option>
-              <option value="visa">التأشيرة</option>
-              <option value="flight">الطيران</option>
-              <option value="ready">جاهز للسفر</option>
-              <option value="completed">مكتمل</option>
-            </select>
-            <button onClick={load} className="btn-outline text-xs py-1.5 px-3">
-              🔄 تحديث
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full data-table min-w-[1000px]">
-            <thead>
-              <tr>
-                <th>العميل</th>
-                <th>كود</th>
-                <th>النوع / الخدمة</th>
-                <th>الباقة</th>
-                <th>المطلوب</th>
-                <th>المدفوع</th>
-                <th>المتبقي</th>
-                <th>حالة الحساب</th>
-                <th>إجراءات سريعة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClients.map((file) => {
-                const subCustomers = customersList.filter(c => c.parent_customer_id === file.customer_id);
-                const filePayments: any[] = file.payments || [];
-                const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-                
-                const mainPkgPrice = file.customer?.packages ? calculateCustomerPackagePrice(file.customer, file.customer.packages) : 0;
-                const mainBookingTotal = Number(file.booking?.total_amount || 0) || mainPkgPrice;
-                
-                const bookingTotal = mainBookingTotal + subCustomers.reduce((sum, sc) => {
-                  const subBooking = bookings.find(b => b.customer_id === sc.id);
-                  const subPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
-                  const subPkgPrice = subPkg ? calculateCustomerPackagePrice(sc, subPkg) : 0;
-                  return sum + (Number(subBooking?.total_amount || 0) || subPkgPrice);
-                }, 0);
-
-                const remaining = Math.max(0, bookingTotal - totalPaid);
-                const isPaid = remaining === 0 && bookingTotal > 0;
-                
-                return (
-                  <tr key={file.id} className="hover:bg-gray-50/50">
-                    <td>
-                      <div className="font-semibold text-navy-900">{file.customer?.name || '—'}</div>
-                      {subCustomers.length > 0 && <div className="text-[10px] text-gray-500">+{subCustomers.length} تابعين</div>}
-                    </td>
-                    <td className="font-mono text-xs text-gray-600">{file.customer?.client_code || '—'}</td>
-                    <td>
-                      <span className="badge bg-gray-100 text-gray-600 font-medium">
-                        {file.customer?.client_type === 'فوج' ? 'فوج' : file.customer?.service_type || '—'}
-                      </span>
-                    </td>
-                    <td className="text-sm font-medium text-gray-800">{file.customer?.packages?.name || '—'}</td>
-                    <td className="font-bold text-navy-800">{bookingTotal.toLocaleString('ar-EG')} ج.م</td>
-                    <td className="font-bold text-emerald-600">{totalPaid.toLocaleString('ar-EG')} ج.م</td>
-                    <td className="font-bold text-red-600">{remaining.toLocaleString('ar-EG')} ج.م</td>
-                    <td>
-                      <span className={`badge ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {isPaid ? 'مدفوع بالكامل' : 'مدفوع جزئياً / غير مدفوع'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <button onClick={() => setDetailCustomer(file.customer)} title="عرض التفاصيل" className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
-                          <Eye size={15} />
-                        </button>
-                        <button onClick={() => { setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '', package_id: file.booking?.package_id || '' }); setShowModal(true); }} title="إضافة دفعة" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600">
-                          <Plus size={15} />
-                        </button>
-                        <button onClick={() => printAccountStatement(file.customer)} title="كشف الحساب" className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600">
-                          <FileText size={15} />
-                        </button>
-                        {file.customer?.client_type !== 'فوج' && file.workflow_stage === 'accounts' && (
-                          <button onClick={() => setOpsTransferFile(file)} title="تحويل للتشغيل" className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600">
-                            <Plane size={15} />
-                          </button>
-                        )}
-                        <button onClick={() => handleDeleteFile(file.id, file.customer?.name || '—')} title="حذف الملف" className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredClients.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="text-center py-8 text-gray-500">لا يوجد عملاء مطابقين للبحث.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-3">
@@ -935,46 +321,25 @@ export default function Payments() {
           <table className="w-full data-table min-w-[1000px]">
             <thead>
               <tr>
-                <th>رقم العملية</th><th>العميل</th><th>الباقة</th><th>نوع العملية</th><th>المبلغ</th>
+                <th>رقم العملية</th><th>العميل</th><th>نوع العملية</th><th>المبلغ</th>
                 <th>الطريقة</th><th>التاريخ</th><th>الحالة</th><th>الاعتماد</th><th>إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(p => (
-                <tr key={p.id} className={`cursor-pointer hover:bg-gray-50/50 ${p.customers?.is_vip ? 'bg-gold-50/50' : ''}`} onClick={() => setSelectedPayment(p)}>
+                <tr key={p.id} className="cursor-pointer hover:bg-gray-50/50" onClick={() => setSelectedPayment(p)}>
                   <td className="font-mono text-xs text-gray-500">#{p.id.slice(0, 8)}</td>
-                  <td className="font-semibold text-gray-800">
-                      <div className="flex items-center gap-2">
-                        {p.customers?.name || '؟'}
-                        {p.customers?.is_vip && <span className="text-[10px] bg-gold-100 text-gold-700 px-1.5 py-0.5 rounded font-bold border border-gold-200">VIP</span>}
-                      </div>
-                    </td>
-                  <td className="text-sm text-gray-600 font-semibold">{p.packages?.name || '—'}</td>
+                  <td className="font-semibold text-gray-800">{p.customers?.name || '—'}</td>
                   <td><span className="badge bg-navy-50 text-navy-700 text-xs">{p.payment_type || 'دفعة عادية'}</span></td>
                   <td className="font-bold text-navy-900">{fmt(p.amount)} ج.م</td>
                   <td><span className="badge bg-gray-100 text-gray-600 text-xs">{p.payment_method}</span></td>
                   <td className="text-gray-500 text-sm">{new Date(p.payment_date).toLocaleDateString('ar-EG')}</td>
                   <td>
-                    {(() => {
-                      const statusText = getPaymentStatusText(p);
-                      const badgeClass = statusText === 'مدفوع بالكامل'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : (statusText === 'غير مدفوع' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
-                      return <span className={`badge ${badgeClass}`}>{statusText}</span>;
-                    })()}
+                    <span className={`badge ${p.status === 'مدفوع بالكامل' ? 'bg-emerald-100 text-emerald-700' : p.status === 'مدفوع جزئياً' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span>
                   </td>
                   <td>{approvalBadge(p.approval_status)}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      {p.customers && (
-                        <button
-                          onClick={() => setDetailCustomer(p.customers)}
-                          title="عرض تفاصيل العميل"
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
-                        >
-                          <Eye size={15} />
-                        </button>
-                      )}
                       <button onClick={() => printReceipt(p)} title="طباعة إيصال" className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600"><Printer size={15} /></button>
                       <button onClick={() => openEdit(p)} title="تعديل" className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600"><Pencil size={15} /></button>
                       <button onClick={() => handleDelete(p)} title="حذف" className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"><Trash2 size={15} /></button>
@@ -990,76 +355,29 @@ export default function Payments() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-navy-900">{editId ? 'تعديل الدفعة' : 'إضافة دفعة جديدة'}</h3>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X size={18} /></button>
             </div>
-            
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            <div className="p-6 space-y-4">
               <div>
-                <label className="form-label flex items-center gap-1.5">العميل *</label>
-                <select
-                  value={form.customer_id}
-                  onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="form-input text-sm"
-                  required
-                >
-                  <option value="">— اختر عميل —</option>
-                  {customersList.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                <label className="form-label">الحجز المرتبط</label>
+                <select value={form.booking_id} onChange={(e) => onBookingChange(e.target.value)} className="form-input">
+                  <option value="">— بدون حجز —</option>
+                  {bookings.map(b => <option key={b.id} value={b.id}>{b.customers?.name || 'حجز'} — {fmt(Number(b.total_amount || 0))} ج.م</option>)}
                 </select>
               </div>
-
-              <div>
-                <label className="form-label flex items-center gap-1.5"><Package size={14} className="text-gold-500" /> اختيار الباقة *</label>
-                <select
-                  value={form.package_id}
-                  onChange={(e) => setForm({ ...form, package_id: e.target.value })}
-                  className="form-input text-sm"
-                  required
-                >
-                  <option value="">— اختر باقة —</option>
-                  {packages.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {fmt(Number(p.price || 0))} ج.م
-                    </option>
-                  ))}
-                </select>
-                
-                {form.customer_id && form.package_id && (
-                  <div className="bg-navy-50 border border-navy-100 rounded-xl p-3 text-xs space-y-1.5 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">سعر الباقة:</span>
-                      <span className="font-bold text-navy-900">{packagePrice.toLocaleString('ar-EG')} ج.م</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">إجمالي المدفوع سابقاً:</span>
-                      <span className="font-bold text-emerald-700">{totalPaidByCustomer.toLocaleString('ar-EG')} ج.م</span>
-                    </div>
-                    <div className="flex justify-between border-t border-navy-200/50 pt-1.5 mt-1">
-                      <span className="text-navy-700 font-semibold">المتبقي المطلوب سداده:</span>
-                      <span className="font-bold text-red-600">{remainingBalance.toLocaleString('ar-EG')} ج.م</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div>
                 <label className="form-label">نوع العملية المالية</label>
                 <select value={form.payment_type} onChange={(e) => setForm({ ...form, payment_type: e.target.value })} className="form-input">
                   {paymentTypes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              
               <div>
                 <label className="form-label">المبلغ (ج.م) <span className="text-red-500">*</span></label>
                 <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="form-input" placeholder="5000" />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">طريقة الدفع</label>
@@ -1072,21 +390,18 @@ export default function Payments() {
                   <input type="date" value={form.payment_date} onChange={(e) => setForm({ ...form, payment_date: e.target.value })} className="form-input" />
                 </div>
               </div>
-              
               <div>
                 <label className="form-label">حالة الدفع</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Payment['status'] })} className="form-input">
                   {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
-              
               <div>
                 <label className="form-label">ملاحظات</label>
                 <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input min-h-[60px] resize-none" placeholder="ملاحظات إضافية" />
               </div>
             </div>
-            
-            <div className="p-5 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
               <button onClick={() => setShowModal(false)} className="btn-outline">إلغاء</button>
               <button onClick={handleSave} disabled={saving || !form.amount} className="btn-gold">{saving ? 'جارٍ الحفظ...' : 'حفظ'}</button>
             </div>
@@ -1120,7 +435,7 @@ export default function Payments() {
                   { label: 'طريقة الدفع', value: selectedPayment.payment_method },
                   { label: 'تاريخ العملية', value: new Date(selectedPayment.payment_date).toLocaleDateString('ar-EG') },
                   { label: 'الموظف المسجل', value: selectedPayment.user_profiles?.name || '—' },
-                  { label: 'حالة العملية', value: getPaymentStatusText(selectedPayment) },
+                  { label: 'حالة العملية', value: selectedPayment.status },
                 ].map(r => (
                   <div key={r.label} className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-0.5">{r.label}</p>
@@ -1215,211 +530,6 @@ export default function Payments() {
                   )}
                 </div>
               )}
-
-              {/* Delete payment action */}
-              <div className="pt-4 border-t border-gray-100 mt-4">
-                <button
-                  onClick={async () => {
-                    const confirmDelete = window.confirm('هل أنت متأكد من حذف هذه الدفعة نهائياً؟');
-                    if (confirmDelete) {
-                      await handleDelete(selectedPayment);
-                      setSelectedPayment(null);
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-bold"
-                >
-                  <Trash2 size={13} /> حذف هذه الدفعة نهائياً من النظام
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Transfer file to Operations modal */}
-      {opsTransferFile && (
-        <TransferFileToOpsModal
-          file={opsTransferFile}
-          onClose={() => setOpsTransferFile(null)}
-          onTransferred={() => {
-            setOpsTransferFile(null);
-            load();
-          }}
-        />
-      )}
-
-      {/* Customer details modal */}
-      {detailCustomer && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setDetailCustomer(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-navy-900 text-white rounded-t-3xl">
-              <div>
-                <h3 className="text-lg font-bold">{detailCustomer.name}</h3>
-                <p className="text-xs text-navy-200 font-mono mt-0.5">{detailCustomer.client_code || 'بدون كود'}</p>
-              </div>
-              <button onClick={() => setDetailCustomer(null)} className="p-1.5 rounded-xl hover:bg-white/10 text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-6 overflow-y-auto flex-1 text-right text-xs">
-              {/* Section 1: Personal Info */}
-              <div>
-                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
-                  <User size={16} className="text-gold-500" /> البيانات الشخصية
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div><span className="text-gray-400 block mb-0.5">الهاتف</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.phone || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">واتساب</span><span className="font-semibold text-gray-800 text-sm" dir="ltr">{detailCustomer.whatsapp || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">البريد الإلكتروني</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.email || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">الجنس</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.gender || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">تاريخ الميلاد</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.birth_date || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">الجنسية</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.nationality || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">المحافظة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.governorate || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">المدينة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.city || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">الدولة</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.country || '—'}</span></div>
-                </div>
-              </div>
-
-              {/* Section 2: Passport & National ID */}
-              <div>
-                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
-                  <FileText size={16} className="text-gold-500" /> الهوية وجواز السفر
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم الهوية الوطنية</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.national_id || '—'}</span></div>
-                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">رقم جواز السفر</span><span className="font-mono font-semibold text-gray-800 text-sm">{detailCustomer.passport_number || '—'}</span></div>
-                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ إصدار جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_issue_date || '—'}</span></div>
-                  <div className="col-span-2"><span className="text-gray-400 block mb-0.5">تاريخ انتهاء جواز السفر</span><span className="font-semibold text-gray-800 text-sm">{detailCustomer.passport_expiry_date || '—'}</span></div>
-                </div>
-              </div>
-
-              {/* Section 3: Trip & Housing */}
-              <div>
-                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
-                  <Plane size={16} className="text-gold-500" /> تفاصيل الرحلة والتسكين
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div><span className="text-gray-400 block mb-0.5">الباقة المطلوبة</span><span className="font-semibold text-navy-800 text-xs bg-gold-50/70 border border-gold-200 px-2 py-0.5 rounded">{detailCustomer.packages?.name || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">فندق مكة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_makkah || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">غرفة مكة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_makkah || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">فندق المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_madinah || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">غرفة المدينة</span><span className="font-semibold text-gray-800">{detailCustomer.room_type_madinah || '—'}</span></div>
-                </div>
-              </div>
-
-              {/* Family Accounts Section */}
-              {(detailCustomer.parent_customer_id || customersList.some(c => c.parent_customer_id === detailCustomer.id)) && (
-                <div>
-                  <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
-                    👨‍👩‍👧‍👦 الحسابات العائلية المرتبطة
-                  </h4>
-                  {detailCustomer.parent_customer_id ? (
-                    (() => {
-                      const parentCust = customersList.find(c => c.id === detailCustomer.parent_customer_id);
-                      return (
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-                          <p className="text-xs font-bold text-amber-900">🔗 تابع للحساب الرئيسي للعائلة:</p>
-                          <p className="text-xs text-gray-700 mt-1">{parentCust?.name || '—'} ({parentCust?.client_code || 'بدون كود'})</p>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    (() => {
-                      const subCusts = customersList.filter(c => c.parent_customer_id === detailCustomer.id);
-                      return (
-                        <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
-                          <p className="text-xs font-bold text-indigo-900">👪 أفراد العائلة المرتبطين بهذا الحساب الرئيسي:</p>
-                          <div className="space-y-1.5">
-                            {subCusts.map(sc => {
-                              const scPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
-                              const scPrice = scPkg ? calculateCustomerPackagePrice(sc, scPkg) : 0;
-                              return (
-                                <div key={sc.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 pb-1">
-                                  <span>{sc.name} ({sc.client_code || 'بدون كود'}) - {sc.age_group || 'بالغ'}</span>
-                                  <span className="font-semibold text-navy-800">{scPrice.toLocaleString('ar-EG')} ج.م</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()
-                  )}
-                </div>
-              )}
-
-              {/* Section: Uploaded Documents */}
-              <div>
-                <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-3 flex items-center gap-2">
-                  <FileText size={16} className="text-gold-500" /> المستندات المرفوعة للعميل
-                </h4>
-                {loadingDetailDocs ? (
-                  <div className="flex items-center justify-center py-4 text-gray-500 gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>جاري تحميل المستندات...</span>
-                  </div>
-                ) : detailDocs.length === 0 ? (
-                  <p className="text-gray-400 py-2">لا توجد مستندات مرفوعة لهذا العميل.</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {detailDocs.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <div className="flex items-center gap-2">
-                          <FileText size={16} className="text-navy-600" />
-                          <div className="text-right">
-                            <span className="font-semibold text-gray-800 block text-xs">{doc.doc_type}</span>
-                            <span className="text-[10px] text-gray-400 block truncate max-w-[150px]">{doc.file_name}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const { data } = await supabase.storage.from('documents').createSignedUrl(doc.file_path, 3600);
-                              if (data) window.open(data.signedUrl);
-                            }}
-                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
-                            title="عرض"
-                          >
-                            <Eye size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const { data } = await supabase.storage.from('documents').download(doc.file_path);
-                              if (data) {
-                                const url = URL.createObjectURL(data);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = doc.file_name;
-                                a.click();
-                              }
-                            }}
-                            className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"
-                            title="تحميل"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Section 4: Notes */}
-              {detailCustomer.notes && (
-                <div>
-                  <h4 className="font-bold text-navy-800 text-sm border-b border-gray-100 pb-2 mb-2">📝 ملاحظات إضافية</h4>
-                  <p className="bg-gray-50 p-3 rounded-2xl text-gray-700 leading-relaxed font-medium">{detailCustomer.notes}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1427,216 +537,3 @@ export default function Payments() {
     </div>
   );
 }
-
-interface TransferFileOpsProps {
-  file: any;
-  onClose: () => void;
-  onTransferred: () => void;
-}
-
-function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOpsProps) {
-  const [opsEmployees, setOpsEmployees] = useState<{ id: string; name: string }[]>([]);
-  const [targetEmpId, setTargetEmpId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [transferring, setTransferring] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
-      const list = (data || []).map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` }));
-      setOpsEmployees(list);
-    })();
-  }, []);
-
-  const handleTransfer = async () => {
-    if (!file?.id) {
-      alert('خطأ: لم يتم العثور على الملف. حاول مجدداً.');
-      return;
-    }
-    setTransferring(true);
-    const updatedNotes = notes
-      ? `${file.notes ? file.notes + ' | ' : ''}ملاحظات اعتماد قسم الحسابات: ${notes}`
-      : file.notes;
-
-    const isMock = String(file.id).startsWith('mock-');
-    let updateError: any = null;
-
-    if (!isMock) {
-      // Try update with financially_approved first, fallback without it
-      const { error: err1 } = await supabase
-        .from('operation_files')
-        .update({
-          workflow_stage: 'operations',
-          file_status: 'قيد التجهيز',
-          financially_approved: true,
-          assigned_to: targetEmpId || null,
-          notes: updatedNotes,
-        })
-        .eq('id', file.id);
-
-      if (err1) {
-        // Retry without financially_approved in case column doesn't exist
-        const { error: err2 } = await supabase
-          .from('operation_files')
-          .update({
-            workflow_stage: 'operations',
-            file_status: 'قيد التجهيز',
-            assigned_to: targetEmpId || null,
-            notes: updatedNotes,
-          })
-          .eq('id', file.id);
-        updateError = err2;
-      }
-
-      if (updateError) {
-        alert(`فشل التحويل للتشغيل: ${updateError.message}`);
-        setTransferring(false);
-        return;
-      }
-
-      if (file.customer_id) {
-        await supabase.from('workflow_timeline').insert({
-          customer_id: file.customer_id,
-          booking_id: file.booking_id || null,
-          stage: 'operations',
-          stage_label: 'قسم التشغيل',
-          department: 'الحسابات',
-          employee_id: targetEmpId || null,
-          status: 'مكتمل',
-          notes: notes || 'تم اعتماد ملف العميل مالياً وتحويله من قسم الحسابات إلى التشغيل',
-        });
-      }
-    }
-
-    // Sync sub-customers to operations stage if they are currently in accounts stage
-    try {
-      const { data: subCusts } = await supabase
-        .from('customers')
-        .select('id, name')
-        .eq('parent_customer_id', file.customer_id);
-
-      if (subCusts && subCusts.length > 0) {
-        const subCustIds = subCusts.map(c => c.id);
-        const { data: subOps } = await supabase
-          .from('operation_files')
-          .select('id, customer_id')
-          .in('customer_id', subCustIds)
-          .eq('workflow_stage', 'accounts');
-
-        if (subOps && subOps.length > 0) {
-          const subOpIds = subOps.map(o => o.id);
-          const { error: subErr1 } = await supabase
-            .from('operation_files')
-            .update({
-              workflow_stage: 'operations',
-              file_status: 'قيد التجهيز',
-              financially_approved: true,
-              assigned_to: targetEmpId || null,
-              notes: updatedNotes,
-            })
-            .in('id', subOpIds);
-
-          if (subErr1) {
-            await supabase
-              .from('operation_files')
-              .update({
-                workflow_stage: 'operations',
-                file_status: 'قيد التجهيز',
-                assigned_to: targetEmpId || null,
-                notes: updatedNotes,
-              })
-              .in('id', subOpIds);
-          }
-
-          const timelines = subOps.map(o => ({
-            customer_id: o.customer_id,
-            booking_id: null,
-            stage: 'operations',
-            stage_label: 'قسم التشغيل',
-            department: 'الحسابات',
-            employee_id: targetEmpId || null,
-            status: 'مكتمل',
-            notes: notes ? `تم اعتماد حساب العائلة الرئيسي وتحويله: ${notes}` : 'تم اعتماد حساب العائلة الرئيسي وتحويله من قسم الحسابات إلى التشغيل',
-          }));
-          await supabase.from('workflow_timeline').insert(timelines);
-        }
-      }
-    } catch (e) {
-      console.error('Error syncing sub-accounts transfer to operations:', e);
-    }
-
-    if (targetEmpId) {
-      await supabase.from('notifications').insert({
-        employee_id: targetEmpId,
-        type: 'task_assigned',
-        title: 'ملف تشغيل جديد محول من قسم الحسابات',
-        body: `العميل: ${file.customer?.name || '—'} - ملاحظات الحسابات: ${notes}`,
-      });
-    }
-
-    setTransferring(false);
-    onTransferred();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
-          <div className="w-12 h-12 rounded-2xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
-            3➜4
-          </div>
-          <div>
-            <h3 className="font-bold text-navy-900 text-base">تحويل العميل من الحسابات إلى التشغيل</h3>
-            <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{file.customer?.name || '—'}</span></p>
-          </div>
-        </div>
-
-        <div className="space-y-3 text-right">
-          <div>
-            <label className="form-label font-bold text-navy-900 text-xs">اختر موظف قسم التشغيل المسؤول:</label>
-            <select
-              value={targetEmpId}
-              onChange={(e) => setTargetEmpId(e.target.value)}
-              className="form-input text-xs"
-            >
-              <option value="">— جميع فريق قسم التشغيل —</option>
-              {opsEmployees.map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للتشغيل:</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="form-input text-xs resize-none"
-              rows={3}
-              placeholder="اكتب ملاحظات الاعتماد المالي والدفعات وقسم الفنادق..."
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleTransfer}
-            disabled={transferring}
-            className="btn-gold flex-1 justify-center text-xs py-2.5"
-          >
-            {transferring ? 'جارٍ التحويل...' : 'تأكيد الاعتماد المالي والتحويل للتشغيل'}
-          </button>
-          <button
-            onClick={onClose}
-            className="btn-outline flex-1 justify-center text-xs py-2.5"
-          >
-            إلغاء
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-

@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { X, UserPlus, Loader2, Shield, Layout } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { X, UserPlus, Loader2, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getDefaultPermissions,
-  getDefaultPagePermissions,
   PERMISSION_GROUPS,
-  ALL_PAGES,
   type Permissions,
   type UserRole,
 } from '../lib/permissions';
@@ -15,7 +12,7 @@ import type { Employee } from '../types';
 
 type Role = UserRole | 'مدير النظام';
 
-const allRoles: Role[] = ['super_admin', 'مالك النظام', 'مدير النظام', 'إضافة عملاء', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
+const allRoles: Role[] = ['مندوب مبيعات', 'مدير المبيعات', 'محاسب', 'موظف التشغيل', 'مدير النظام', 'مالك النظام'];
 
 interface Props {
   open: boolean;
@@ -32,7 +29,6 @@ interface FormState {
   role: Role;
   status: string;
   permissions: Permissions;
-  page_permissions: Record<string, boolean>;
 }
 
 const emptyForm = (): FormState => ({
@@ -40,10 +36,9 @@ const emptyForm = (): FormState => ({
   email: '',
   password: '',
   phone: '',
-  role: 'إضافة عملاء',
+  role: 'مندوب مبيعات',
   status: 'نشط',
-  permissions: getDefaultPermissions('إضافة عملاء'),
-  page_permissions: getDefaultPagePermissions('إضافة عملاء'),
+  permissions: getDefaultPermissions('مندوب مبيعات'),
 });
 
 export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee }: Props) {
@@ -53,7 +48,6 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showPerms, setShowPerms] = useState(false);
-  const [showPages, setShowPages] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -69,25 +63,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         role,
         status: editEmployee.is_active ? 'نشط' : 'غير نشط',
         permissions: getDefaultPermissions(role),
-        page_permissions: getDefaultPagePermissions(role),
       });
-
-      supabase
-        .from('user_profiles')
-        .select('permissions, page_permissions')
-        .eq('id', editEmployee.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) {
-            const hasCustomPerms = data.permissions && Object.keys(data.permissions).length > 0;
-            const hasCustomPages = data.page_permissions && Object.keys(data.page_permissions).length > 0;
-            setForm(prev => ({
-              ...prev,
-              permissions: hasCustomPerms ? data.permissions : prev.permissions,
-              page_permissions: hasCustomPages ? data.page_permissions : prev.page_permissions,
-            }));
-          }
-        });
     } else {
       setIsEdit(false);
       setForm(emptyForm());
@@ -101,7 +77,6 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
       ...form,
       role,
       permissions: getDefaultPermissions(role),
-      page_permissions: getDefaultPagePermissions(role),
     });
   };
 
@@ -109,16 +84,6 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
     setForm({
       ...form,
       permissions: { ...form.permissions, [key]: !form.permissions[key] },
-    });
-  };
-
-  const togglePage = (key: string) => {
-    setForm({
-      ...form,
-      page_permissions: {
-        ...form.page_permissions,
-        [key]: !form.page_permissions[key],
-      },
     });
   };
 
@@ -132,6 +97,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
     setSaving(true);
 
     if (isEdit && editEmployee) {
+      // Edit: update employees row + (optionally) user_profiles if email changed
       const empPayload = {
         name: form.name,
         email: form.email || null,
@@ -145,6 +111,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         .eq('id', editEmployee.id);
       if (e1) { setError(e1.message); setSaving(false); return; }
 
+      // Try to update user_profiles (linked via email)
       const { error: e2 } = await supabase
         .from('user_profiles')
         .update({
@@ -154,47 +121,46 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           role: form.role,
           status: form.status,
           permissions: form.permissions,
-          page_permissions: form.page_permissions,
         })
-        .eq('id', editEmployee.id);
+        .eq('email', editEmployee.email);
+      // Ignore if no matching profile
 
       if (e2) console.warn('Profile update skipped:', e2.message);
-
-      // If password field is filled, update password via RPC
-      if (form.password) {
-        const { error: pwdErr } = await supabase.rpc('change_user_password', {
-          p_user_id: editEmployee.id,
-          p_new_password: form.password
-        });
-        if (pwdErr) { setError(pwdErr.message); setSaving(false); return; }
-      }
-
       setSaving(false);
       onSaved();
       onClose();
       return;
     }
 
+    // Create new employee + auth user via create-user edge function
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const fnUrl = `${supabaseUrl}/functions/v1/create-user`;
     try {
-      const { data: newId, error: rpcError } = await supabase.rpc('create_app_user', {
-        p_email: form.email,
-        p_password: form.password,
-        p_name: form.name,
-        p_role: form.role,
-        p_phone: form.phone || null,
-        p_status: form.status,
-        p_permissions: form.permissions,
-        p_page_permissions: form.page_permissions
+      const resp = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          phone: form.phone,
+          role: form.role,
+          status: form.status,
+          permissions: form.permissions,
+        }),
       });
-
-      if (rpcError) {
-        setError(rpcError.message);
+      const data = await resp.json();
+      if (!resp.ok) {
+        setError(data?.error || `فشل إنشاء المستخدم (${resp.status})`);
         setSaving(false);
         return;
       }
-
-      const { error: e3 } = await supabase.from('employees').upsert({
-        id: newId,
+      // 2) Insert employee row linked by email so Header can find it
+      const { error: e3 } = await supabase.from('employees').insert({
         name: form.name,
         email: form.email,
         phone: form.phone || null,
@@ -204,14 +170,13 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         clients_count: 0,
         bookings_count: 0,
       });
-
       if (e3) {
-        console.error('Employee row upsert failed:', e3.message);
-        setError(e3.message);
+        // Non-fatal: auth user + profile were created; employee row can be re-added
+        console.warn('Employee row insert failed (auth user was still created):', e3.message);
+        setError('تم إنشاء حساب المستخدم ولكن تعذّر إضافته كموظف. تحقق من البريد الإلكتروني.');
         setSaving(false);
         return;
       }
-
       setSaving(false);
       onSaved();
       onClose();
@@ -227,7 +192,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-xl shadow-2xl animate-fadeIn my-8"
+        className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -239,7 +204,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
             <div>
               <h3 className="text-white font-bold text-base">{isEdit ? 'تعديل بيانات موظف' : 'إضافة موظف جديد'}</h3>
               <p className="text-white/60 text-xs">
-                {isEdit ? 'تحديث البيانات والواجهات والصلاحيات' : 'إنشاء حساب وتخصيص الشاشات المصرحة'}
+                {isEdit ? 'تحديث البيانات الأساسية' : 'سيتم إنشاء حساب دخول للموظف تلقائياً'}
               </p>
             </div>
           </div>
@@ -248,171 +213,131 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           </button>
         </div>
 
-        {/* Form Wrap */}
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-          {/* Body */}
-          <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="form-label">الاسم الكامل <span className="text-red-500">*</span></label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="form-input"
-                  placeholder="مثال: أحمد محمد علي"
-                  autoComplete="name"
-                />
-              </div>
-              <div>
-                <label className="form-label">البريد الإلكتروني <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  dir="ltr"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="form-input disabled:opacity-60 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  placeholder="employee@promise.com"
-                  autoComplete="email"
-                  disabled={isEdit}
-                />
-              </div>
-              <div>
-                <label className="form-label">
-                  {isEdit ? 'تغيير كلمة المرور (اختياري)' : 'كلمة المرور'} {!isEdit && <span className="text-red-500">*</span>}
-                </label>
-                <input
-                  type="password"
-                  dir="ltr"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="form-input"
-                  placeholder={isEdit ? 'اتركها فارغة للإبقاء عليها' : '••••••••'}
-                  autoComplete="new-password"
-                />
-              </div>
-              <div>
-                <label className="form-label">رقم الهاتف</label>
-                <input
-                  dir="ltr"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="form-input"
-                  placeholder="01xxxxxxxxx"
-                  autoComplete="tel"
-                />
-              </div>
-              <div>
-                <label className="form-label">الوظيفة الأساسية</label>
-                <select
-                  value={form.role}
-                  onChange={(e) => onRoleChange(e.target.value as Role)}
-                  className="form-input"
-                >
-                  {allRoles.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">حالة الحساب</label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="form-input"
-                >
-                  <option value="نشط">نشط</option>
-                  <option value="غير نشط">غير نشط</option>
-                </select>
-              </div>
-
-              {/* Custom Page Access Selection */}
-              <div className="col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPages((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gold-50 rounded-xl border border-gold-200 hover:border-gold-400 transition-all"
-                >
-                  <span className="flex items-center gap-2 text-sm font-bold text-navy-900">
-                    <Layout size={16} className="text-gold-600" /> تحديد الواجهات الظاهرة للموظف (Page Control)
-                  </span>
-                  <span className="text-xs text-navy-600 font-medium">
-                    {showPages ? 'إخفاء' : 'تخصيص الواجهات'}
-                  </span>
-                </button>
-                {showPages && (
-                  <div className="mt-2 grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100 max-h-48 overflow-y-auto animate-fadeIn">
-                    {ALL_PAGES.map((pg) => (
-                      <label key={pg.key} className="flex items-center gap-2 cursor-pointer p-1.5 bg-white rounded-lg border border-gray-100">
-                        <input
-                          type="checkbox"
-                          checked={form.page_permissions[pg.key] ?? false}
-                          onChange={() => togglePage(pg.key)}
-                          className="w-3.5 h-3.5 rounded accent-gold-500"
-                        />
-                        <span className="text-xs text-navy-900 font-semibold">{pg.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Custom Action Permissions Selection */}
-              <div className="col-span-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPerms((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-navy-300 transition-all"
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-navy-700">
-                    <Shield size={15} /> صلاحيات الإضافة، التعديل والحذف
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {showPerms ? 'إخفاء' : 'تخصيص الإجراءات'}
-                  </span>
-                </button>
-                {showPerms && (
-                  <div className="mt-2 grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 animate-fadeIn">
-                    {PERMISSION_GROUPS.map((group) => (
-                      <div key={group.label} className="space-y-1.5">
-                        <p className="text-[10px] font-bold text-navy-700 uppercase mt-1">{group.label}</p>
-                        {group.items.map((item) => (
-                          <label key={item.key} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={form.permissions[item.key as keyof Permissions] ?? false}
-                              onChange={() => togglePerm(item.key as keyof Permissions)}
-                              className="w-3.5 h-3.5 rounded accent-navy-700"
-                            />
-                            <span className="text-[11px] text-gray-600">{item.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="form-label">الاسم الكامل <span className="text-red-500">*</span></label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="form-input"
+                placeholder="مثال: أحمد محمد علي"
+              />
             </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
-                {error}
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="btn-outline">إلغاء</button>
-            <button type="submit" disabled={saving} className="btn-gold">
-              {saving ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 size={16} className="animate-spin" />
-                  {isEdit ? 'جارٍ الحفظ...' : 'جارٍ إنشاء الحساب...'}
+            <div>
+              <label className="form-label">البريد الإلكتروني <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                dir="ltr"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="form-input"
+                placeholder="employee@promise.com"
+              />
+            </div>
+            <div>
+              <label className="form-label">
+                كلمة المرور {!isEdit && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="password"
+                dir="ltr"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="form-input"
+                placeholder={isEdit ? 'اتركها فارغة للإبقاء عليها' : '••••••••'}
+                disabled={isEdit}
+              />
+            </div>
+            <div>
+              <label className="form-label">رقم الهاتف</label>
+              <input
+                dir="ltr"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="form-input"
+                placeholder="01xxxxxxxxx"
+              />
+            </div>
+            <div>
+              <label className="form-label">الوظيفة</label>
+              <select
+                value={form.role}
+                onChange={(e) => onRoleChange(e.target.value as Role)}
+                className="form-input"
+              >
+                {allRoles.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">الحالة</label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+                className="form-input"
+              >
+                <option value="نشط">نشط</option>
+                <option value="غير نشط">غير نشط</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowPerms((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 hover:border-navy-300 transition-all"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-navy-700">
+                  <Shield size={15} />الصلاحيات
                 </span>
-              ) : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
-            </button>
+                <span className="text-xs text-gray-400">
+                  {showPerms ? 'إخفاء' : 'تخصيص الصلاحيات'}
+                </span>
+              </button>
+              {showPerms && (
+                <div className="mt-2 grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 animate-fadeIn">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.label} className="space-y-1.5">
+                      <p className="text-[10px] font-bold text-navy-700 uppercase mt-1">{group.label}</p>
+                      {group.items.map((item) => (
+                        <label key={item.key} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.permissions[item.key]}
+                            onChange={() => togglePerm(item.key)}
+                            className="w-3.5 h-3.5 rounded accent-navy-700"
+                          />
+                          <span className="text-[11px] text-gray-600">{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </form>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+          <button onClick={onClose} className="btn-outline">إلغاء</button>
+          <button onClick={handleSave} disabled={saving} className="btn-gold">
+            {saving ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                {isEdit ? 'جارٍ الحفظ...' : 'جارٍ إنشاء الحساب...'}
+              </span>
+            ) : isEdit ? 'حفظ التعديلات' : 'إضافة الموظف'}
+          </button>
+        </div>
       </div>
     </div>
   );

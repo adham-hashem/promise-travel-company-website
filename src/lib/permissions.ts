@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'مالك النظام' | 'مدير النظام' | 'إضافة عملاء' | 'مدير المبيعات' | 'مندوب مبيعات' | 'محاسب' | 'موظف التشغيل' | 'مسؤول طيران';
+export type UserRole = 'مالك النظام' | 'مدير المبيعات' | 'مندوب مبيعات' | 'محاسب' | 'موظف التشغيل';
 
 export interface Permissions {
   // Customers
@@ -46,6 +46,8 @@ export interface Permissions {
   operations_access: boolean;
   operations_edit: boolean;
   operations_delete: boolean;
+  vip_management_access: boolean;
+  super_admin_access: boolean;
   // Hotels
   hotels_view: boolean;
   hotels_add: boolean;
@@ -61,97 +63,9 @@ export interface Permissions {
   inquiries_add: boolean;
   inquiries_edit: boolean;
   inquiries_delete: boolean;
-  vip_management_access: boolean;
 }
 
-export type PageKey = 
-  | 'dashboard'
-  | 'inquiries'
-  | 'customers'
-  | 'customer-add'
-  | 'customer-details'
-  | 'revenue'
-  | 'payments'
-  | 'installments'
-  | 'expenses'
-  | 'commissions'
-  | 'invoices'
-  | 'operations'
-  | 'visa'
-  | 'flight-tickets'
-  | 'client-search'
-  | 'bookings'
-  | 'packages'
-  | 'offers'
-  | 'hotels'
-  | 'internal-trips'
-  | 'internal-bookings'
-  | 'internal-customers'
-  | 'internal-reports'
-  | 'suppliers'
-  | 'tasks'
-  | 'calendar'
-  | 'profit'
-  | 'reports'
-  | 'employees'
-  | 'settings'
-  | 'super-admin'
-  | 'travel-groups'
-  | 'sales-portal'
-  | 'vip-dashboard'
-  | 'vip-details'
-  | 'internal-groups'
-  | 'quotation-form';
-
-export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
-  { key: 'dashboard', label: 'لوحة التحكم', group: 'الرئيسية' },
-  { key: 'client-search', label: 'البحث الذكي', group: 'الرئيسية' },
-  { key: 'inquiries', label: 'الاستعلامات (المسار الأول)', group: 'المسار والتسلسل' },
-  { key: 'customers', label: 'العملاء CRM', group: 'المسار والتسلسل' },
-  { key: 'revenue', label: 'قسم الحسابات - الإيرادات', group: 'المسار والتسلسل' },
-  { key: 'payments', label: 'قسم الحسابات - المدفوعات', group: 'المسار والتسلسل' },
-  { key: 'operations', label: 'قسم التشغيل', group: 'المسار والتسلسل' },
-  { key: 'flight-tickets', label: 'قسم الطيران', group: 'المسار والتسلسل' },
-  { key: 'visa', label: 'إدارة التأشيرات', group: 'إدارة المبيعات والأعمال' },
-  { key: 'bookings', label: 'الحجوزات', group: 'إدارة المبيعات والأعمال' },
-  { key: 'packages', label: 'الباقات', group: 'إدارة المبيعات والأعمال' },
-  { key: 'offers', label: 'العروض', group: 'إدارة المبيعات والأعمال' },
-  { key: 'hotels', label: 'إدارة الفنادق', group: 'إدارة المبيعات والأعمال' },
-  { key: 'invoices', label: 'الفواتير', group: 'الحسابات والتكاليف' },
-  { key: 'installments', label: 'الأقساط', group: 'الحسابات والتكاليف' },
-  { key: 'expenses', label: 'المصروفات والتكاليف', group: 'الحسابات والتكاليف' },
-  { key: 'commissions', label: 'العمولات', group: 'الحسابات والتكاليف' },
-  { key: 'profit', label: 'تحليل الأرباح', group: 'التقارير والإدارة' },
-  { key: 'reports', label: 'التقارير الشاملة', group: 'التقارير والإدارة' },
-  { key: 'tasks', label: 'إدارة المهام', group: 'الإدارة والتحكم' },
-  { key: 'calendar', label: 'التقويم', group: 'الإدارة والتحكم' },
-  { key: 'travel-groups', label: 'الأفواج (Travel Groups)', group: 'قسم التشغيل' },
-  { key: 'internal-groups', label: 'المجموعات (الرحلات الداخلية)', group: 'قسم التشغيل' },
-  { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
-  { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
-  { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
-  { key: 'sales-portal', label: 'بوابة مندوب المبيعات', group: 'إدارة المبيعات والأعمال' },
-  { key: 'vip-dashboard', label: 'لوحة عملاء VIP', group: 'إدارة المبيعات والأعمال' },
-  { key: 'vip-details', label: 'تفاصيل عميل VIP', group: 'إدارة المبيعات والأعمال' },
-  { key: 'quotation-form', label: 'طلب عرض سعر', group: 'أوامر الطباعة' },
-];
-
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
-  super_admin: {
-    customers_view: true, customers_add: true, customers_edit: true, customers_delete: true,
-    bookings_view: true, bookings_add: true, bookings_edit: true, bookings_delete: true,
-    packages_view: true, packages_add: true, packages_edit: true, packages_delete: true,
-    offers_view: true, offers_add: true, offers_edit: true, offers_delete: true,
-    employees_view: true, employees_add: true, employees_edit: true, employees_delete: true,
-    reports_view: true, reports_export_pdf: true, reports_export_excel: true,
-    settings_access: true, settings_edit: true,
-    accounting_revenue: true, accounting_payments: true, accounting_installments: true, accounting_expenses: true, accounting_commissions: true,
-    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: true,
-    hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
-    invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
-    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
-    vip_management_access: true,
-  },
   'مالك النظام': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: true,
     bookings_view: true, bookings_add: true, bookings_edit: true, bookings_delete: true,
@@ -161,41 +75,10 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     reports_view: true, reports_export_pdf: true, reports_export_excel: true,
     settings_access: true, settings_edit: true,
     accounting_revenue: true, accounting_payments: true, accounting_installments: true, accounting_expenses: true, accounting_commissions: true,
-    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: true,
+    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: true, vip_management_access: true, super_admin_access: true,
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
-    vip_management_access: true,
-  },
-  'مدير النظام': {
-    customers_view: true, customers_add: true, customers_edit: true, customers_delete: true,
-    bookings_view: true, bookings_add: true, bookings_edit: true, bookings_delete: true,
-    packages_view: true, packages_add: true, packages_edit: true, packages_delete: true,
-    offers_view: true, offers_add: true, offers_edit: true, offers_delete: true,
-    employees_view: true, employees_add: true, employees_edit: true, employees_delete: true,
-    reports_view: true, reports_export_pdf: true, reports_export_excel: true,
-    settings_access: true, settings_edit: true,
-    accounting_revenue: true, accounting_payments: true, accounting_installments: true, accounting_expenses: true, accounting_commissions: true,
-    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: true,
-    hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: true,
-    invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: true,
-    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
-    vip_management_access: true,
-  },
-  'إضافة عملاء': {
-    customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
-    bookings_view: false, bookings_add: false, bookings_edit: false, bookings_delete: false,
-    packages_view: true, packages_add: false, packages_edit: false, packages_delete: false,
-    offers_view: false, offers_add: false, offers_edit: false, offers_delete: false,
-    employees_view: false, employees_add: false, employees_edit: false, employees_delete: false,
-    reports_view: false, reports_export_pdf: false, reports_export_excel: false,
-    settings_access: false, settings_edit: false,
-    accounting_revenue: false, accounting_payments: false, accounting_installments: false, accounting_expenses: false, accounting_commissions: false,
-    documents_upload: true, documents_review: false, documents_view: true, operations_access: false, operations_edit: false, operations_delete: false,
-    hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
-    invoices_view: false, invoices_add: false, invoices_edit: false, invoices_delete: false,
-    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
-    vip_management_access: false,
   },
   'مدير المبيعات': {
     customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
@@ -206,14 +89,13 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     reports_view: true, reports_export_pdf: true, reports_export_excel: true,
     settings_access: false, settings_edit: false,
     accounting_revenue: true, accounting_payments: false, accounting_installments: true, accounting_expenses: false, accounting_commissions: true,
-    documents_upload: true, documents_review: false, documents_view: true, operations_access: true, operations_edit: false, operations_delete: false,
+    documents_upload: true, documents_review: false, documents_view: true, operations_access: true, operations_edit: false, operations_delete: false, vip_management_access: false, super_admin_access: false,
     hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: false,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: false,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
-    vip_management_access: false,
   },
   'مندوب مبيعات': {
-    customers_view: false, customers_add: true, customers_edit: true, customers_delete: false,
+    customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
     bookings_view: true, bookings_add: false, bookings_edit: false, bookings_delete: false,
     packages_view: true, packages_add: false, packages_edit: false, packages_delete: false,
     offers_view: true, offers_add: false, offers_edit: false, offers_delete: false,
@@ -221,11 +103,10 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     reports_view: false, reports_export_pdf: false, reports_export_excel: false,
     settings_access: false, settings_edit: false,
     accounting_revenue: false, accounting_payments: false, accounting_installments: false, accounting_expenses: false, accounting_commissions: false,
-    documents_upload: true, documents_review: false, documents_view: true, operations_access: false, operations_edit: false, operations_delete: false,
+    documents_upload: true, documents_review: false, documents_view: true, operations_access: false, operations_edit: false, operations_delete: false, vip_management_access: false, super_admin_access: false,
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: false,
-    vip_management_access: false,
   },
   'محاسب': {
     customers_view: false, customers_add: false, customers_edit: false, customers_delete: false,
@@ -236,11 +117,10 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     reports_view: true, reports_export_pdf: true, reports_export_excel: true,
     settings_access: false, settings_edit: false,
     accounting_revenue: true, accounting_payments: true, accounting_installments: true, accounting_expenses: true, accounting_commissions: false,
-    documents_upload: false, documents_review: true, documents_view: true, operations_access: true, operations_edit: false, operations_delete: false,
+    documents_upload: false, documents_review: true, documents_view: true, operations_access: true, operations_edit: false, operations_delete: false, vip_management_access: false, super_admin_access: false,
     hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: false,
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
-    vip_management_access: false,
   },
   'موظف التشغيل': {
     customers_view: true, customers_add: false, customers_edit: false, customers_delete: false,
@@ -251,26 +131,10 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     reports_view: false, reports_export_pdf: false, reports_export_excel: false,
     settings_access: false, settings_edit: false,
     accounting_revenue: false, accounting_payments: false, accounting_installments: false, accounting_expenses: false, accounting_commissions: false,
-    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: false,
+    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: false, vip_management_access: false, super_admin_access: false,
     hotels_view: true, hotels_add: false, hotels_edit: false, hotels_delete: false,
     invoices_view: true, invoices_add: false, invoices_edit: false, invoices_delete: false,
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
-    vip_management_access: false,
-  },
-  'مسؤول طيران': {
-    customers_view: true, customers_add: false, customers_edit: false, customers_delete: false,
-    bookings_view: true, bookings_add: false, bookings_edit: false, bookings_delete: false,
-    packages_view: true, packages_add: false, packages_edit: false, packages_delete: false,
-    offers_view: false, offers_add: false, offers_edit: false, offers_delete: false,
-    employees_view: false, employees_add: false, employees_edit: false, employees_delete: false,
-    reports_view: false, reports_export_pdf: false, reports_export_excel: false,
-    settings_access: false, settings_edit: false,
-    accounting_revenue: false, accounting_payments: false, accounting_installments: false, accounting_expenses: false, accounting_commissions: false,
-    documents_upload: true, documents_review: true, documents_view: true, operations_access: true, operations_edit: true, operations_delete: false,
-    hotels_view: false, hotels_add: false, hotels_edit: false, hotels_delete: false,
-    invoices_view: false, invoices_add: false, invoices_edit: false, invoices_delete: false,
-    inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
-    vip_management_access: false,
   },
 };
 
@@ -278,78 +142,110 @@ export function getDefaultPermissions(role: string): Permissions {
   if (role in DEFAULT_PERMISSIONS) {
     return { ...DEFAULT_PERMISSIONS[role as UserRole] };
   }
+  // Roles outside the canonical UserRole (e.g. 'مدير النظام') get owner-style powers
   return { ...DEFAULT_PERMISSIONS['مالك النظام'] };
 }
 
-export function getDefaultPagePermissions(role: string): Record<string, boolean> {
-  const pages: Record<string, boolean> = {};
-  // tasks is universally enabled for all roles by default
-  pages['tasks'] = true;
-
-  if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') {
-    ALL_PAGES.forEach(p => { pages[p.key] = true; });
-  } else if (role === 'موظف التشغيل') {
-    pages['operations'] = true;
-    pages['visa'] = true;
-    pages['travel-groups'] = true;
-    pages['internal-groups'] = true;
-    pages['vip-dashboard'] = true;
-    pages['vip-details'] = true;
-  } else if (role === 'إضافة عملاء') {
-    pages['inquiries'] = true;
-    pages['customers'] = true;
-    pages['customer-add'] = true;
-    pages['customer-details'] = true;
-  } else if (role === 'محاسب') {
-    pages['revenue'] = true;
-    pages['payments'] = true;
-    pages['installments'] = true;
-    pages['expenses'] = true;
-    pages['commissions'] = true;
-    pages['invoices'] = true;
-  } else if (role === 'موظف التشغيل') {
-    pages['operations'] = true;
-    pages['visa'] = true;
-    pages['travel-groups'] = true;
-    pages['internal-groups'] = true;
-  } else if (role === 'مسؤول طيران') {
-    pages['flight-tickets'] = true;
-  } else if (role === 'مندوب مبيعات') {
-    pages['inquiries'] = true;
-    pages['sales-portal'] = true;
-    pages['quotation-form'] = true;
-    pages['bookings'] = true;
-    pages['packages'] = true;
-    pages['offers'] = true;
-    pages['hotels'] = true;
-  } else if (role === 'مدير المبيعات') {
-    pages['inquiries'] = true;
-    pages['customers'] = true;
-    pages['quotation-form'] = true;
-    pages['bookings'] = true;
-    pages['packages'] = true;
-    pages['offers'] = true;
-    pages['employees'] = true;
-  } else {
-    pages['inquiries'] = true;
-    pages['customers'] = true;
-    pages['bookings'] = true;
-  }
-  return pages;
-}
-
-export function getRoleHomePage(role: string): PageKey {
-  if (role === 'super_admin' || role === 'مالك النظام' || role === 'مدير النظام') return 'dashboard';
-  if (role === 'مندوب مبيعات') return 'inquiries';
-  if (role === 'مدير المبيعات') return 'inquiries';
-  if (role === 'محاسب') return 'payments';
-  if (role === 'موظف التشغيل') return 'operations';
-  if (role === 'مسؤول طيران') return 'flight-tickets';
-  if (role === 'إضافة عملاء') return 'inquiries';
-  return 'dashboard';
-}
-
 export const PERMISSION_GROUPS = [
+  {
+    label: 'العملاء',
+    items: [
+      { key: 'customers_view', label: 'عرض العملاء' },
+      { key: 'customers_add', label: 'إضافة عميل' },
+      { key: 'customers_edit', label: 'تعديل عميل' },
+      { key: 'customers_delete', label: 'حذف عميل' },
+    ],
+  },
+  {
+    label: 'الحجوزات',
+    items: [
+      { key: 'bookings_view', label: 'عرض الحجوزات' },
+      { key: 'bookings_add', label: 'إضافة حجز' },
+      { key: 'bookings_edit', label: 'تعديل حجز' },
+      { key: 'bookings_delete', label: 'حذف حجز' },
+    ],
+  },
+  {
+    label: 'الباقات',
+    items: [
+      { key: 'packages_view', label: 'عرض الباقات' },
+      { key: 'packages_add', label: 'إضافة باقة' },
+      { key: 'packages_edit', label: 'تعديل باقة' },
+      { key: 'packages_delete', label: 'حذف باقة' },
+    ],
+  },
+  {
+    label: 'العروض',
+    items: [
+      { key: 'offers_view', label: 'عرض العروض' },
+      { key: 'offers_add', label: 'إضافة عرض' },
+      { key: 'offers_edit', label: 'تعديل عرض' },
+      { key: 'offers_delete', label: 'حذف عرض' },
+    ],
+  },
+  {
+    label: 'الموظفون',
+    items: [
+      { key: 'employees_view', label: 'عرض الموظفين' },
+      { key: 'employees_add', label: 'إضافة موظف' },
+      { key: 'employees_edit', label: 'تعديل موظف' },
+      { key: 'employees_delete', label: 'حذف موظف' },
+    ],
+  },
+  {
+    label: 'التقارير',
+    items: [
+      { key: 'reports_view', label: 'عرض التقارير' },
+      { key: 'reports_export_pdf', label: 'تصدير PDF' },
+      { key: 'reports_export_excel', label: 'تصدير Excel' },
+    ],
+  },
+  {
+    label: 'الإعدادات',
+    items: [
+      { key: 'settings_access', label: 'الوصول للإعدادات' },
+      { key: 'settings_edit', label: 'تعديل إعدادات النظام' },
+    ],
+  },
+  {
+    label: 'الحسابات',
+    items: [
+      { key: 'accounting_revenue', label: 'الإيرادات' },
+      { key: 'accounting_payments', label: 'المدفوعات' },
+      { key: 'accounting_installments', label: 'الأقساط' },
+      { key: 'accounting_expenses', label: 'المصروفات' },
+      { key: 'accounting_commissions', label: 'عمولات الموظفين' },
+    ],
+  },
+  {
+    label: 'المستندات والتشغيل',
+    items: [
+      { key: 'documents_upload', label: 'رفع المستندات' },
+      { key: 'documents_view', label: 'عرض المستندات' },
+      { key: 'documents_review', label: 'مراجعة المستندات' },
+      { key: 'operations_access', label: 'لوحة التشغيل' },
+      { key: 'operations_edit', label: 'تعديل ملفات التشغيل' },
+      { key: 'operations_delete', label: 'حذف ملفات التشغيل' },
+    ],
+  },
+  {
+    label: 'الفنادق',
+    items: [
+      { key: 'hotels_view', label: 'عرض الفنادق' },
+      { key: 'hotels_add', label: 'إضافة فندق' },
+      { key: 'hotels_edit', label: 'تعديل فندق' },
+      { key: 'hotels_delete', label: 'حذف فندق' },
+    ],
+  },
+  {
+    label: 'الفواتير',
+    items: [
+      { key: 'invoices_view', label: 'عرض الفواتير' },
+      { key: 'invoices_add', label: 'إنشاء فاتورة' },
+      { key: 'invoices_edit', label: 'تعديل فاتورة' },
+      { key: 'invoices_delete', label: 'حذف فاتورة' },
+    ],
+  },
   {
     label: 'الاستعلامات',
     items: [
@@ -359,53 +255,7 @@ export const PERMISSION_GROUPS = [
       { key: 'inquiries_delete', label: 'حذف استعلام' },
     ],
   },
-  {
-    label: 'العملاء CRM',
-    items: [
-      { key: 'customers_view', label: 'عرض العملاء' },
-      { key: 'customers_add', label: 'إضافة عميل' },
-      { key: 'customers_edit', label: 'تعديل عميل' },
-      { key: 'customers_delete', label: 'حذف عميل' },
-    ],
-  },
-  {
-    label: 'الحسابات والتكاليف',
-    items: [
-      { key: 'accounting_revenue', label: 'إيرادات الشركة' },
-      { key: 'accounting_payments', label: 'سندات الدفع والاعتماد' },
-      { key: 'accounting_installments', label: 'إدارة الأقساط' },
-      { key: 'accounting_expenses', label: 'المصروفات والتكاليف' },
-      { key: 'accounting_commissions', label: 'عمولات الموظفين' },
-      { key: 'invoices_view', label: 'عرض الفواتير' },
-      { key: 'invoices_add', label: 'إنشاء فاتورة' },
-    ],
-  },
-  {
-    label: 'التشغيل والتأشيرات',
-    items: [
-      { key: 'operations_access', label: 'لوحة قسم التشغيل' },
-      { key: 'operations_edit', label: 'تعديل وثائق التشغيل' },
-      { key: 'documents_upload', label: 'رفع المستندات والجوازات' },
-      { key: 'documents_view', label: 'معاينة وتنزيل المستندات' },
-      { key: 'vip_management_access', label: 'إدارة ومتابعة عملاء VIP' },
-    ],
-  },
-  {
-    label: 'الحجوزات والباقات والعروض',
-    items: [
-      { key: 'bookings_view', label: 'عرض الحجوزات' },
-      { key: 'bookings_add', label: 'إضافة حجز' },
-      { key: 'packages_view', label: 'عرض الباقات' },
-      { key: 'offers_view', label: 'عرض العروض' },
-    ],
-  },
-  {
-    label: 'إدارة الموظفين والإعدادات',
-    items: [
-      { key: 'employees_view', label: 'عرض الموظفين' },
-      { key: 'employees_add', label: 'إضافة موظفين' },
-      { key: 'employees_edit', label: 'تعديل موظفين' },
-      { key: 'settings_access', label: 'إعدادات النظام' },
-    ],
-  },
 ] as const;
+
+
+

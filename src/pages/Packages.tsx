@@ -1,10 +1,17 @@
-import { useEffect, useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, Package as PackageIcon, Upload, X, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Pencil, Trash2, Package as PackageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Package } from '../types';
-import { compressImage } from '../lib/imageCompressor';
 
-const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', price_double: '', price_triple: '', price_quad: '', price_child: '', price_infant: '', image_url: '', description: '', featured: false };
+const MOCK: Package[] = [
+  { id: 'p1', name: 'باقة العمرة الاقتصادية', type: 'عمرة', hotel: 'فندق قريش', airline: 'مصر للطيران', duration_days: 10, price: 8500, is_active: true, created_at: '2026-01-01' },
+  { id: 'p2', name: 'باقة العمرة الفاخرة', type: 'عمرة', hotel: 'فندق الشيراتون مكة', airline: 'مصر للطيران', duration_days: 14, price: 15000, is_active: true, created_at: '2026-01-01' },
+  { id: 'p3', name: 'باقة الحج الاقتصادية', type: 'حج', hotel: 'فندق النور', airline: 'طيران العربية', duration_days: 40, price: 25000, is_active: true, created_at: '2026-01-01' },
+  { id: 'p4', name: 'باقة الحج الفاخرة', type: 'حج', hotel: 'فندق هيلتون مكة', airline: 'مصر للطيران', duration_days: 45, price: 45000, is_active: true, created_at: '2026-01-01' },
+  { id: 'p5', name: 'باقة عمرة رمضان', type: 'عمرة', hotel: 'فندق موفنبيك', airline: 'مصر للطيران', duration_days: 15, price: 18000, is_active: true, created_at: '2026-01-01' },
+];
+
+const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', airline: '', duration_days: '', price: '', image_url: '', description: '', featured: false };
 
 export default function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -13,77 +20,25 @@ export default function Packages() {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.from('packages').select('*').order('created_at').then(({ data }) => {
-      setPackages((data as Package[]) || []);
+      setPackages(data && data.length > 0 ? data : MOCK);
       setLoading(false);
     });
   }, []);
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (p: Package) => {
-    setForm({
-      name: p.name,
-      type: p.type,
-      hotel: p.hotel || '',
-      hotel_makkah: p.hotel_makkah || '',
-      hotel_madinah: p.hotel_madinah || '',
-      airline: p.airline || '',
-      duration_days: String(p.duration_days || ''),
-      price: String(p.price),
-      price_double: String(p.price_double || ''),
-      price_triple: String(p.price_triple || ''),
-      price_quad: String(p.price_quad || ''),
-      price_child: String(p.price_child || ''),
-      price_infant: String(p.price_infant || ''),
-      image_url: p.image_url || '',
-      description: p.description || '',
-      featured: p.featured || false
-    });
+    setForm({ name: p.name, type: p.type, hotel: p.hotel || '', airline: p.airline || '', duration_days: String(p.duration_days || ''), price: String(p.price), image_url: p.image_url || '', description: p.description || '', featured: p.featured || false });
     setEditId(p.id); setShowModal(true);
   };
 
   const handleSave = async () => {
     if (!form.name || !form.price) return;
     setSaving(true);
-    const parsedPrices = {
-      price_double: parseFloat(form.price_double) || 0,
-      price_triple: parseFloat(form.price_triple) || 0,
-      price_quad: parseFloat(form.price_quad) || 0,
-      price_child: parseFloat(form.price_child) || 0,
-      price_infant: parseFloat(form.price_infant) || 0,
-    };
-    const payload = {
-      name: form.name,
-      type: form.type,
-      hotel: form.hotel || undefined,
-      hotel_makkah: form.hotel_makkah || undefined,
-      hotel_madinah: form.hotel_madinah || undefined,
-      airline: form.airline || undefined,
-      duration_days: form.duration_days ? parseInt(form.duration_days) : undefined,
-      price: parseFloat(form.price),
-      ...parsedPrices,
-      image_url: form.image_url || undefined,
-      description: form.description || undefined,
-      featured: form.featured
-    };
-    const dbPayload = {
-      name: form.name,
-      type: form.type,
-      hotel: form.hotel || null,
-      hotel_makkah: form.hotel_makkah || null,
-      hotel_madinah: form.hotel_madinah || null,
-      airline: form.airline || null,
-      duration_days: form.duration_days ? parseInt(form.duration_days) : null,
-      price: parseFloat(form.price),
-      ...parsedPrices,
-      image_url: form.image_url || null,
-      description: form.description || null,
-      featured: form.featured
-    };
+    const payload = { name: form.name, type: form.type, hotel: form.hotel || undefined, airline: form.airline || undefined, duration_days: form.duration_days ? parseInt(form.duration_days) : undefined, price: parseFloat(form.price), image_url: form.image_url || undefined, description: form.description || undefined, featured: form.featured };
+    const dbPayload = { name: form.name, type: form.type, hotel: form.hotel || null, airline: form.airline || null, duration_days: form.duration_days ? parseInt(form.duration_days) : null, price: parseFloat(form.price), image_url: form.image_url || null, description: form.description || null, featured: form.featured };
     if (editId) {
       await supabase.from('packages').update(dbPayload).eq('id', editId);
       setPackages(packages.map(p => p.id === editId ? { ...p, ...payload } : p));
@@ -99,44 +54,6 @@ export default function Packages() {
     if (!confirm('هل أنت متأكد من حذف هذه الباقة؟')) return;
     await supabase.from('packages').delete().eq('id', id);
     setPackages(packages.filter(p => p.id !== id));
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حجم الصورة كبير جداً. يجب أن يكون أقل من 5 ميجابايت.');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const compressedFile = await compressImage(file);
-      const ext = compressedFile.name.split('.').pop() || 'jpg';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
-      const filePath = `packages/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, compressedFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (uploadError) {
-        alert('فشل رفع الصورة: ' + uploadError.message);
-        return;
-      }
-
-      const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
-      setForm(prev => ({ ...prev, image_url: publicUrlData.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ أثناء رفع الصورة');
-    } finally {
-      setUploading(false);
-    }
   };
 
   return (
@@ -175,24 +92,7 @@ export default function Packages() {
                   </div>
                 </div>
                 <div className="space-y-2 text-xs text-gray-600">
-                  {p.hotel_makkah && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 flex items-center gap-1">🕋 فندق مكة</span>
-                      <span className="font-medium">{p.hotel_makkah}</span>
-                    </div>
-                  )}
-                  {p.hotel_madinah && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400 flex items-center gap-1">🕌 فندق المدينة</span>
-                      <span className="font-medium">{p.hotel_madinah}</span>
-                    </div>
-                  )}
-                  {!p.hotel_makkah && !p.hotel_madinah && p.hotel && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">الفندق</span>
-                      <span className="font-medium">{p.hotel}</span>
-                    </div>
-                  )}
+                  {p.hotel && <div className="flex justify-between"><span className="text-gray-400">الفندق</span><span className="font-medium">{p.hotel}</span></div>}
                   {p.airline && <div className="flex justify-between"><span className="text-gray-400">شركة الطيران</span><span className="font-medium">{p.airline}</span></div>}
                   {p.duration_days && <div className="flex justify-between"><span className="text-gray-400">المدة</span><span className="font-medium">{p.duration_days} يوم</span></div>}
                 </div>
@@ -209,11 +109,11 @@ export default function Packages() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex-shrink-0">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fadeIn">
+            <div className="p-6 border-b border-gray-100">
               <h3 className="text-lg font-bold text-navy-900">{editId ? 'تعديل الباقة' : 'إضافة باقة جديدة'}</h3>
             </div>
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="form-label">اسم الباقة <span className="text-red-500">*</span></label>
@@ -231,104 +131,20 @@ export default function Packages() {
                   <input type="number" value={form.duration_days} onChange={(e) => setForm({ ...form, duration_days: e.target.value })} className="form-input" placeholder="14" />
                 </div>
                 <div>
-                  <label className="form-label">🕋 فندق مكة</label>
-                  <input value={form.hotel_makkah} onChange={(e) => setForm({ ...form, hotel_makkah: e.target.value })} className="form-input" placeholder="فندق مكة" />
-                </div>
-                <div>
-                  <label className="form-label">🕌 فندق المدينة</label>
-                  <input value={form.hotel_madinah} onChange={(e) => setForm({ ...form, hotel_madinah: e.target.value })} className="form-input" placeholder="فندق المدينة" />
-                </div>
-                <div>
-                  <label className="form-label">الفندق (عام)</label>
-                  <input value={form.hotel} onChange={(e) => setForm({ ...form, hotel: e.target.value })} className="form-input" placeholder="اسم الفندق العام" />
+                  <label className="form-label">الفندق</label>
+                  <input value={form.hotel} onChange={(e) => setForm({ ...form, hotel: e.target.value })} className="form-input" placeholder="اسم الفندق" />
                 </div>
                 <div>
                   <label className="form-label">شركة الطيران</label>
                   <input value={form.airline} onChange={(e) => setForm({ ...form, airline: e.target.value })} className="form-input" placeholder="مثال: مصر للطيران" />
                 </div>
                 <div className="col-span-2">
-                  <label className="form-label">السعر الأساسي للفرد (ج.م) <span className="text-red-500">*</span></label>
+                  <label className="form-label">السعر (ج.م) <span className="text-red-500">*</span></label>
                   <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="form-input" placeholder="18000" />
                 </div>
                 <div className="col-span-2">
-                  <label className="form-label font-bold text-navy-800 text-xs">تفاصيل أسعار الغرف (ج.م):</label>
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-navy-50 rounded-xl border border-navy-100 mt-1">
-                    <div>
-                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة ثنائية</label>
-                      <input type="number" value={form.price_double} onChange={(e) => setForm({ ...form, price_double: e.target.value })} className="form-input text-xs" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة ثلاثية</label>
-                      <input type="number" value={form.price_triple} onChange={(e) => setForm({ ...form, price_triple: e.target.value })} className="form-input text-xs" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">غرفة رباعية</label>
-                      <input type="number" value={form.price_quad} onChange={(e) => setForm({ ...form, price_quad: e.target.value })} className="form-input text-xs" placeholder="0" />
-                    </div>
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <label className="form-label font-bold text-navy-800 text-xs">تفاصيل أسعار الفئات العمرية (ج.م):</label>
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-gold-50/50 rounded-xl border border-gold-100 mt-1">
-                    <div>
-                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">سعر الطفل (Child)</label>
-                      <input type="number" value={form.price_child} onChange={(e) => setForm({ ...form, price_child: e.target.value })} className="form-input text-xs" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-gray-500 block mb-1">سعر الرضيع (Infant)</label>
-                      <input type="number" value={form.price_infant} onChange={(e) => setForm({ ...form, price_infant: e.target.value })} className="form-input text-xs" placeholder="0" />
-                    </div>
-                  </div>
-                </div>
-                <div className="col-span-2">
-                  <label className="form-label">صورة الباقة (للموقع)</label>
-                  <div className="mt-1 flex items-center gap-4">
-                    {form.image_url ? (
-                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0">
-                        <img src={form.image_url} alt="معاينة" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, image_url: '' })}
-                          className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
-                          title="حذف الصورة"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-gold-500 hover:bg-gold-50/20 flex flex-col items-center justify-center text-gray-400 hover:text-gold-600 transition-all flex-shrink-0"
-                      >
-                        {uploading ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-gold-600" />
-                        ) : (
-                          <>
-                            <Upload className="w-6 h-6" />
-                            <span className="text-[10px] mt-1 font-semibold">اختر صورة</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>صيغ الصور المدعومة: PNG, JPG, JPEG, WEBP.</p>
-                      <p>الحد الأقصى لحجم الملف: 5 ميجابايت.</p>
-                      {form.image_url && (
-                        <p className="text-emerald-600 font-semibold flex items-center gap-1">
-                          ✓ تم رفع الصورة بنجاح
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <label className="form-label">رابط صورة الباقة (للموقع)</label>
+                  <input dir="ltr" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} className="form-input" placeholder="https://..." />
                 </div>
                 <div className="col-span-2">
                   <label className="form-label">وصف الباقة (للموقع)</label>
@@ -342,7 +158,7 @@ export default function Packages() {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
               <button onClick={() => setShowModal(false)} className="btn-outline">إلغاء</button>
               <button onClick={handleSave} disabled={saving} className="btn-gold">
                 {saving ? 'جارٍ الحفظ...' : editId ? 'حفظ التعديلات' : 'إضافة الباقة'}

@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
 import WebsiteHeader from './WebsiteHeader';
 import WebsiteFooter from './WebsiteFooter';
-import SEOHead from './SEOHead';
 import Home from '../../pages/public/Home';
 import HajjPage from '../../pages/public/HajjPage';
 import UmrahPage from '../../pages/public/UmrahPage';
 import InternalPage from '../../pages/public/InternalPage';
 import HotelsPage from '../../pages/public/HotelsPage';
 import HotelDetailsPage from '../../pages/public/HotelDetailsPage';
-import PackageDetailsPage from '../../pages/public/PackageDetailsPage';
 import OffersPage from '../../pages/public/OffersPage';
+import OfferDetailsPage from '../../pages/public/OfferDetailsPage';
+import PackageDetailsPage from '../../pages/public/PackageDetailsPage';
 import BookingPage from '../../pages/public/BookingPage';
 import ContactPage from '../../pages/public/ContactPage';
+import BrandInfoPage from '../../pages/public/BrandInfoPage';
+import FloatingSocial from './FloatingSocial';
 
 export type PublicPage =
-  | 'home' | 'hajj' | 'umrah' | 'internal'
-  | 'hotels' | 'hotel-details' | 'package-details' | 'offers' | 'booking' | 'contact';
+  | 'home' | 'about' | 'services' | 'hajj' | 'umrah' | 'internal'
+  | 'hotels' | 'hotel-details' | 'offers' | 'offer-details'
+  | 'package-details' | 'booking' | 'contact';
 
 interface HotelPreset {
   packageId?: string;
@@ -26,274 +29,50 @@ export interface NavigateProps {
   page: PublicPage;
   preset?: HotelPreset;
   hotelId?: string;
+  offerId?: string;
 }
 
-const SEO_META: Record<PublicPage, { title: string; description: string; path: string }> = {
-  home: {
-    title: 'Promise Travel | بروميس للسياحة والسفر — برامج الحج والعمرة والرحلات',
-    description: 'وكالة بروميس للسياحة والسفر — خيارك الأول لرحلات العمرة والحج، الفنادق المصنفة قرب الحرم الشريف، السياحة الداخلية وتذاكر الطيران بأفضل الأسعار.',
-    path: '',
-  },
-  hajj: {
-    title: 'برامج الحج السياحي الفاخر | Promise Travel بروميس للسياحة',
-    description: 'اكتشف أقوى عروض وبرامج الحج السياحي الفاخر مع بروميس للسياحة: إقامة قرب الحرم، انتقالات مكيفة، وإشراف ديني متخصص.',
-    path: 'hajj',
-  },
-  umrah: {
-    title: 'عروض ورحلات العمرة طوال العام | Promise Travel بروميس للسياحة',
-    description: 'أفضل رحلات العمرة الاقتصادية والفاخرة طوال العام مع بروميس للسياحة. فنادق ممتازة على بعد خطوات من الحرم المكي والنبوي.',
-    path: 'umrah',
-  },
-  internal: {
-    title: 'رحلات السياحة الداخلية | Promise Travel بروميس للسياحة',
-    description: 'استمتع بأجمل رحلات السياحة الداخلية في مصر (شرم الشيخ، الغردقة، الأقصر وأسوان) مع وكالة بروميس للسياحة والسفر.',
-    path: 'internal',
-  },
-  hotels: {
-    title: 'حجز فنادق مكة والمدينة المنورة | Promise Travel',
-    description: 'احجز أفضل فنادق مكة المكرمة والمدينة المنورة المصنفة 5 نجوم و 4 نجوم بأفضل الأسعار وأقرب المواقع للحرمين الشريفين.',
-    path: 'hotels',
-  },
-  'hotel-details': {
-    title: 'تفاصيل الفندق والحجز المباشر | Promise Travel',
-    description: 'عرض تفاصيل الفندق، صور الغرف، الخدمات المتاحة وإمكانية الحجز المباشر عبر وكالة بروميس للسياحة.',
-    path: 'hotels',
-  },
-  offers: {
-    title: 'أقوى عروض الخصومات على الحج والعمرة | Promise Travel',
-    description: 'تابع أحدث العروض والخصومات الحصرية على رحلات العمرة، الحج، الفنادق والرحلات الداخلية من بروميس للسياحة.',
-    path: 'offers',
-  },
-  booking: {
-    title: 'حجز الرحلة والبرنامج online | Promise Travel',
-    description: 'احجز رحلتك أو فندقك الآن عبر الإنترنت مع وكالة بروميس للسياحة والسفر بخطوات سهلة وآمنة.',
-    path: 'booking',
-  },
-  contact: {
-    title: 'اتصل بنا وتواصل مع بروميس للسياحة | Promise Travel',
-    description: 'تواصل مع وكالة بروميس للسياحة والسفر للحصول على الاستشارات والحجوزات. هاتف، واتساب، والعنوان.',
-    path: 'contact',
-  },
-  'package-details': {
-    title: 'تفاصيل الباقة والحجز المباشر | Promise Travel',
-    description: 'عرض تفاصيل باقة الحج أو العمرة، خطة الرحلة والأسعار والحجز المباشر مع بروميس للسياحة.',
-    path: 'packages',
-  },
-};
-
-const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
-  home: {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: [
-      {
-        '@type': 'Question',
-        name: 'كيف يمكنني الحجز مع بروميس للسياحة؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'يمكنك الحجز مباشرة من خلال صفحة الحجز على موقعنا، أو التواصل معنا هاتفياً وسيقوم فريقنا بمساعدتك في إتمام الحجز.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل تشمل باقات الحج والعمرة تذاكر الطيران؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، جميع باقات الحج والعمرة تشمل تذاكر الطيران ذهاباً وعودة، كما تشمل الإقامة والنقل والتأشيرات.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل يمكنني الدفع على دفعات؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، نوفر نظام دفع مرن يتيح لك دفع جزء من المبلغ عند الحجز والباقي قبل موعد السفر بفترة كافية.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل توفرون مرشدين سياحيين؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، نوفر مرشدين متخصصين يتحدثون العربية والإنجليزية طوال فترة الرحلة لضمان تجربة مريحة وممتعة.',
-        },
-      },
-    ],
-  },
-  hajj: {
-    '@context': 'https://schema.org',
-    '@type': 'TouristTrip',
-    name: 'برامج الحج السياحي الفاخر مع بروميس للسياحة',
-    description: 'برامج حج متكاملة: إقامة فاخرة قرب المشاعر المقدسة، إشراف ديني متخصص، نقل مكيف، تأشيرات، طيران.',
-    touristType: 'حجاج بيت الله الحرام',
-    provider: {
-      '@type': 'TravelAgency',
-      name: 'Promise Travel | بروميس للسياحة والسفر',
-      url: 'https://promisetravelgroup.com',
-    },
-  },
-  umrah: {
-    '@context': 'https://schema.org',
-    '@type': 'TouristTrip',
-    name: 'عروض ورحلات العمرة طوال العام مع بروميس للسياحة',
-    description: 'رحلات عمرة اقتصادية وفاخرة طوال العام مع فنادق ممتازة على بعد خطوات من الحرم المكي والنبوي.',
-    touristType: 'معتمرين',
-    provider: {
-      '@type': 'TravelAgency',
-      name: 'Promise Travel | بروميس للسياحة والسفر',
-      url: 'https://promisetravelgroup.com',
-    },
-  },
-  contact: {
-    '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: 'Promise Travel | بروميس للسياحة والسفر',
-    telephone: '+201012484971',
-    email: 'info@promisetravel.com',
-    url: 'https://promisetravelgroup.com/contact',
-    address: {
-      '@type': 'PostalAddress',
-      addressLocality: 'القاهرة',
-      addressCountry: 'EG',
-    },
-    openingHoursSpecification: {
-      '@type': 'OpeningHoursSpecification',
-      dayOfWeek: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-      opens: '09:00',
-      closes: '22:00',
-    },
-  },
-};
-
 export default function WebsiteRouter() {
-  const [page, setPage] = useState<PublicPage>(() => {
-    if (typeof window === 'undefined') return 'home';
-    const h = window.location.hash.replace(/^#\/?/, '').toLowerCase();
-    if (h.startsWith('hotel-details/')) {
-      return 'hotel-details';
-    }
-    if (h.startsWith('package-details/')) {
-      return 'package-details';
-    }
-    const validPages: PublicPage[] = ['home', 'hajj', 'umrah', 'internal', 'hotels', 'offers', 'booking', 'contact'];
-    if (validPages.includes(h as PublicPage)) {
-      return h as PublicPage;
-    }
-    return 'home';
-  });
-
+  const [page, setPage] = useState<PublicPage>('home');
   const [bookingPreset, setBookingPreset] = useState<HotelPreset | undefined>();
-
-  const [hotelId, setHotelId] = useState<string | undefined>(() => {
-    if (typeof window === 'undefined') return undefined;
-    const h = window.location.hash.replace(/^#\/?/, '');
-    if (h.startsWith('hotel-details/')) {
-      return h.substring('hotel-details/'.length);
-    }
-    return undefined;
-  });
-
-  const [packageId, setPackageId] = useState<string | undefined>(() => {
-    if (typeof window === 'undefined') return undefined;
-    const h = window.location.hash.replace(/^#\/?/, '');
-    if (h.startsWith('package-details/')) {
-      return h.substring('package-details/'.length);
-    }
-    return undefined;
-  });
+  const [hotelId, setHotelId] = useState<string | undefined>();
+  const [offerId, setOfferId] = useState<string | undefined>();
+  const [packageId, setPackageId] = useState<string | undefined>();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-  useEffect(() => {
-    const handleHashChange = () => {
-      const h = window.location.hash.replace(/^#\/?/, '');
-      if (!h) {
-        setPage('home');
-        return;
-      }
-      
-      if (h.startsWith('hotel-details/')) {
-        setHotelId(h.substring('hotel-details/'.length));
-        setPage('hotel-details');
-      } else if (h.startsWith('package-details/')) {
-        setPackageId(h.substring('package-details/'.length));
-        setPage('package-details');
-      } else {
-        const validPages: PublicPage[] = ['home', 'hajj', 'umrah', 'internal', 'hotels', 'offers', 'booking', 'contact'];
-        if (validPages.includes(h as PublicPage)) {
-          setPage(h as PublicPage);
-        } else {
-          setPage('home');
-        }
-      }
-    };
-    
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
   const go = (p: PublicPage, preset?: HotelPreset, id?: string) => {
     setBookingPreset(preset);
-    let hash = p as string;
-    if (p === 'hotel-details' && id) {
-      setHotelId(id);
-      hash = `hotel-details/${id}`;
-    } else if (p === 'package-details' && id) {
-      setPackageId(id);
-      hash = `package-details/${id}`;
-    }
-    window.location.hash = hash;
+    setHotelId(id);
+    setOfferId(id);
+    setPackageId(id);
     setPage(p);
   };
 
-  const currentSEO = SEO_META[page] || SEO_META.home;
-
   return (
-    <div className="min-h-screen bg-white flex flex-col" dir="rtl">
-      <SEOHead
-        title={currentSEO.title}
-        description={currentSEO.description}
-        path={currentSEO.path}
-        jsonLd={PAGE_JSONLD[page] || null}
-      />
-
+    <div className="public-shell min-h-screen bg-white flex flex-col" dir="rtl">
       <WebsiteHeader currentPage={page} onNavigate={go} />
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-hidden">
         {page === 'home' && <Home onNavigate={go} />}
+        {page === 'about' && <BrandInfoPage mode="about" onNavigate={go} />}
+        {page === 'services' && <BrandInfoPage mode="services" onNavigate={go} />}
         {page === 'hajj' && <HajjPage onNavigate={go} />}
         {page === 'umrah' && <UmrahPage onNavigate={go} />}
         {page === 'internal' && <InternalPage onNavigate={go} />}
         {page === 'hotels' && <HotelsPage onNavigate={go} />}
         {page === 'hotel-details' && hotelId && <HotelDetailsPage hotelId={hotelId} onNavigate={go} />}
-        {page === 'package-details' && packageId && <PackageDetailsPage packageId={packageId} onNavigate={go} />}
         {page === 'offers' && <OffersPage onNavigate={go} />}
+        {page === 'offer-details' && offerId && <OfferDetailsPage offerId={offerId} onNavigate={go} />}
+        {page === 'package-details' && packageId && <PackageDetailsPage packageId={packageId} onNavigate={go} />}
         {page === 'booking' && <BookingPage preset={bookingPreset} onDone={() => go('home')} />}
         {page === 'contact' && <ContactPage />}
       </main>
 
       <WebsiteFooter onNavigate={go} />
-
-      {/* Floating WhatsApp Button */}
-      <a
-        href="https://wa.me/201012484971"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-6 left-6 z-50 bg-[#25D366] text-white p-3.5 md:p-4 rounded-full shadow-[0_8px_30px_rgba(37,211,102,0.4)] hover:bg-[#20ba5a] hover:scale-110 active:scale-95 transition-all flex items-center justify-center border border-emerald-400/20 group"
-        title="تواصل معنا عبر واتساب"
-      >
-        <span className="absolute inset-0 rounded-full bg-[#25D366] opacity-35 group-hover:animate-ping -z-10"></span>
-        <svg
-          className="w-6 h-6 md:w-7 md:h-7 fill-current transform -translate-x-[1px] translate-y-[0.5px]"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.729-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.59 2.019 14.113.992 11.488.992 6.05 1.01 1.625 5.387 1.621 10.82c-.001 1.702.447 3.367 1.299 4.847l-.979 3.57 3.664-.959zm12.385-6.242c-.315-.156-1.86-.908-2.144-.1-1.011-.082-.128-.278-.29-.408-.073-.059-.819-.36-.957-.424-.14-.066-.24-.099-.345.056-.105.155-.407.511-.5.617-.091.106-.182.119-.496.037-1.16-.58-1.914-1.286-2.58-2.434-.15-.259-.015-.4.12-.536.12-.122.27-.315.405-.473.136-.157.181-.262.27-.437.091-.176.046-.328-.023-.467-.068-.14-.616-1.486-.844-2.036-.222-.534-.447-.461-.616-.47l-.527-.008c-.182 0-.477.067-.727.34-.25.274-1.045 1.022-1.045 2.493 0 1.472 1.07 2.892 1.218 3.097.147.206 2.107 3.2 5.103 4.492.713.307 1.27.491 1.704.629.717.227 1.37.195 1.886.118.575-.086 1.86-.761 2.124-1.458.264-.697.264-1.296.186-1.422-.078-.127-.29-.183-.605-.339z" />
-        </svg>
-      </a>
+      <FloatingSocial />
     </div>
   );
 }
-

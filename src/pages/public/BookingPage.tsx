@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Loader2, CheckCircle2, Moon, Plane, MapPin, Hotel as HotelIcon,
   User, Phone, Mail, FileText, Send, Calendar, Users, Upload,
-  Eye, Trash2, Globe,
+  Eye, Trash2, Globe, Hash,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { compressImage } from '../../lib/imageCompressor';
 import type { Package, Hotel, InternalTrip } from '../../types';
 
 interface Props {
@@ -38,10 +37,6 @@ export default function BookingPage({ preset, onDone }: Props) {
     travelers: '1',
     travel_date: '',
     notes: '',
-    room_type: 'ثنائي' as 'ثنائي' | 'ثلاثي' | 'رباعي',
-    num_adults: '1',
-    num_children: '0',
-    num_infants: '0',
   });
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({
     'جواز سفر': null, 'بطاقة رقم قومي': null, 'صورة شخصية': null,
@@ -49,7 +44,6 @@ export default function BookingPage({ preset, onDone }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
-  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -62,23 +56,9 @@ export default function BookingPage({ preset, onDone }: Props) {
     });
   }, []);
 
-  useEffect(() => {
-    if (done) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [done]);
-
-  useEffect(() => {
-    if (preset?.type) {
-      loadOptions(preset.type, preset.packageId);
-    } else {
-      setPackages([]);
-    }
-  }, [preset]);
-
-  const loadOptions = async (type: string, initialPackageId?: string) => {
+  const loadOptions = async (type: string) => {
     setPackages(null);
-    setForm((f) => ({ ...f, package_id: initialPackageId || '', hotel_id: '' }));
+    setForm((f) => ({ ...f, package_id: '', hotel_id: '' }));
     if (!type) { setPackages([]); return; }
     if (type === 'داخلي') {
       setPackages([]);
@@ -150,20 +130,21 @@ export default function BookingPage({ preset, onDone }: Props) {
       }
 
       // 3. Upload optional documents
+      let hasDocs = false;
       for (const docType of optionalDocs) {
         const file = docFiles[docType.id];
         if (!file) continue;
-        const compressedFile = await compressImage(file);
-        const ext = compressedFile.name.split('.').pop();
+        hasDocs = true;
+        const ext = file.name.split('.').pop();
         const filePath = `${customerId}/${Date.now()}_${docType.id}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
+        const { error: upErr } = await supabase.storage.from('documents').upload(filePath, file);
         if (upErr) continue;
         await supabase.from('documents').insert({
           customer_id: customerId,
           doc_type: docType.id,
           file_path: filePath,
-          file_name: compressedFile.name,
-          file_size: compressedFile.size,
+          file_name: file.name,
+          file_size: file.size,
           status: 'مرفوع',
         });
       }
@@ -192,23 +173,7 @@ export default function BookingPage({ preset, onDone }: Props) {
       } else if (form.package_id) {
         bookingData.package_id = form.package_id;
         const pkg = packages?.find((p) => p.id === form.package_id);
-        if (pkg) {
-          let roomRate = Number(pkg.price);
-          if (form.room_type === 'ثنائي' && pkg.price_double) roomRate = Number(pkg.price_double);
-          else if (form.room_type === 'ثلاثي' && pkg.price_triple) roomRate = Number(pkg.price_triple);
-          else if (form.room_type === 'رباعي' && pkg.price_quad) roomRate = Number(pkg.price_quad);
-
-          const adultsVal = Number(form.num_adults) || 0;
-          const childrenVal = Number(form.num_children) || 0;
-          const infantsVal = Number(form.num_infants) || 0;
-
-          const childRate = pkg.price_child ? Number(pkg.price_child) : roomRate;
-          const infantRate = pkg.price_infant ? Number(pkg.price_infant) : roomRate;
-
-          const total = (roomRate * adultsVal) + (childRate * childrenVal) + (infantRate * infantsVal);
-          bookingData.total_amount = total;
-          bookingData.notes = `تفاصيل السكن: غرفة ${form.room_type} — الأفراد: ${adultsVal} بالغ، ${childrenVal} طفل، ${infantsVal} رضيع — ${bookingNotes}`;
-        }
+        if (pkg) bookingData.total_amount = Number(pkg.price) * (Number(form.travelers) || 1);
       }
 
       const { data: booking, error: bkErr } = await supabase
@@ -227,11 +192,11 @@ export default function BookingPage({ preset, onDone }: Props) {
           travel_date: form.travel_date || null,
           notes: 'تم الإنشاء تلقائياً من حجز الموقع',
         });
-        setCreatedBookingId(booking.id);
       }
 
       setCreatedCode(clientCode);
       setDone(true);
+      setTimeout(() => { onDone(); }, 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى');
     } finally {
@@ -241,35 +206,20 @@ export default function BookingPage({ preset, onDone }: Props) {
 
   if (done) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-20 bg-gray-50/50" dir="rtl">
-        <div className="max-w-md w-full text-center bg-white rounded-3xl border border-gray-100 p-8 shadow-xl animate-fadeIn">
-          <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 size={40} className="text-emerald-600" />
+      <div className="min-h-[70vh] flex items-center justify-center px-4 py-20">
+        <div className="max-w-md text-center">
+          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 animate-fadeIn">
+            <CheckCircle2 size={48} className="text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-black text-navy-900 mb-3">تم استلام طلبك بنجاح!</h2>
-          <p className="text-gray-500 text-sm mb-6">شكراً لك على الحجز مع Promise Travel. يمكنك الاحتفاظ ببيانات الحجز التالية للمتابعة مع خدمة العملاء:</p>
-          
-          <div className="space-y-3 mb-8 text-right">
-            {createdBookingId && (
-              <div className="flex items-center justify-between p-4 bg-navy-50/80 border border-navy-100 rounded-2xl">
-                <span className="text-sm font-semibold text-gray-500">رقم الحجز:</span>
-                <span className="font-mono font-black text-navy-900 text-lg">#{createdBookingId.slice(0, 8).toUpperCase()}</span>
-              </div>
-            )}
-            {createdCode && (
-              <div className="flex items-center justify-between p-4 bg-gold-50/80 border border-gold-100 rounded-2xl">
-                <span className="text-sm font-semibold text-gray-500">كود العميل:</span>
-                <span className="font-mono font-black text-gold-700 text-lg">{createdCode}</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={onDone}
-            className="w-full bg-gradient-navy text-white font-bold py-3.5 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
-          >
-            العودة للصفحة الرئيسية
-          </button>
+          <h2 className="text-2xl font-black text-emerald-950 mb-3">تم استلام طلبك بنجاح!</h2>
+          <p className="text-gray-500 mb-2">شكراً لك. سيتواصل معك فريق المبيعات لدينا في أقرب وقت لتأكيد الحجز.</p>
+          {createdCode && (
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 mt-3 mb-4">
+              <Hash size={16} className="text-gold-600" />
+              <span className="font-mono font-black text-emerald-800">كود العميل: {createdCode}</span>
+            </div>
+          )}
+          <p className="text-gold-600 font-semibold text-sm">جارٍ تحويلك للصفحة الرئيسية...</p>
         </div>
       </div>
     );
@@ -279,48 +229,22 @@ export default function BookingPage({ preset, onDone }: Props) {
     <div>
       {/* Hero */}
       <section className="relative h-[35vh] min-h-[280px] overflow-hidden">
-        <img 
-          src="/صفحة الحجز للكمبيوتر.webp" 
-          alt="احجز رحلتك" 
-          className="hidden md:block w-full h-full object-cover" 
-        />
-        <img 
-          src="/صفحة الحجز للموبايل .webp" 
-          alt="احجز رحلتك" 
-          className="block md:hidden w-full h-full object-cover" 
-        />
-        <div className="absolute inset-0 bg-white/10" />
+        <img src="https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="احجز الآن" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-emerald-950 via-emerald-900/70 to-emerald-900/30" />
         <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-3 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
+          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-3">
             <Globe size={12} /> حجز من الموقع
           </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-2 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">احجز رحلتك</h1>
-          <p className="text-white text-lg drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">ابدأ رحلتك المباركة الآن — املأ النموذج وسنتواصل معك فوراً</p>
+          <h1 className="text-3xl md:text-5xl font-black mb-2">احجز رحلتك</h1>
+          <p className="text-white/80 text-lg">ابدأ رحلتك المباركة الآن — املأ النموذج وسنتواصل معك فوراً</p>
         </div>
       </section>
 
       {/* Form */}
       <section className="py-16">
         <div className="max-w-2xl mx-auto px-4">
-<div className="mb-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-gold text-navy-900">
-                  <Phone size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-navy-900">تواصل معنا لحجزك</h3>
-                  <p className="mt-1 text-sm text-gray-600">لأي استفسار أو حجز، يمكنكم التواصل على الرقمين التاليين:</p>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <a href="tel:01011106989" dir="ltr" className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-navy-800 transition-colors hover:border-gold-400 hover:text-gold-600">01011106989</a>
-                    <a href="tel:01055503857" dir="ltr" className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-navy-800 transition-colors hover:border-gold-400 hover:text-gold-600">01055503857</a>
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-[#D4A017]">نخدم عملاءنا في جميع محافظات مصر.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-navy p-6">
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="bg-gradient-emerald p-6">
               <h2 className="text-white font-black text-lg">نموذج الحجز</h2>
               <p className="text-white/60 text-sm mt-1">الحقول المطلوبة مشار إليها بعلامة <span className="text-red-400">*</span> — المستندات اختيارية</p>
             </div>
@@ -339,7 +263,7 @@ export default function BookingPage({ preset, onDone }: Props) {
                         type="button"
                         onClick={() => setService(s.value)}
                         className={`p-3 sm:p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 ${
-                          active ? 'border-gold-500 bg-gold-50 text-navy-900' : 'border-gray-100 text-gray-500 hover:border-navy-200'
+                          active ? 'border-gold-500 bg-gold-50 text-emerald-900' : 'border-gray-100 text-gray-500 hover:border-emerald-200'
                         }`}
                       >
                         <Icon size={20} />
@@ -392,10 +316,10 @@ export default function BookingPage({ preset, onDone }: Props) {
                     {trips.map((t) => (
                       <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                         <div>
-                          <p className="text-sm font-bold text-navy-900">{t.name}</p>
+                          <p className="text-sm font-bold text-emerald-900">{t.name}</p>
                           <p className="text-xs text-gray-500">{t.destination} — {new Date(t.start_date).toLocaleDateString('ar-EG')}</p>
                         </div>
-                        <span className="text-sm font-bold text-navy-700">{Number(t.price).toLocaleString('ar-EG')} ج.م</span>
+                        <span className="text-sm font-bold text-emerald-700">{Number(t.price).toLocaleString('ar-EG')} ج.م</span>
                       </div>
                     ))}
                   </div>
@@ -407,15 +331,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">الاسم بالكامل <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input !pr-12" placeholder="الاسم بالكامل" />
+                    <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pr-9" placeholder="الاسم بالكامل" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">رقم الهاتف <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input !pr-12" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pr-9" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
               </div>
@@ -425,104 +349,33 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">رقم واتساب</label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input !pr-12" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pr-9" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">البريد الإلكتروني</label>
                   <div className="relative">
-                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input !pr-12" placeholder="example@email.com" />
+                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pr-9" placeholder="example@email.com" />
                   </div>
                 </div>
               </div>
 
-              {/* Room type and Age splits for Packages */}
-              {(form.service_type === 'حج' || form.service_type === 'عمرة') && form.package_id && (
-                <div className="p-4 bg-navy-50/50 rounded-2xl border border-navy-100/80 space-y-3">
-                  <p className="text-xs font-bold text-navy-900 border-b border-navy-100 pb-2">تفاصيل الغرفة وتوزيع المسافرين:</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">نوع الغرفة</label>
-                      <select
-                        value={form.room_type}
-                        onChange={(e) => setForm({ ...form, room_type: e.target.value as any })}
-                        className="form-input text-xs"
-                      >
-                        <option value="ثنائي">ثنائي (Double)</option>
-                        <option value="ثلاثي">ثلاثي (Triple)</option>
-                        <option value="رباعي">رباعي (Quad)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد البالغين</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={form.num_adults}
-                        onChange={(e) => {
-                          const adults = e.target.value;
-                          const total = Number(adults) + Number(form.num_children) + Number(form.num_infants);
-                          setForm({ ...form, num_adults: adults, travelers: String(total) });
-                        }}
-                        className="form-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد الأطفال (2-12 سنة)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.num_children}
-                        onChange={(e) => {
-                          const kids = e.target.value;
-                          const total = Number(form.num_adults) + Number(kids) + Number(form.num_infants);
-                          setForm({ ...form, num_children: kids, travelers: String(total) });
-                        }}
-                        className="form-input text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">عدد الرضع (أقل من سنتين)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.num_infants}
-                        onChange={(e) => {
-                          const infants = e.target.value;
-                          const total = Number(form.num_adults) + Number(form.num_children) + Number(infants);
-                          setForm({ ...form, num_infants: infants, travelers: String(total) });
-                        }}
-                        className="form-input text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Travelers + Travel date */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">إجمالي عدد الأفراد</label>
+                  <label className="form-label">عدد الأفراد</label>
                   <div className="relative">
-                    <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input
-                      type="number"
-                      min="1"
-                      disabled={form.service_type === 'حج' || form.service_type === 'عمرة'}
-                      value={form.travelers}
-                      onChange={(e) => setForm({ ...form, travelers: e.target.value })}
-                      className="form-input !pr-12 disabled:bg-gray-50 disabled:text-gray-500"
-                      placeholder="1"
-                    />
+                    <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-9" placeholder="1" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">تاريخ السفر المفضل</label>
                   <div className="relative">
-                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none z-10" />
-                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input !pr-12" dir="ltr" />
+                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-9" dir="ltr" />
                   </div>
                 </div>
               </div>
@@ -531,8 +384,8 @@ export default function BookingPage({ preset, onDone }: Props) {
               <div>
                 <label className="form-label">ملاحظات إضافية</label>
                 <div className="relative">
-                  <FileText size={16} className="absolute top-4 right-3 text-gray-400 pointer-events-none z-10" />
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input !pr-12 min-h-[90px] resize-none" placeholder="أي تفاصيل إضافية تود إخبارنا بها" />
+                  <FileText size={16} className="absolute top-4 right-3 text-gray-400" />
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pr-9 min-h-[90px] resize-none" placeholder="أي تفاصيل إضافية تود إخبارنا بها" />
                 </div>
               </div>
 
@@ -545,7 +398,7 @@ export default function BookingPage({ preset, onDone }: Props) {
                     return (
                       <div key={d.id} className={`rounded-2xl border-2 p-3 transition-all ${file ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-100'}`}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-navy-900">{d.label}</span>
+                          <span className="text-xs font-bold text-emerald-900">{d.label}</span>
                           {file && <CheckCircle2 size={14} className="text-emerald-500" />}
                         </div>
                         {!file ? (
@@ -561,7 +414,7 @@ export default function BookingPage({ preset, onDone }: Props) {
                           <div className="space-y-1.5">
                             <p className="text-[10px] text-gray-600 truncate bg-white rounded px-1.5 py-1">{file.name}</p>
                             <div className="flex items-center gap-1">
-                              <button type="button" onClick={() => previewFile(d.id)} className="p-1 rounded hover:bg-navy-50 text-navy-600"><Eye size={12} /></button>
+                              <button type="button" onClick={() => previewFile(d.id)} className="p-1 rounded hover:bg-emerald-50 text-emerald-600"><Eye size={12} /></button>
                               <button type="button" onClick={() => setDocFiles({ ...docFiles, [d.id]: null })} className="p-1 rounded hover:bg-red-50 text-red-500"><Trash2 size={12} /></button>
                             </div>
                           </div>
@@ -586,7 +439,7 @@ export default function BookingPage({ preset, onDone }: Props) {
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full bg-gradient-gold text-navy-900 font-black py-4 rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-gold text-emerald-950 font-black py-4 rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
               >
                 {submitting ? (
                   <><Loader2 size={18} className="animate-spin" /> جارٍ إرسال الطلب...</>

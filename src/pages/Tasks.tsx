@@ -1,20 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, CheckCircle2, Clock, AlertCircle, ListChecks,
-  Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send, ChevronDown, ChevronUp,
+  Filter, Search, Hash, User, Calendar, Trash2, Zap,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Task, TaskPriority, TaskStatus, Employee, Page } from '../types';
-
-interface TaskUpdate {
-  id: string;
-  task_id: string;
-  employee_id?: string;
-  content: string;
-  created_at: string;
-  employees?: { name: string };
-}
 
 const priorities: TaskPriority[] = ['منخفضة', 'متوسطة', 'عالية', 'عاجل'];
 const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مكتملة', 'متأخرة'];
@@ -45,10 +36,8 @@ interface Props {
   onNavigate: (page: Page, id?: string) => void;
 }
 
-export default function Tasks({}: Props) {
+export default function Tasks({ onNavigate }: Props) {
   const { profile } = useAuth();
-  const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
-  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,108 +50,21 @@ export default function Tasks({}: Props) {
     priority: 'متوسطة' as TaskPriority, due_date: '', client_code: '',
   });
   const [saving, setSaving] = useState(false);
-  const [taskCustomers, setTaskCustomers] = useState<Record<string, { name: string; phone: string; whatsapp?: string }>>({});
-
-  // Task updates (timeline per task)
-  const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
-  const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
-  const [sendingUpdate, setSendingUpdate] = useState<string | null>(null);
-  const [expandedUpdates, setExpandedUpdates] = useState<Record<string, boolean>>({});
-  const [lastViewedUpdates, setLastViewedUpdates] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem('last_viewed_task_updates');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  const [seenTasks, setSeenTasks] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('seen_tasks');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const markTaskAsSeen = (taskId: string) => {
-    if (!seenTasks.includes(taskId)) {
-      const updated = [...seenTasks, taskId];
-      setSeenTasks(updated);
-      localStorage.setItem('seen_tasks', JSON.stringify(updated));
-    }
-  };
-
-  const markUpdatesAsRead = (taskId: string) => {
-    const now = new Date().toISOString();
-    const updated = { ...lastViewedUpdates, [taskId]: now };
-    setLastViewedUpdates(updated);
-    localStorage.setItem('last_viewed_task_updates', JSON.stringify(updated));
-  };
-
-  const toggleUpdates = (taskId: string) => {
-    const isExpanding = !expandedUpdates[taskId];
-    setExpandedUpdates(prev => ({ ...prev, [taskId]: isExpanding }));
-    if (isExpanding) {
-      markUpdatesAsRead(taskId);
-    }
-  };
 
   useEffect(() => {
-    if (profile) {
-      load();
-    }
+    load();
     supabase.from('employees').select('*').eq('is_active', true).then(({ data }) => {
       if (data) setEmployees(data as Employee[]);
     });
-  }, [profile]);
+  }, []);
 
   const load = async () => {
-    if (!profile) return;
     setLoading(true);
-    let query = supabase.from('tasks').select('*, employees(*)');
-    if (!isManager) {
-      query = query.eq('employee_id', profile.id);
-    }
-    const { data } = await query.order('created_at', { ascending: false });
-    const fetchedTasks = (data as Task[]) || [];
-    setTasks(fetchedTasks);
-
-    // Fetch associated customers for these tasks
-    const clientCodes = fetchedTasks.map(t => t.client_code).filter(Boolean);
-    const customersMap: Record<string, { name: string; phone: string; whatsapp?: string }> = {};
-    if (clientCodes.length > 0) {
-      const { data: custData } = await supabase
-        .from('customers')
-        .select('client_code, name, phone, whatsapp')
-        .in('client_code', clientCodes);
-      if (custData) {
-        custData.forEach(c => {
-          if (c.client_code) {
-            customersMap[c.client_code] = c;
-          }
-        });
-      }
-    }
-    setTaskCustomers(customersMap);
-
-    // Load task updates for all fetched tasks
-    if (fetchedTasks.length > 0) {
-      const taskIds = fetchedTasks.map(t => t.id);
-      const { data: updates } = await supabase
-        .from('task_updates')
-        .select('*, employees(name)')
-        .in('task_id', taskIds)
-        .order('created_at', { ascending: true });
-      const updatesMap: Record<string, TaskUpdate[]> = {};
-      ((updates || []) as TaskUpdate[]).forEach((u) => {
-        if (!updatesMap[u.task_id]) updatesMap[u.task_id] = [];
-        updatesMap[u.task_id].push(u);
-      });
-      setTaskUpdates(updatesMap);
-    }
-
+    const { data } = await supabase
+      .from('tasks')
+      .select('*, employees(*)')
+      .order('created_at', { ascending: false });
+    setTasks((data as Task[]) || []);
     setLoading(false);
   };
 
@@ -185,7 +87,6 @@ export default function Tasks({}: Props) {
   };
 
   const createTask = async () => {
-    if (!isManager) return;
     if (!form.title.trim() || !form.due_date) return;
     setSaving(true);
     const { data } = await supabase
@@ -227,31 +128,6 @@ export default function Tasks({}: Props) {
     if (data) setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
   };
 
-  const sendTaskUpdate = async (taskId: string) => {
-    const content = newUpdateText[taskId]?.trim();
-    if (!content || !profile) return;
-    setSendingUpdate(taskId);
-    try {
-      const { data } = await supabase
-        .from('task_updates')
-        .insert({ task_id: taskId, employee_id: profile.id, content })
-        .select('*, employees(name)')
-        .single();
-      if (data) {
-        setTaskUpdates(prev => ({
-          ...prev,
-          [taskId]: [...(prev[taskId] || []), data as TaskUpdate],
-        }));
-        setNewUpdateText(prev => ({ ...prev, [taskId]: '' }));
-        // Auto-expand updates after sending
-        setExpandedUpdates(prev => ({ ...prev, [taskId]: true }));
-        markUpdatesAsRead(taskId);
-      }
-    } finally {
-      setSendingUpdate(null);
-    }
-  };
-
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id);
     setTasks(tasks.filter((t) => t.id !== id));
@@ -264,11 +140,9 @@ export default function Tasks({}: Props) {
           <h2 className="section-title">إدارة المهام</h2>
           <p className="section-subtitle">متابعة المهام بين جميع الأقسام والموظفين</p>
         </div>
-        {isManager && (
-          <button onClick={() => setShowForm(!showForm)} className="btn-gold">
-            <Plus size={16} /> مهمة جديدة
-          </button>
-        )}
+        <button onClick={() => setShowForm(!showForm)} className="btn-gold">
+          <Plus size={16} /> مهمة جديدة
+        </button>
       </div>
 
       {/* Stats */}
@@ -373,18 +247,11 @@ export default function Tasks({}: Props) {
           <div className="divide-y divide-gray-50">
             {filtered.map((t) => {
               const StatusIcon = statusIcons[t.status] || Clock;
-              const associatedCust = t.client_code ? taskCustomers[t.client_code] : undefined;
               return (
-                <div key={t.id} onClick={() => markTaskAsSeen(t.id)} className="p-5 hover:bg-gray-50/50 transition-colors">
+                <div key={t.id} className="p-5 hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]} relative`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]}`}>
                       <StatusIcon size={18} />
-                      {t.status === 'جديدة' && !seenTasks.includes(t.id) && (
-                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                        </span>
-                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -394,118 +261,7 @@ export default function Tasks({}: Props) {
                         )}
                         <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
                       </div>
-                      {t.description && <p className="text-xs text-gray-500 mb-2 whitespace-pre-wrap">{t.description}</p>}
-
-                      {associatedCust && (
-                        <div className="mt-2 mb-3 bg-gray-50 border border-gray-150 rounded-xl p-3 text-xs space-y-1 max-w-md">
-                          <p className="font-bold text-navy-800 flex items-center gap-1.5">👤 بيانات العميل المرتبط:</p>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-gray-600 mt-1">
-                            <div><strong>الاسم:</strong> {associatedCust.name}</div>
-                            <div><strong>رمز العميل:</strong> {t.client_code}</div>
-                            <div>
-                              <strong>الهاتف:</strong>{' '}
-                              <a href={`tel:${associatedCust.phone}`} className="text-blue-600 hover:underline font-semibold font-mono">
-                                {associatedCust.phone}
-                              </a>
-                            </div>
-                            {associatedCust.whatsapp && (
-                              <div>
-                                <strong>واتساب:</strong>{' '}
-                                <a href={`https://wa.me/${associatedCust.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-650 hover:underline font-semibold font-mono">
-                                  {associatedCust.whatsapp}
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Task Updates Timeline */}
-                      {(taskUpdates[t.id] || []).length > 0 && (
-                        <div className="mt-2 mb-2">
-                          <button
-                            onClick={() => toggleUpdates(t.id)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors mb-1.5"
-                          >
-                            <MessageSquare size={12} />
-                            المستجدات ({taskUpdates[t.id].length})
-                            {(() => {
-                              const updates = taskUpdates[t.id] || [];
-                              if (updates.length === 0) return false;
-                              const latestUpdate = updates[updates.length - 1];
-                              if (latestUpdate.employee_id === profile?.id) return false;
-                              const lastTime = lastViewedUpdates[t.id];
-                              return !lastTime || new Date(latestUpdate.created_at) > new Date(lastTime);
-                            })() && !expandedUpdates[t.id] && (
-                              <span className="relative flex h-1.5 w-1.5 mr-1">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
-                              </span>
-                            )}
-                            {expandedUpdates[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                          </button>
-
-                          {expandedUpdates[t.id] && (
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                              {taskUpdates[t.id].map((u, idx) => (
-                                <div key={u.id} className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs relative">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                      {idx + 1}
-                                    </span>
-                                    <span className="text-[10px] text-blue-600 font-semibold">
-                                      {u.employees?.name || 'الموظف'}
-                                    </span>
-                                    <span className="text-[9px] text-gray-400 mr-auto">
-                                      {new Date(u.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}
-                                    </span>
-                                  </div>
-                                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed mr-7">{u.content}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Add new update — employee only, task not completed */}
-                      {!isManager && profile?.id === t.employee_id && t.status !== 'مكتملة' && (
-                        <div className="mt-2 mb-3 bg-navy-50/60 rounded-xl border border-navy-100 overflow-hidden">
-                          <div className="px-3 pt-2.5 pb-1">
-                            <label className="block text-[10px] font-bold text-navy-700 mb-1.5 flex items-center gap-1">
-                              <Send size={10} /> أضف مستجد / آخر ما تم إنجازه:
-                            </label>
-                            <textarea
-                              value={newUpdateText[t.id] || ''}
-                              onChange={(e) => setNewUpdateText(prev => ({ ...prev, [t.id]: e.target.value }))}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendTaskUpdate(t.id);
-                              }}
-                              rows={2}
-                              placeholder="اكتب آخر مستجدات المهمة هنا... (Ctrl+Enter للإرسال)"
-                              className="form-input text-xs resize-none bg-white"
-                            />
-                          </div>
-                          <div className="px-3 pb-2.5 flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400">
-                              {(newUpdateText[t.id] || '').length} حرف
-                            </span>
-                            <button
-                              onClick={() => sendTaskUpdate(t.id)}
-                              disabled={!newUpdateText[t.id]?.trim() || sendingUpdate === t.id}
-                              className="btn-gold text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                            >
-                              {sendingUpdate === t.id ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <Send size={12} />
-                              )}
-                              إرسال التحديث
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
+                      {t.description && <p className="text-xs text-gray-500 mb-2">{t.description}</p>}
                       <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
                         {t.employees?.name && <span className="flex items-center gap-1"><User size={11} />{t.employees.name}</span>}
                         {t.department && <span className="flex items-center gap-1"><Filter size={11} />{t.department}</span>}
@@ -516,18 +272,12 @@ export default function Tasks({}: Props) {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <select
                         value={t.status}
-                        disabled={t.status === 'مكتملة' && !isManager}
                         onChange={(e) => updateStatus(t, e.target.value as TaskStatus)}
-                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-75"
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                       >
-                        {statuses.map((s) => {
-                          if (s === 'مكتملة' && !isManager) return null;
-                          return <option key={s} value={s}>{s}</option>;
-                        })}
+                        {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      {isManager && (
-                        <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
-                      )}
+                      <button onClick={() => deleteTask(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500" title="حذف"><Trash2 size={14} /></button>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe, Menu, Key, Lock, Eye, EyeOff, User, LogOut, X } from 'lucide-react';
+import { Search, Bell, CheckCircle2, Users, ListChecks, Clock, AlertCircle, Zap, UserPlus, CalendarCheck, CreditCard, FileText, Plane, Globe } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,8 @@ const pageNames: Record<string, string> = {
   suppliers: 'إدارة الموردين',
   visa: 'إدارة التأشيرات',
   'flight-tickets': 'قسم الطيران',
+  'travel-groups': 'مجموعات السفر',
+  'accommodation': 'الإقامة والغرف',
 };
 
 const notifIcons: Record<string, React.ElementType> = {
@@ -70,11 +72,10 @@ interface Props {
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   onNavigate?: (page: Page) => void;
-  onToggleSidebar?: () => void;
 }
 
-export default function Header({ currentPage, searchValue, onSearchChange, onNavigate, onToggleSidebar }: Props) {
-  const { profile, signOut } = useAuth();
+export default function Header({ currentPage, searchValue, onSearchChange, onNavigate }: Props) {
+  const { profile } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -84,87 +85,11 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   const superRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // User Profile & Change Password State
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showPwdModal, setShowPwdModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
-  const [showNewPwd, setShowNewPwd] = useState(false);
-  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
-  const [pwdLoading, setPwdLoading] = useState(false);
-  const [pwdError, setPwdError] = useState('');
-  const [pwdSuccess, setPwdSuccess] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwdError('');
-    setPwdSuccess(false);
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPwdError('يرجى ملء جميع الحقول');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPwdError('كلمتا المرور الجديدتان غير متطابقتين');
-      return;
-    }
-
-    setPwdLoading(true);
-
-    try {
-      // 1. Verify current password hash
-      const { data: isValid, error: verifyErr } = await supabase.rpc('verify_current_password', {
-        p_password: currentPassword
-      });
-
-      if (verifyErr || !isValid) {
-        setPwdError('كلمة المرور الحالية غير صحيحة');
-        setPwdLoading(false);
-        return;
-      }
-
-      // 2. Update password hash in database
-      const { error: changeErr } = await supabase.rpc('change_user_password', {
-        p_user_id: profile?.id,
-        p_new_password: newPassword
-      });
-
-      if (changeErr) {
-        setPwdError(changeErr.message);
-        setPwdLoading(false);
-        return;
-      }
-
-      setPwdSuccess(true);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        setShowPwdModal(false);
-        setPwdSuccess(false);
-      }, 2000);
-    } catch (err: any) {
-      setPwdError(err.message || 'حدث خطأ أثناء تغيير كلمة المرور');
-    } finally {
-      setPwdLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut();
-    setShowProfileMenu(false);
-    window.location.hash = '/admin'; // Redirect to admin login area
-  };
-
   // Load employee record matching this user's email, then their notifications
   useEffect(() => {
     if (!profile?.email) return;
     let cancelled = false;
-    const loadNotifs = async () => {
+    (async () => {
       const { data: emp } = await supabase
         .from('employees')
         .select('*')
@@ -179,15 +104,8 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
         .order('created_at', { ascending: false })
         .limit(20);
       if (!cancelled) setNotifications((notifs as AppNotification[]) || []);
-    };
-
-    loadNotifs();
-    const intervalId = setInterval(loadNotifs, 15000);
-
-    return () => { 
-      cancelled = true; 
-      clearInterval(intervalId);
-    };
+    })();
+    return () => { cancelled = true; };
   }, [profile?.email]);
 
   // Close dropdown on outside click
@@ -199,23 +117,19 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
       if (superRef.current && !superRef.current.contains(e.target as Node)) {
         setShowSuper(false);
       }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
-        setShowProfileMenu(false);
-      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Super search: search across customers, operation files, invoices, visas
+  // Super search: search across customers, bookings, invoices by code/name/phone
   const runSuperSearch = async (q: string) => {
-    if (q.trim().length < 1) { setSuperResults([]); return; }
+    if (q.trim().length < 2) { setSuperResults([]); return; }
     const query = q.trim();
-    const [custRes, invRes, opRes, visaRes] = await Promise.all([
-      supabase.from('customers').select('id, name, client_code, phone').or(`name.ilike.%${query}%,client_code.ilike.%${query}%,phone.ilike.%${query}%`).limit(4),
-      supabase.from('invoices').select('id, invoice_number, customer:customers(name)').ilike('invoice_number', `%${query}%`).limit(4),
-      supabase.from('operation_files').select('id, op_number, customer:customers(name, client_code)').ilike('op_number', `%${query}%`).limit(4),
-      supabase.from('visa_management').select('id, visa_id, full_name, visa_type').or(`visa_id.ilike.%${query}%,full_name.ilike.%${query}%`).limit(4),
+    const [custRes, bkRes, invRes] = await Promise.all([
+      supabase.from('customers').select('id, name, client_code, phone').or(`name.ilike.%${query}%,client_code.ilike.%${query}%,phone.ilike.%${query}%`).limit(5),
+      supabase.from('bookings').select('id, customer:customers(name, client_code)').limit(5),
+      supabase.from('invoices').select('id, invoice_number, customer:customers(name)').ilike('invoice_number', `%${query}%`).limit(5),
     ]);
     const results: Array<{ id: string; label: string; sub: string; type: string }> = [];
     (custRes.data as Array<{ id: string; name: string; client_code: string | null; phone: string }> || []).forEach((c) => {
@@ -224,12 +138,6 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
     (invRes.data as Array<{ id: string; invoice_number: string; customer: { name: string } | null }> || []).forEach((inv) => {
       results.push({ id: inv.id, label: inv.invoice_number, sub: inv.customer?.name || 'فاتورة', type: 'invoice' });
     });
-    (opRes.data as unknown as Array<{ id: string; op_number: string; customer: { name: string; client_code: string | null } | null }> || []).forEach((op) => {
-      results.push({ id: op.id, label: op.op_number || 'ملف تشغيل', sub: op.customer?.name || '', type: 'operation' });
-    });
-    (visaRes.data as Array<{ id: string; visa_id: string; full_name: string; visa_type: string }> || []).forEach((v) => {
-      results.push({ id: v.id, label: v.full_name, sub: `${v.visa_type} - ${v.visa_id || ''}`, type: 'visa' });
-    });
     setSuperResults(results.slice(0, 8));
   };
 
@@ -237,14 +145,11 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
     onSearchChange?.(v);
     setShowSuper(true);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => runSuperSearch(v), 250);
+    searchTimer.current = setTimeout(() => runSuperSearch(v), 300);
   };
 
   const onSuperSelect = (r: { id: string; type: string }) => {
-    if (r.type === 'customer') onNavigate?.('client-search', r.id);
-    else if (r.type === 'invoice') onNavigate?.('invoices');
-    else if (r.type === 'operation') onNavigate?.('operations');
-    else if (r.type === 'visa') onNavigate?.('visa');
+    if (r.type === 'customer') onNavigate?.('customer-details', r.id);
     setShowSuper(false);
   };
 
@@ -260,27 +165,10 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
     setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
   };
 
-  const getTypeLabel = (t: string) => {
-    if (t === 'customer') return 'عميل';
-    if (t === 'invoice') return 'فاتورة';
-    if (t === 'operation') return 'تشغيل';
-    if (t === 'visa') return 'تأشيرة';
-    return '';
-  };
-
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-3 md:gap-4 fixed top-0 left-0 right-0 md:right-64 z-20 shadow-sm">
-      {onToggleSidebar && (
-        <button
-          onClick={onToggleSidebar}
-          className="p-2 rounded-xl hover:bg-gray-100 text-gray-600 md:hidden flex-shrink-0 transition-colors"
-          title="القائمة"
-        >
-          <Menu size={20} />
-        </button>
-      )}
-      <div className="flex-1 min-w-0">
-        <h2 className="text-sm md:text-lg font-bold text-navy-900 truncate">{pageNames[currentPage] || 'لوحة التحكم'}</h2>
+    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-6 gap-4 fixed top-0 left-0 right-64 z-20 shadow-sm">
+      <div className="flex-1">
+        <h2 className="text-lg font-bold text-navy-900">{pageNames[currentPage] || 'لوحة التحكم'}</h2>
       </div>
 
       {onSearchChange && (
@@ -289,7 +177,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
           <input
             type="text" value={searchValue} onChange={(e) => onSuperInput(e.target.value)}
             onFocus={() => setShowSuper(true)}
-            placeholder="بحث شامل: كود، اسم، هاتف، فاتورة..."
+            placeholder="بحث شامل: Client Code، اسم، هاتف..."
             className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pr-9 pl-4 text-sm focus:outline-none focus:ring-2 focus:ring-gold-300 focus:border-transparent"
           />
           {showSuper && superResults.length > 0 && (
@@ -300,14 +188,14 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
                   onClick={() => onSuperSelect(r)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-right"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${r.type === 'customer' ? 'bg-navy-100 text-navy-700' : r.type === 'invoice' ? 'bg-gold-100 text-gold-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                    {r.type === 'customer' ? <Users size={14} /> : r.type === 'invoice' ? <FileText size={14} /> : <Plane size={14} />}
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${r.type === 'customer' ? 'bg-navy-100 text-navy-700' : 'bg-gold-100 text-gold-700'}`}>
+                    {r.type === 'customer' ? <Users size={14} /> : <FileText size={14} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-navy-900 truncate">{r.label}</p>
                     <p className="text-xs text-gray-500 truncate">{r.sub}</p>
                   </div>
-                  <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{getTypeLabel(r.type)}</span>
+                  <span className="text-[10px] text-gray-400">{r.type === 'customer' ? 'عميل' : 'فاتورة'}</span>
                 </button>
               ))}
             </div>
@@ -329,15 +217,6 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
           <span className="hidden md:inline">البحث الذكي</span>
         </button>
       )}
-
-      <a
-        href="/"
-        title="الذهاب للموقع الرئيسي"
-        className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-gold-200 bg-gold-50 text-gold-700 hover:bg-gold-100 transition-all transition-colors"
-      >
-        <Globe size={15} />
-        <span className="hidden md:inline">الموقع الرئيسي</span>
-      </a>
 
       <div className="relative" ref={dropdownRef}>
         <button
@@ -393,146 +272,15 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
 
       <div className="w-px h-8 bg-gray-200" />
 
-      <div className="relative" ref={profileMenuRef}>
-        <button
-          onClick={() => setShowProfileMenu(v => !v)}
-          className="flex items-center gap-3 hover:bg-gray-50 p-1.5 rounded-xl transition-all"
-        >
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-navy-900 leading-tight">{profile?.name || 'مستخدم'}</p>
-            <p className="text-xs text-gold-600 font-medium leading-tight">{profile?.role || ''}</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm shadow-md">
-            {profile?.name?.charAt(0) || 'م'}
-          </div>
-        </button>
-
-        {showProfileMenu && (
-          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
-            <button
-              onClick={() => { setShowPwdModal(true); setShowProfileMenu(false); }}
-              className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-right"
-            >
-              <Key size={14} className="text-gold-500" />
-              <span>تغيير كلمة المرور</span>
-            </button>
-            <div className="h-px bg-gray-100 mx-3" />
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-right"
-            >
-              <LogOut size={14} />
-              <span>تسجيل الخروج</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Change Password Modal */}
-      {showPwdModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowPwdModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-navy-900 flex items-center gap-2">
-                <Key size={18} className="text-gold-500" />
-                تغيير كلمة المرور الخاصة بك
-              </h3>
-              <button onClick={() => setShowPwdModal(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handlePasswordChange}>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="form-label">كلمة المرور الحالية <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      type={showCurrentPwd ? 'text' : 'password'}
-                      value={currentPassword}
-                      onChange={e => setCurrentPassword(e.target.value)}
-                      className="form-input pl-9 text-left"
-                      placeholder="••••••••"
-                      dir="ltr"
-                      required
-                    />
-                    <button type="button" onClick={() => setShowCurrentPwd(!showCurrentPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
-                      {showCurrentPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">كلمة المرور الجديدة <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      type={showNewPwd ? 'text' : 'password'}
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      className="form-input pl-9 text-left"
-                      placeholder="••••••••"
-                      dir="ltr"
-                      required
-                    />
-                    <button type="button" onClick={() => setShowNewPwd(!showNewPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
-                      {showNewPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="form-label">تأكيد كلمة المرور الجديدة <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPwd ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      className="form-input pl-9 text-left"
-                      placeholder="••••••••"
-                      dir="ltr"
-                      required
-                    />
-                    <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute top-1/2 -translate-y-1/2 left-2.5 text-gray-400 hover:text-gray-600">
-                      {showConfirmPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-gray-400 leading-normal">
-                  * يجب أن تتكون كلمة المرور من 8 أحرف على الأقل، وتحتوي على حرف كبير، حرف صغير، رقم، ورمز خاص (مثل !@#$%^&*).
-                </p>
-
-                {pwdError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">
-                    {pwdError}
-                  </div>
-                )}
-
-                {pwdSuccess && (
-                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-2.5 text-sm">
-                    تم تغيير كلمة المرور بنجاح! سيتم إغلاق النافذة...
-                  </div>
-                )}
-              </div>
-
-              <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowPwdModal(false)} className="btn-outline">إلغاء</button>
-                <button type="submit" disabled={pwdLoading || pwdSuccess} className="btn-gold">
-                  {pwdLoading ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      جارٍ الحفظ...
-                    </span>
-                  ) : 'حفظ كلمة المرور'}
-                </button>
-              </div>
-            </form>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <p className="text-sm font-semibold text-navy-900 leading-tight">{profile?.name || 'مستخدم'}</p>
+          <p className="text-xs text-gold-600 font-medium leading-tight">{profile?.role || ''}</p>
         </div>
-      )}
+        <div className="w-9 h-9 rounded-xl bg-gradient-navy flex items-center justify-center text-white font-bold text-sm shadow-md">
+          {profile?.name?.charAt(0) || 'م'}
+        </div>
+      </div>
     </header>
   );
 }

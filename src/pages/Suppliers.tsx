@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, Hash, Phone, Mail, MapPin, FileText,
-  Search, Filter, Building2, Plane, Bus, Compass,
-  Wallet,
+  Search, Filter, Building2, Plane, Bus, Compass, Trash2,
+  Wallet, Download,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Supplier, SupplierPayment, SupplierType } from '../types';

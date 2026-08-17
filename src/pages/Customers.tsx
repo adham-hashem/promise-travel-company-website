@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Eye, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2, Download } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Pencil, Phone, Hash, Globe } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Customer, CustomerStatus, Page } from '../types';
 
 const statusColors: Record<CustomerStatus, string> = {
   جديد: 'bg-blue-100 text-blue-700 border border-blue-200',
   مهتم: 'bg-amber-100 text-amber-700 border border-amber-200',
   متابعة: 'bg-purple-100 text-purple-700 border border-purple-200',
-  حجز: 'bg-cyan-100 text-cyan-700 border border-cyan-200',
-  مغلق: 'bg-gray-200 text-gray-600 border border-gray-300',
   'تم الحجز': 'bg-green-100 text-green-700 border border-green-200',
   مكتمل: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
   ملغي: 'bg-red-100 text-red-700 border border-red-200',
@@ -22,124 +19,38 @@ interface Props {
   searchValue: string;
 }
 
-interface CustomerWithOpFile extends Customer {
-  operation_files?: Array<{ id: string; workflow_stage: string }>;
-}
+const MOCK: Customer[] = [
+  { id: '1', name: 'محمد عبد الرحمن السيد', phone: '01012345678', governorate: 'القاهرة', status: 'مهتم', created_at: '2026-06-15', employees: { id: 'e1', name: 'أحمد محمد', role: 'مندوب', clients_count: 45, bookings_count: 32, target_percentage: 87, is_active: true, created_at: '' }, last_follow_up: '2026-06-22' },
+  { id: '2', name: 'سارة أحمد إبراهيم', phone: '01123456789', governorate: 'الإسكندرية', status: 'متابعة', created_at: '2026-06-10', employees: { id: 'e2', name: 'فاطمة علي', role: 'مندوب', clients_count: 38, bookings_count: 27, target_percentage: 75, is_active: true, created_at: '' }, last_follow_up: '2026-06-20' },
+  { id: '3', name: 'عمر خالد الفيومي', phone: '01234567890', governorate: 'الجيزة', status: 'تم الحجز', created_at: '2026-05-28', employees: { id: 'e1', name: 'أحمد محمد', role: 'مندوب', clients_count: 45, bookings_count: 32, target_percentage: 87, is_active: true, created_at: '' }, last_follow_up: '2026-06-18' },
+  { id: '4', name: 'هدى محمود عمر', phone: '01345678901', governorate: 'الشرقية', status: 'جديد', created_at: '2026-06-21', employees: { id: 'e3', name: 'محمود إبراهيم', role: 'مندوب', clients_count: 29, bookings_count: 19, target_percentage: 62, is_active: true, created_at: '' }, last_follow_up: undefined },
+  { id: '5', name: 'كريم يوسف حسن', phone: '01456789012', governorate: 'المنصورة', status: 'مكتمل', created_at: '2026-04-10', employees: { id: 'e2', name: 'فاطمة علي', role: 'مندوب', clients_count: 38, bookings_count: 27, target_percentage: 75, is_active: true, created_at: '' }, last_follow_up: '2026-05-30' },
+  { id: '6', name: 'نور الدين عمر علي', phone: '01567890123', governorate: 'أسيوط', status: 'ملغي', created_at: '2026-05-01', employees: { id: 'e4', name: 'نور الدين', role: 'مندوب', clients_count: 52, bookings_count: 41, target_percentage: 92, is_active: true, created_at: '' }, last_follow_up: '2026-05-15' },
+];
 
 export default function Customers({ onNavigate, searchValue }: Props) {
-  const [customers, setCustomers] = useState<CustomerWithOpFile[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'الكل'>('الكل');
-  const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
-      let { data } = await supabase
+      const { data } = await supabase
         .from('customers')
-        .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
-        .eq('is_vip', false)
+        .select('*, packages(*), employees(*)')
         .order('created_at', { ascending: false });
-        
-      if (data) {
-        data = data.filter(c => !c.source || !c.source.startsWith('مسودة:'));
-      }
-      setCustomers((data as CustomerWithOpFile[]) || []);
+      if (data && data.length > 0) setCustomers(data as Customer[]);
+      else setCustomers(MOCK);
       setLoading(false);
     }
     load();
   }, []);
-  const handleExportExcel = () => {
-    const data = filtered.map(c => ({
-      'الكود': c.client_code || '—',
-      'الاسم': c.name,
-      'الهاتف': c.phone,
-      'المحافظة': c.governorate || '—',
-      'الحالة': c.status,
-      'الموظف المسؤول': c.employees?.name || '—',
-      'تاريخ الإضافة': new Date(c.created_at).toLocaleDateString('ar-EG'),
-      'المصدر': c.source || '—'
-    }));
-    exportToExcel(data, 'العملاء_CRM');
-  };
-
-  const handleExportPDF = () => {
-    const headers = ['الكود', 'الاسم', 'الهاتف', 'المحافظة', 'الحالة', 'الموظف المسؤول', 'تاريخ الإضافة', 'المصدر'];
-    const rows = filtered.map(c => [
-      c.client_code || '—',
-      c.name,
-      c.phone,
-      c.governorate || '—',
-      c.status,
-      c.employees?.name || '—',
-      new Date(c.created_at).toLocaleDateString('ar-EG'),
-      c.source || '—'
-    ]);
-    exportToPDF('تقرير عملاء CRM', headers, rows);
-  };
-
 
   const filtered = customers.filter((c) => {
-    if (c.is_archived && !searchValue) return false;
     const matchSearch = !searchValue || c.name.includes(searchValue) || c.phone.includes(searchValue) || (c.client_code && c.client_code.includes(searchValue));
     const matchStatus = statusFilter === 'الكل' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-
-    const [{ data: hasFlight }, { data: hasPayment }] = await Promise.all([
-      supabase.from('flight_tickets').select('id').eq('customer_id', deleteTarget.id).limit(1),
-      supabase.from('payments').select('id').eq('customer_id', deleteTarget.id).limit(1)
-    ]);
-
-    if (hasFlight && hasFlight.length > 0) {
-      alert("لا يمكن حذف العميل لأنه لا يزال مسجلاً له تذاكر طيران في قسم الطيران. يجب حذف تذاكر الطيران الخاصة به أولاً لضمان سلامة البيانات.");
-      setDeleting(false);
-      setDeleteTarget(null);
-      return;
-    }
-
-    if (hasPayment && hasPayment.length > 0) {
-      alert("لا يمكن حذف العميل لأنه مسجل له حركات مالية (مدفوعات) في قسم الحسابات. يجب حذف مدفوعات العميل أولاً لضمان سلامة القيود الحسابية.");
-      setDeleting(false);
-      setDeleteTarget(null);
-      return;
-    }
-
-    try {
-      // 1. Get all operation files for the customer
-      const { data: opFiles } = await supabase.from('operation_files').select('id').eq('customer_id', deleteTarget.id);
-      const opFileIds = (opFiles || []).map(f => f.id);
-      
-      // 2. Cascade delete linked logs, timelines, and files
-      if (opFileIds.length > 0) {
-        await supabase.from('operation_logs').delete().in('file_id', opFileIds);
-        await supabase.from('workflow_timeline').delete().eq('customer_id', deleteTarget.id);
-        await supabase.from('operation_files').delete().eq('customer_id', deleteTarget.id);
-      }
-
-      // 3. Cascade delete bookings, docs, and visa applications
-      await supabase.from('bookings').delete().eq('customer_id', deleteTarget.id);
-      await supabase.from('docs').delete().eq('customer_id', deleteTarget.id);
-      await supabase.from('visa_applications').delete().eq('customer_id', deleteTarget.id);
-    } catch (err) {
-      console.error('Error cascading customer delete:', err);
-    }
-
-    await supabase.from('customers').delete().eq('id', deleteTarget.id);
-    
-    // Auto revert inquiry conversion if it exists
-    await supabase.from('inquiries').update({ converted_customer_id: null, status: 'جديد' }).eq('converted_customer_id', deleteTarget.id);
-
-    setCustomers(customers.filter(c => c.id !== deleteTarget.id));
-    setDeleteTarget(null);
-    setDeleting(false);
-    alert('تم حذف العميل وكافة سجلاته التشغيلية غير المالية بنجاح.');
-  };
 
   return (
     <div className="space-y-5">
@@ -162,21 +73,13 @@ export default function Customers({ onNavigate, searchValue }: Props) {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleExportExcel} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-            <Download size={14} /> Excel
-          </button>
-          <button onClick={handleExportPDF} className="btn-outline text-xs py-2 px-3 flex items-center gap-1.5 border-red-200 text-red-700 hover:bg-red-50">
-            <Download size={14} /> PDF
-          </button>
-          <button
-            onClick={() => onNavigate('customer-add')}
-            className="btn-gold animate-fadeIn"
-          >
-            <Plus size={16} />
-            إضافة عميل جديد
-          </button>
-        </div>
+        <button
+          onClick={() => onNavigate('customer-add')}
+          className="btn-gold"
+        >
+          <Plus size={16} />
+          إضافة عميل جديد
+        </button>
       </div>
 
       {/* Table Card */}
@@ -249,40 +152,13 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                           <Globe size={10} /> Website
                         </span>
                       ) : c.source ? (
-                        <span className="badge bg-gray-100 text-gray-600">{c.source.replace(/^مندوب:\s*/, '')}</span>
+                        <span className="badge bg-gray-100 text-gray-600">{c.source}</span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5">
-                        {(() => {
-                          const activeOp = c.operation_files?.find(o => o.workflow_stage !== 'completed');
-                          if (activeOp) {
-                            const stageLabels: Record<string, string> = {
-                              accounts: '💰 الحسابات',
-                              operations: '⚙️ التشغيل',
-                              visa: '🛂 التأشيرة',
-                              flight: '✈️ الطيران',
-                              ready: '✅ جاهز'
-                            };
-                            return (
-                              <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md font-bold whitespace-nowrap">
-                                {stageLabels[activeOp.workflow_stage] || 'محوّل ✔'}
-                              </span>
-                            );
-                          }
-                          return (
-                            <button
-                              onClick={() => setTransferCustomer(c)}
-                              className="btn-gold text-[11px] py-1 px-2.5 flex items-center gap-1 shadow-xs whitespace-nowrap"
-                              title="تحويل ملف العميل إلى قسم الحسابات"
-                            >
-                              <ArrowRightLeft size={13} />
-                              تحويل للحسابات
-                            </button>
-                          );
-                        })()}
                         <button
                           onClick={() => onNavigate('customer-details', c.id)}
                           className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600 transition-colors"
@@ -291,11 +167,10 @@ export default function Customers({ onNavigate, searchValue }: Props) {
                           <Eye size={15} />
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(c)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
-                          title="حذف العميل"
+                          className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600 transition-colors"
+                          title="تعديل"
                         >
-                          <Trash2 size={15} />
+                          <Pencil size={15} />
                         </button>
                       </div>
                     </td>
@@ -311,270 +186,6 @@ export default function Customers({ onNavigate, searchValue }: Props) {
             )}
           </div>
         )}
-      </div>
-
-      {/* Transfer to Accounts Modal */}
-      {transferCustomer && (
-        <TransferAccountsModal
-          customer={transferCustomer}
-          onClose={() => setTransferCustomer(null)}
-          onTransferred={() => setTransferCustomer(null)}
-        />
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5 border border-red-100">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
-                <Trash2 size={22} />
-              </div>
-              <div>
-                <h3 className="font-bold text-navy-900 text-base">حذف العميل نهائياً</h3>
-                <p className="text-xs text-red-600">هذا الإجراء لا يمكن التراجع عنه!</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-700">
-              هل أنت متأكد من حذف العميل <span className="font-bold text-navy-900">{deleteTarget.name}</span>?
-              <br /><span className="text-xs text-red-500 block mt-1">سيتم حذف جميع بياناته وسجلاته ومستنداته بشكل نهائي.</span>
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 flex items-center justify-center gap-2"
-              >
-                {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
-                {deleting ? 'جارٍ الحذف...' : 'حذف نهائي'}
-              </button>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface TransferAccountsProps {
-  customer: Customer;
-  onClose: () => void;
-  onTransferred: () => void;
-}
-
-function TransferAccountsModal({ customer, onClose, onTransferred }: TransferAccountsProps) {
-  const [accountsEmployees, setAccountsEmployees] = useState<{ id: string; name: string }[]>([]);
-  const [targetEmpId, setTargetEmpId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [transferring, setTransferring] = useState(false);
-  const [allCustomers, setAllCustomers] = useState<{ id: string; name: string; client_code?: string }[]>([]);
-  const [accountMethod, setAccountMethod] = useState<'independent' | 'linked'>('independent');
-  const [parentCustomerId, setParentCustomerId] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: empData } = await supabase.from('employees').select('id, name, role').eq('is_active', true);
-      const accList = (empData || []).filter((e: any) => e.role === 'محاسب' || e.role === 'مالك النظام' || e.role === 'مدير النظام' || e.role === 'super_admin');
-      setAccountsEmployees(accList.map((e: any) => ({ id: e.id, name: `${e.name} (${e.role})` })));
-
-      const { data: custData } = await supabase.from('customers').select('id, name, client_code').order('name');
-      setAllCustomers(custData || []);
-    })();
-  }, []);
-
-  const handleTransfer = async () => {
-    if (accountMethod === 'linked' && !parentCustomerId) {
-      alert('⚠️ يرجى اختيار العميل صاحب الحساب الرئيسي أولاً.');
-      return;
-    }
-    setTransferring(true);
-
-    const parentId = accountMethod === 'linked' ? parentCustomerId : null;
-    await supabase.from('customers').update({ parent_customer_id: parentId }).eq('id', customer.id);
-
-    const { data: existingOp } = await supabase
-      .from('operation_files')
-      .select('id')
-      .eq('customer_id', customer.id)
-      .neq('workflow_stage', 'completed')
-      .maybeSingle();
-    const payload = {
-      customer_id: customer.id,
-      workflow_stage: 'accounts',
-      file_status: 'جديد',
-      assigned_to: targetEmpId || null,
-      notes: notes ? `تم التحويل من قائمة العملاء CRM: ${notes}` : 'تم التحويل من العملاء CRM إلى قسم الحسابات',
-    };
-
-    if (existingOp) {
-      await supabase.from('operation_files').update(payload).eq('id', existingOp.id);
-    } else {
-      await supabase.from('operation_files').insert(payload);
-    }
-
-    await supabase.from('workflow_timeline').insert({
-      customer_id: customer.id,
-      stage: 'accounts',
-      stage_label: 'قسم الحسابات',
-      department: 'CRM / العملاء',
-      employee_id: targetEmpId || null,
-      status: 'مكتمل',
-      notes: notes || 'تم تحويل العميل من قائمة العملاء CRM إلى قسم الحسابات',
-    });
-
-    if (targetEmpId) {
-      await supabase.from('notifications').insert({
-        employee_id: targetEmpId,
-        type: 'new_customer',
-        title: 'عميل جديد محول من قائمة العملاء CRM إلى الحسابات',
-        body: `العميل: ${customer.name} - ملاحظات: ${notes}`,
-      });
-    }
-
-    setTransferring(false);
-    onTransferred();
-  };
-
-  const filteredCustomers = allCustomers.filter(c => 
-    c.id !== customer.id &&
-    (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     (c.client_code && c.client_code.toLowerCase().includes(searchQuery.toLowerCase())))
-  ).slice(0, 10);
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gold-100 animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 text-gold-600 border-b border-gray-100 pb-3">
-          <div className="w-12 h-12 rounded-2xl bg-gold-100 flex items-center justify-center text-navy-900 font-bold">
-            2➜3
-          </div>
-          <div>
-            <h3 className="font-bold text-navy-900 text-base">تحويل العميل إلى قسم الحسابات</h3>
-            <p className="text-xs text-gray-500">العميل: <span className="font-semibold text-navy-900">{customer.name}</span></p>
-          </div>
-        </div>
-
-        <div className="space-y-3 text-right">
-          <div>
-            <label className="form-label font-bold text-navy-900 text-xs">اختر موظف قسم الحسابات المستلم:</label>
-            <select
-              value={targetEmpId}
-              onChange={(e) => setTargetEmpId(e.target.value)}
-              className="form-input text-xs"
-            >
-              <option value="">— جميع فريق الحسابات —</option>
-              {accountsEmployees.map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="form-label font-bold text-navy-900 text-xs">طريقة الحساب المالي:</label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setAccountMethod('independent')}
-                className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
-                  accountMethod === 'independent'
-                    ? 'border-gold-500 bg-gold-50 text-navy-900'
-                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
-                }`}
-              >
-                حساب مستقل
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccountMethod('linked')}
-                className={`py-2 px-3 text-xs rounded-xl border-2 font-bold transition-all ${
-                  accountMethod === 'linked'
-                    ? 'border-gold-500 bg-gold-50 text-navy-900'
-                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
-                }`}
-              >
-                ربط الحساب بعميل آخر
-              </button>
-            </div>
-          </div>
-
-          {accountMethod === 'linked' && (
-            <div className="relative">
-              <label className="form-label font-bold text-navy-900 text-xs">ابحث عن العميل صاحب الحساب الرئيسي:</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                className="form-input text-xs"
-                placeholder="ابحث بالاسم أو كود العميل..."
-              />
-              {showDropdown && searchQuery && (
-                <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-lg max-h-48 overflow-y-auto">
-                  {filteredCustomers.map(c => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        setParentCustomerId(c.id);
-                        setSearchQuery(`${c.name} (${c.client_code || '—'})`);
-                        setShowDropdown(false);
-                      }}
-                      className="w-full text-right px-4 py-2 hover:bg-gray-50 text-xs text-navy-900 font-semibold border-b border-gray-50 last:border-b-0"
-                    >
-                      {c.name} {c.client_code ? `(${c.client_code})` : ''}
-                    </button>
-                  ))}
-                  {filteredCustomers.length === 0 && (
-                    <p className="p-3 text-xs text-gray-400 text-center">لا توجد نتائج مطابقة</p>
-                  )}
-                </div>
-              )}
-              {parentCustomerId && !showDropdown && (
-                <p className="text-[10px] text-emerald-600 font-semibold mt-1">
-                  ✔ تم الاختيار بنجاح
-                </p>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label className="form-label font-bold text-navy-900 text-xs">ملاحظات وتعليمات التحويل للحسابات:</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="form-input text-xs resize-none"
-              rows={3}
-              placeholder="اكتب تفاصيل الفواتير، الدفعات، طريقة السداد المطلوبة..."
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleTransfer}
-            disabled={transferring}
-            className="btn-gold flex-1 justify-center text-xs py-2.5"
-          >
-            {transferring ? 'جارٍ التحويل...' : 'تأكيد وإرسال لقسم الحسابات'}
-          </button>
-          <button
-            onClick={onClose}
-            className="btn-outline flex-1 justify-center text-xs py-2.5"
-          >
-            إلغاء
-          </button>
-        </div>
       </div>
     </div>
   );

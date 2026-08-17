@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Search, X, User, Phone, Hash, FileText,
-  CalendarCheck, CreditCard, MessageSquare,
+  Search, X, User, Phone, Hash, Calendar, FileText,
+  CalendarCheck, CreditCard, Building2, MessageSquare,
   ChevronRight, AlertCircle, Loader2, Wallet, FileCheck,
-  ListChecks, Plane, ClipboardList,
-  Download, Eye, Clock, Briefcase,
+  ListChecks, Plane, Hotel as HotelIcon, ClipboardList,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Booking, Invoice, Inquiry, Page, Task } from '../types';
@@ -15,33 +14,13 @@ interface FullData {
   bookings?: Array<Booking & { package_name?: string; package_type?: string; employee_name?: string }>;
   invoices?: Array<Invoice & { hotel_name?: string }>;
   payments?: Array<{ id: string; amount: number; payment_date: string; payment_method: string; status: string; transaction_number?: string }>;
-  documents?: Array<{ id: string; doc_type: string; status: string; created_at: string; doc_number?: string; file_path?: string; file_name?: string }>;
+  documents?: Array<{ id: string; doc_type: string; status: string; created_at: string; doc_number?: string }>;
   operation_files?: Array<{ id: string; op_number: string; file_status: string; financially_approved: boolean; travel_date: string | null; return_date: string | null; visa_status?: string }>;
-  visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null; visa_file_path?: string; visa_file_name?: string }>;
-  tickets?: Array<{ id: string; pnr: string; airline?: string; flight_number?: string; departure_airport?: string; arrival_airport?: string; departure_datetime?: string; return_datetime?: string; e_ticket_number?: string; ticket_file_path?: string; ticket_file_name?: string; status?: string }>;
+  visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null }>;
   tasks?: Task[];
   inquiries?: Inquiry[];
+  visas?: Array<{ id: string; visa_id: string; visa_type: string; country: string; visa_status: string; visa_fee: number; application_date: string | null; issue_date: string | null; expiry_date: string | null }>;
   internal_bookings?: Array<{ id: string; trip_name?: string; booking_status: string; total_amount: number; created_at: string }>;
-  timeline?: Array<{
-    id: string;
-    stage: string;
-    stage_label: string;
-    department?: string;
-    employee_real_name?: string;
-    employee_name?: string;
-    status: string;
-    notes?: string;
-    created_at: string;
-  }>;
-  op_documents?: Array<{
-    id: string;
-    operation_file_id: string;
-    op_number: string;
-    doc_type: string;
-    file_path: string;
-    file_name: string;
-    created_at: string;
-  }>;
 }
 
 const statusColors: Record<string, string> = {
@@ -60,109 +39,61 @@ const statusColors: Record<string, string> = {
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
-  customerId?: string | null;
 }
 
-interface CandidateCustomer {
-  id: string;
-  name: string;
-  client_code: string | null;
-  phone: string;
-  status: string;
-}
-
-export default function ClientSearch({ onNavigate, customerId }: Props) {
+export default function ClientSearch({ onNavigate }: Props) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<FullData | null>(null);
-  const [candidates, setCandidates] = useState<CandidateCustomer[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Autocomplete suggestions search
   useEffect(() => {
-    const q = query.trim();
-    if (q.length < 1) {
-      setCandidates([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      let matches: CandidateCustomer[] = [];
-
-      // 1. If it looks like an invoice
-      if (q.toUpperCase().includes('-INV-')) {
-        const { data: invs } = await supabase
-          .from('invoices')
-          .select('customer:customers(id, name, client_code, phone, status)')
-          .ilike('invoice_number', `%${q}%`)
-          .limit(5);
-        if (invs) {
-          matches = invs
-            .map(i => Array.isArray(i.customer) ? i.customer[0] : i.customer)
-            .filter(Boolean) as CandidateCustomer[];
-        }
-      }
-      // 2. If it looks like an operation file
-      else if (q.toUpperCase().startsWith('OP-')) {
-        const { data: ops } = await supabase
-          .from('operation_files')
-          .select('customer:customers(id, name, client_code, phone, status)')
-          .ilike('op_number', `%${q}%`)
-          .limit(5);
-        if (ops) {
-          matches = ops
-            .map(o => Array.isArray(o.customer) ? o.customer[0] : o.customer)
-            .filter(Boolean) as CandidateCustomer[];
-        }
-      }
-      // 3. General customer search (name, phone, client_code, passport)
-      else {
-        const { data } = await supabase
-          .from('customers')
-          .select('id, name, client_code, phone, status')
-          .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
-          .limit(8);
-        if (data) {
-          matches = data as CandidateCustomer[];
-        }
-      }
-
-      // Deduplicate matches
-      const uniqueMatches = matches.filter(
-        (c, index, self) => self.findIndex(t => t.id === c.id) === index
-      );
-
-      setCandidates(uniqueMatches);
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  // Click outside to close dropdown
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    inputRef.current?.focus();
   }, []);
 
-  const loadFullByCode = async (clientCode: string) => {
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
     setLoading(true);
+    setResult(null);
     setNotFound(false);
-    setCandidates([]);
-    const { data, error } = await supabase.rpc('get_customer_full_data', { p_client_code: clientCode });
-    if (error) {
-      console.error('[ClientSearch] RPC error:', error);
-      alert('خطأ أثناء جلب بيانات العميل: ' + error.message);
+
+    // Try by invoice sub-code first (CL-1001-INV-01)
+    if (q.includes('-INV-')) {
+      const { data: inv } = await supabase.from('invoices').select('customer:customers(client_code)').eq('invoice_number', q).maybeSingle();
+      if (inv?.customer?.client_code) {
+        const { data } = await supabase.rpc('get_customer_full_data', { p_client_code: inv.customer.client_code });
+        setResult(data as FullData);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Resolve to a client_code
+    let clientCode: string | null = null;
+
+    const isCode = /^[A-Z]{2}-\d+$/i.test(q);
+    const isPhone = /^\d{10,11}$/.test(q);
+
+    if (isCode) {
+      clientCode = q.toUpperCase();
+    } else if (isPhone) {
+      const { data: c } = await supabase.from('customers').select('client_code').eq('phone', q).maybeSingle();
+      clientCode = c?.client_code || null;
+    } else {
+      const { data: c } = await supabase.from('customers').select('client_code').ilike('name', `%${q}%`).limit(1).maybeSingle();
+      clientCode = c?.client_code || null;
+    }
+
+    if (!clientCode) {
+      setNotFound(true);
       setLoading(false);
       return;
     }
+
+    const { data } = await supabase.rpc('get_customer_full_data', { p_client_code: clientCode });
     const full = data as FullData;
     if (!full || !full.found) {
       setNotFound(true);
@@ -172,110 +103,15 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
     setLoading(false);
   };
 
-  const loadFullById = async (id: string) => {
-    setLoading(true);
-    setNotFound(false);
-    setCandidates([]);
-    const { data: cust } = await supabase.from('customers').select('client_code').eq('id', id).maybeSingle();
-    if (cust?.client_code) {
-      setQuery(cust.client_code);
-      await loadFullByCode(cust.client_code);
-    } else {
-      setNotFound(true);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (customerId) {
-      loadFullById(customerId);
-    } else {
-      inputRef.current?.focus();
-    }
-  }, [customerId]);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    setLoading(true);
-    setResult(null);
-    setCandidates([]);
-    setNotFound(false);
-
-    // 1. Check Invoice Sub-code (CL-1001-INV-01)
-    if (q.toUpperCase().includes('-INV-')) {
-      const { data: inv } = await supabase.from('invoices').select('customer:customers(client_code)').eq('invoice_number', q).maybeSingle();
-      const customerObj = Array.isArray(inv?.customer) ? inv.customer[0] : (inv?.customer as any);
-      if (customerObj?.client_code) {
-        await loadFullByCode(customerObj.client_code);
-        return;
-      }
-    }
-
-    // 2. Check Operation File Number (OP-1001)
-    if (q.toUpperCase().startsWith('OP-')) {
-      const { data: op } = await supabase.from('operation_files').select('customer:customers(client_code)').eq('op_number', q.toUpperCase()).maybeSingle();
-      const customerObj = Array.isArray(op?.customer) ? op.customer[0] : (op?.customer as any);
-      if (customerObj?.client_code) {
-        await loadFullByCode(customerObj.client_code);
-        return;
-      }
-    }
-
-    // 3. Exact Client Code match (CL-1001, HJ-1001, OM-1001)
-    const isCode = /^[A-Z]{2}-\d+$/i.test(q);
-    if (isCode) {
-      await loadFullByCode(q.toUpperCase());
-      return;
-    }
-
-    // 4. Query matching customers by name, phone, or passport
-    const { data: matches } = await supabase
-      .from('customers')
-      .select('id, name, client_code, phone, status')
-      .not('sales_agent_submitted', 'eq', false)
-      .or(`name.ilike.%${q}%,phone.ilike.%${q}%,client_code.ilike.%${q}%,passport_number.ilike.%${q}%`)
-      .limit(10);
-
-    const list = (matches as CandidateCustomer[]) || [];
-    if (list.length === 0) {
-      setNotFound(true);
-      setLoading(false);
-    } else if (list.length === 1 && list[0].client_code) {
-      await loadFullByCode(list[0].client_code);
-    } else {
-      setCandidates(list);
-      setLoading(false);
-    }
-  };
-
   const clear = () => {
     setQuery('');
     setResult(null);
-    setCandidates([]);
     setNotFound(false);
     inputRef.current?.focus();
   };
 
   const customer = result?.customer;
   const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
-
-  const handleViewDoc = async (filePath: string) => {
-    const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 3600);
-    if (data) window.open(data.signedUrl);
-  };
-
-  const handleDownloadDoc = async (filePath: string, fileName: string) => {
-    const { data } = await supabase.storage.from('documents').download(filePath);
-    if (data) {
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-    }
-  };
 
   const SectionCard = ({
     title, icon: Icon, count, children, accent = 'text-navy-600',
@@ -304,58 +140,22 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
       </div>
 
       {/* Search Bar */}
-      <form onSubmit={handleSearch} className="relative z-50">
+      <form onSubmit={handleSearch} className="relative">
         <div className="flex gap-3">
-          <div ref={dropdownRef} className="relative flex-1">
-            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div className="relative flex-1">
+            <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               ref={inputRef}
               value={query}
-              onChange={e => { setQuery(e.target.value); setShowDropdown(true); }}
-              onFocus={() => setShowDropdown(true)}
-              className="w-full h-14 bg-white border-2 border-gray-200 focus:border-gold-400 rounded-2xl pr-12 pl-12 text-base font-medium outline-none transition-colors shadow-sm"
-              placeholder="ابحث بـ: كود CL-1001، ملف OP-1001، فاتورة، جواز السفر، هاتف، أو اسم العميل"
+              onChange={e => setQuery(e.target.value)}
+              className="w-full h-14 bg-white border-2 border-gray-200 focus:border-gold-400 rounded-2xl pr-12 pl-4 text-base font-medium outline-none transition-colors shadow-sm"
+              placeholder="ابحث بـ: CL-1001 أو رقم الهاتف أو اسم العميل"
               dir="rtl"
             />
             {query && (
-              <button
-                type="button"
-                onClick={() => { clear(); setShowDropdown(false); }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
-              >
+              <button type="button" onClick={clear} className="absolute left-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-lg transition-colors">
                 <X size={16} className="text-gray-400" />
               </button>
-            )}
-
-            {/* Suggestions Dropdown */}
-            {showDropdown && candidates.length > 0 && (
-              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-y-auto z-[60] divide-y divide-gray-50">
-                {candidates.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={async () => {
-                      setShowDropdown(false);
-                      if (c.client_code) {
-                        setQuery(c.client_code);
-                        await loadFullByCode(c.client_code);
-                      } else {
-                        await loadFullById(c.id);
-                      }
-                    }}
-                    className="w-full text-right px-4 py-3.5 hover:bg-gold-50/50 flex items-center justify-between text-sm transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <User size={14} className="text-gray-400" />
-                      <span className="font-semibold text-gray-800">{c.name}</span>
-                      <span className="text-xs text-gray-400 font-medium">({c.phone})</span>
-                    </div>
-                    <span className="text-[10px] font-bold font-mono text-gold-600 bg-gold-50 border border-gold-100/50 px-2 py-0.5 rounded-lg">
-                      {c.client_code || 'بدون كود'}
-                    </span>
-                  </button>
-                ))}
-              </div>
             )}
           </div>
           <button type="submit" disabled={loading || !query.trim()} className="btn-gold h-14 px-8 text-base">
@@ -365,11 +165,10 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
 
         <div className="flex gap-2 mt-3 flex-wrap">
           {[
-            { label: 'كود العميل', example: 'CL-1001 / HJ-1001' },
-            { label: 'ملف تشغيل', example: 'OP-1001' },
-            { label: 'فاتورة', example: 'CL-1001-INV-01' },
-            { label: 'هاتف / جواز', example: '010XXXXXXXX' },
-            { label: 'اسم العميل', example: 'محمد أحمد' },
+            { label: 'كود العميل', example: 'CL-1001' },
+            { label: 'Sub Code', example: 'CL-1001-INV-01' },
+            { label: 'هاتف', example: '010XXXXXXXX' },
+            { label: 'اسم', example: 'محمد أحمد' },
           ].map(hint => (
             <span key={hint.label} className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
               <span className="font-semibold text-gray-700">{hint.label}:</span> {hint.example}
@@ -377,33 +176,6 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
           ))}
         </div>
       </form>
-
-      {/* Candidates List */}
-      {candidates.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-3">
-          <h3 className="font-bold text-navy-900 text-sm">نتائج مطابقة ({candidates.length}) — اختر العميل لعرض ملفه الكامل:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {candidates.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => c.client_code && loadFullByCode(c.client_code)}
-                className="flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-gold-400 hover:bg-gold-50/30 transition-all text-right group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-navy-100 text-navy-700 font-bold flex items-center justify-center text-sm">
-                    {c.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="font-bold text-navy-900 text-sm group-hover:text-gold-600 transition-colors">{c.name}</p>
-                    <p className="text-xs text-gray-500 font-mono mt-0.5">{c.client_code || 'بدون كود'} • {c.phone}</p>
-                  </div>
-                </div>
-                <span className="badge border text-xs bg-navy-50 text-navy-700 border-navy-100">{c.status}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Not Found */}
       {notFound && (
@@ -525,51 +297,6 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
             </div>
           </SectionCard>
 
-          {/* Customer Journey Timeline */}
-          <SectionCard title="مسار العميل الزمني بالترتيب" icon={Clock} count={result.timeline?.length ?? 0} accent="text-gold-600">
-            <div className="p-6">
-              {result.timeline?.length === 0 ? (
-                <EmptyRow />
-              ) : (
-                <div className="relative border-r-2 border-gray-100 mr-4 pr-6 space-y-6">
-                  {result.timeline?.map((step) => {
-                    return (
-                      <div key={step.id} className="relative">
-                        {/* Dot indicator */}
-                        <div className="absolute -right-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white bg-gold-500 shadow-sm" />
-                        
-                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-navy-900 text-sm">{step.stage_label}</span>
-                              {step.department && (
-                                <span className="badge text-[10px] bg-navy-50 text-navy-700">قسم: {step.department}</span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-400 font-mono">
-                              {new Date(step.created_at).toLocaleString('ar-EG')}
-                            </span>
-                          </div>
-                          
-                          {step.notes && (
-                            <p className="text-xs text-gray-600 bg-white p-2.5 rounded-lg border border-gray-100/50 leading-relaxed">
-                              {step.notes}
-                            </p>
-                          )}
-                          
-                          <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
-                            <span>المسؤول: {step.employee_real_name || step.employee_name || '—'}</span>
-                            <span className="text-emerald-600 font-semibold">{step.status}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </SectionCard>
-
           {/* Sub-codes grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Bookings */}
@@ -643,47 +370,17 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
             </SectionCard>
 
             {/* Documents */}
-            <SectionCard title="المستندات والملفات" icon={ClipboardList} count={(result.documents?.length ?? 0) + (result.op_documents?.length ?? 0)} accent="text-amber-600">
-              <div className="p-4 space-y-4">
-                {/* Basic Documents */}
-                <div>
-                  <h4 className="text-xs font-bold text-gray-400 mb-2">مستندات العميل الأساسية</h4>
-                  {result.documents?.length === 0 ? <EmptyRow /> : result.documents?.map(doc => (
-                    <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-2">
-                      <div>
-                        {doc.doc_number && <p className="text-xs font-mono font-bold text-gold-700 mb-0.5">{doc.doc_number}</p>}
-                        <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="badge text-xs bg-gray-100 text-gray-600">{doc.status}</span>
-                        {doc.file_path && (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleViewDoc(doc.file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Eye size={14} /></button>
-                            <button onClick={() => handleDownloadDoc(doc.file_path!, doc.file_name || 'doc')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Download size={14} /></button>
-                          </div>
-                        )}
-                      </div>
+            <SectionCard title="المستندات" icon={ClipboardList} count={result.documents?.length ?? 0} accent="text-amber-600">
+              <div className="p-4 space-y-2">
+                {result.documents?.length === 0 ? <EmptyRow /> : result.documents?.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div>
+                      {doc.doc_number && <p className="text-xs font-mono font-bold text-gold-700 mb-0.5">{doc.doc_number}</p>}
+                      <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
                     </div>
-                  ))}
-                </div>
-
-                {/* Operational Documents */}
-                <div className="pt-2 border-t border-gray-100">
-                  <h4 className="text-xs font-bold text-gray-400 mb-2">مستندات ملفات التشغيل (الطيران، الفنادق، التأشيرات)</h4>
-                  {result.op_documents?.length === 0 ? <EmptyRow /> : result.op_documents?.map(doc => (
-                    <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-2">
-                      <div>
-                        <p className="text-xs font-mono font-bold text-cyan-600 mb-0.5">{doc.op_number}</p>
-                        <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{doc.file_name}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => handleViewDoc(doc.file_path)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Eye size={14} /></button>
-                        <button onClick={() => handleDownloadDoc(doc.file_path, doc.file_name)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Download size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    <span className="badge text-xs bg-gray-100 text-gray-600">{doc.status}</span>
+                  </div>
+                ))}
               </div>
             </SectionCard>
 
@@ -734,56 +431,6 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
                         <p className="text-xs text-gray-500">{inq.service_type} · {inq.source}</p>
                       </div>
                       <span className="badge text-xs bg-blue-100 text-blue-700">{inq.status}</span>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            )}
-
-            {/* Visas */}
-            {(result.visas?.length ?? 0) > 0 && (
-              <SectionCard title="التأشيرات" icon={Briefcase} count={result.visas?.length ?? 0} accent="text-purple-600">
-                <div className="p-4 space-y-2">
-                  {result.visas?.map(v => (
-                    <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="text-sm font-semibold text-navy-900">{v.visa_type} — {v.country}</p>
-                        <p className="text-xs text-gray-500">تاريخ التقديم: {v.application_date ? new Date(v.application_date).toLocaleDateString('ar-EG') : '—'}</p>
-                      </div>
-                      <div className="text-left flex items-center gap-2">
-                        <span className={`badge text-xs ${statusColors[v.visa_status] ?? 'bg-purple-100 text-purple-700'}`}>{v.visa_status}</span>
-                        {v.visa_file_path && (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleViewDoc(v.visa_file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="عرض"><Eye size={14} /></button>
-                            <button onClick={() => handleDownloadDoc(v.visa_file_path!, v.visa_file_name || 'visa')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="تحميل"><Download size={14} /></button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-            )}
-
-            {/* Flight Tickets */}
-            {(result.tickets?.length ?? 0) > 0 && (
-              <SectionCard title="تذاكر الطيران" icon={Plane} count={result.tickets?.length ?? 0} accent="text-cyan-600">
-                <div className="p-4 space-y-2">
-                  {result.tickets?.map(t => (
-                    <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="text-sm font-semibold text-navy-900">{t.airline || 'طيران'} {t.flight_number || ''}</p>
-                        <p className="text-xs text-gray-500">PNR: <span className="font-mono font-bold text-cyan-600">{t.pnr || '—'}</span> · {t.departure_airport || ''} ➔ {t.arrival_airport || ''}</p>
-                      </div>
-                      <div className="text-left flex items-center gap-2">
-                        <span className="badge text-xs bg-cyan-100 text-cyan-700">{t.status || 'صادر'}</span>
-                        {t.ticket_file_path && (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleViewDoc(t.ticket_file_path!)} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="عرض"><Eye size={14} /></button>
-                            <button onClick={() => handleDownloadDoc(t.ticket_file_path!, t.ticket_file_name || 'ticket')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500" title="تحميل"><Download size={14} /></button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ))}
                 </div>

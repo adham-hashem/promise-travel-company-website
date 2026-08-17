@@ -11,6 +11,7 @@ export interface Visa {
   visa_id?: string;
   client_code?: string;
   booking_id?: string;
+  package_id?: string;
   customer_id?: string;
   full_name: string;
   service_type: string;
@@ -89,9 +90,9 @@ export interface Task {
   department?: string;
   client_code?: string;
   booking_id?: string;
+  package_id?: string;
   related_section?: string;
   auto_generated?: boolean;
-  employee_response?: string;
   employees?: Employee;
 }
 
@@ -118,16 +119,9 @@ export interface Package {
   name: string;
   type: PackageType;
   hotel?: string;
-  hotel_makkah?: string;
-  hotel_madinah?: string;
   airline?: string;
   duration_days?: number;
   price: number;
-  price_double?: number;
-  price_triple?: number;
-  price_quad?: number;
-  price_child?: number;
-  price_infant?: number;
   cost_price?: number;
   is_active: boolean;
   image_url?: string;
@@ -182,65 +176,20 @@ export interface Customer {
   country?: string;
   documents_status?: 'مكتمل' | 'ناقص مستندات';
   visa_requirement?: VisaRequirement;
-  hotel_makkah?: string;
-  hotel_madinah?: string;
-  room_type_makkah?: string;
-  room_type_madinah?: string;
   is_archived?: boolean;
+  archived_at?: string;
+  travel_ready?: boolean;
+  hotel_confirmed?: boolean;
+  transportation_confirmed?: boolean;
+  supervisor_assigned?: boolean;
+  room_assigned?: boolean;
+  rooming_type?: 'individual' | 'family';
+  room_type_preference?: 'double' | 'triple' | 'quad';
+  family_id?: string;
   created_at: string;
   packages?: Package;
   employees?: Employee;
-  is_vip?: boolean;
-  client_type?: 'فردي' | 'فوج';
-  parent_customer_id?: string;
-  age_group?: 'بالغ' | 'طفل' | 'رضيع';
 }
-
-export interface VipRequest {
-  id: string;
-  customer_id: string;
-  travel_city?: string;
-  departure_date?: string;
-  return_date?: string;
-  airline_preference?: string;
-  flight_class?: string;
-  hotel_preference?: string; // Keep for legacy
-  hotel_makkah?: string;
-  hotel_madinah?: string;
-  hotel_stars?: string;
-  room_type?: string; // Keep for legacy
-  room_type_makkah?: string;
-  room_type_madinah?: string;
-  meal_plan?: string;
-  view_preference?: string;
-  transportation_method?: string;
-  train_preference?: string;
-  mazarat?: string;
-  additional_services?: string;
-  travelers_count: number;
-  special_notes?: string;
-  assigned_vip_manager?: string;
-  current_stage: 'accounts' | 'operations' | 'bookings' | 'flights' | 'hotels' | 'housing' | 'visas' | 'ready';
-  is_archived?: boolean;
-  created_at: string;
-  updated_at: string;
-  customers?: Customer;
-  employees?: Employee;
-}
-
-export interface VipWorkflowStep {
-  id: string;
-  vip_request_id: string;
-  step_key: string;
-  step_label: string;
-  status: string;
-  assigned_employee_id?: string;
-  execution_date?: string;
-  department_notes?: string;
-  updated_at: string;
-  assigned_employee_name?: string;
-}
-
 
 export interface CommunicationLog {
   id: string;
@@ -392,14 +341,104 @@ export type Page =
   | 'suppliers'
   | 'visa'
   | 'flight-tickets'
-  | 'super-admin'
-  | 'sales-portal'
   | 'travel-groups'
-  | 'vip-dashboard'
-  | 'vip-details'
-  | 'internal-groups'
-  | 'website'
-  | 'quotation-form';
+  | 'accommodation'
+  | 'website' | 'super-admin' | 'sales-portal' | 'vip-trips' | 'vip-details' | 'internal-groups' | 'quotation-form' | 'vip-dashboard';
+
+// ===== Travel Groups =====
+export type TravelGroupStatus = 'مفتوحة' | 'مكتملة' | 'جاهز للسفر' | 'في السفر' | 'مكتملة بنجاح' | 'ملغاة';
+export type TravelGroupServiceType = 'حج' | 'عمرة' | 'رحلة داخلية';
+export type AccommodationStatus = 'غير محدد' | 'مؤكد' | 'قيد التأكيد' | 'مشكلة';
+
+export interface TravelGroup {
+  id: string;
+  group_code: string;
+  group_name: string;
+  service_type: TravelGroupServiceType;
+  package_id?: string;
+  supervisor_id?: string;
+  departure_date?: string;
+  return_date?: string;
+  departure_time?: string;
+  return_time?: string;
+  airline?: string;
+  flight_number?: string;
+  departure_airport?: string;
+  arrival_airport?: string;
+  hotel_makkah?: string;
+  hotel_madinah?: string;
+  internal_hotel?: string;
+  bus_number?: string;
+  max_capacity: number;
+  current_count: number;
+  status: TravelGroupStatus;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  returned_at?: string;
+  packages?: Package;
+  supervisors?: Employee;
+}
+
+export interface TravelGroupMember {
+  id: string;
+  group_id: string;
+  customer_id: string;
+  room_number?: string;
+  accommodation_status: AccommodationStatus;
+  added_by?: string;
+  added_at: string;
+  customers?: Customer;
+}
+
+// ===== Accommodation =====
+export type RoomType = 'double' | 'triple' | 'quad' | 'connected';
+export type RoomStatus = 'waiting' | 'complete' | 'checked_in' | 'checked_out';
+export type RoomGender = 'male' | 'female' | 'mixed';
+
+export interface Family {
+  id: string;
+  group_id: string;
+  family_name: string;
+  family_head_customer_id?: string;
+  room_id?: string;
+  member_count: number;
+  created_by?: string;
+  created_at: string;
+  rooms?: Room;
+}
+
+export interface Room {
+  id: string;
+  group_id: string;
+  room_number?: string;
+  room_type: RoomType;
+  capacity: number;
+  current_occupancy: number;
+  gender: RoomGender;
+  family_id?: string;
+  hotel?: string;
+  hotel_branch?: string;
+  city?: string;
+  floor?: string;
+  status: RoomStatus;
+  color_tag: number;
+  is_locked: boolean;
+  created_at: string;
+  families?: Family;
+}
+
+export interface RoomAssignment {
+  id: string;
+  room_id: string;
+  group_id: string;
+  customer_id: string;
+  family_id?: string;
+  assigned_at: string;
+  assigned_by?: string;
+  customers?: Customer;
+}
 
 // ===== Accounting types =====
 export type PaymentMethod = 'كاش' | 'تحويل بنكي' | 'فودافون كاش' | 'أقساط';
@@ -434,36 +473,6 @@ export interface Payment {
   user_profiles?: Employee;
 }
 
-export interface FinancialInstallment {
-  id: string;
-  customer_id: string;
-  amount: number;
-  due_date: string;
-  status: 'مستحق' | 'مدفوع' | 'متأخر' | 'ملغي';
-  notes?: string;
-  payment_id?: string;
-  created_at: string;
-  updated_at: string;
-  customers?: Customer;
-  payments?: Payment;
-}
-
-export interface ApprovalRequest {
-  id: string;
-  type: string;
-  record_id: string;
-  record_type: string;
-  requested_by?: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewed_by?: string;
-  reviewed_at?: string;
-  created_at: string;
-  record_details?: any;
-  requester?: Employee;
-  reviewer?: Employee;
-}
-
 export interface PaymentProof {
   id: string;
   payment_id: string;
@@ -481,6 +490,7 @@ export interface PaymentProof {
 export interface Installment {
   id: string;
   booking_id?: string;
+  package_id?: string;
   customer_id?: string;
   total_amount: number;
   paid_amount: number;
@@ -492,6 +502,7 @@ export interface Installment {
   created_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
 }
 
 export interface Expense {
@@ -525,6 +536,7 @@ export interface DocumentRecord {
   id: string;
   customer_id?: string;
   booking_id?: string;
+  package_id?: string;
   uploaded_by?: string;
   doc_type: DocType;
   file_path: string;
@@ -538,6 +550,7 @@ export interface DocumentRecord {
   created_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
   user_profiles?: Employee;
   reviewer?: Employee;
 }
@@ -573,6 +586,7 @@ export interface Invoice {
   invoice_number: string;
   customer_id?: string;
   booking_id?: string;
+  package_id?: string;
   hotel_id?: string;
   service_type: InvoiceServiceType;
   package_name?: string;
@@ -584,6 +598,7 @@ export interface Invoice {
   updated_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
   hotels?: Hotel;
 }
 
@@ -618,6 +633,7 @@ export interface OperationFile {
   id: string;
   op_number: string;
   booking_id?: string;
+  package_id?: string;
   customer_id?: string;
   employee_id?: string;
   file_status: OperationFileStatus;
@@ -629,11 +645,11 @@ export interface OperationFile {
   notes?: string;
   financially_approved: boolean;
   workflow_stage?: 'new' | 'accounts' | 'operations' | 'visa' | 'flight' | 'ready' | 'completed';
-  is_archived?: boolean;
   created_at: string;
   updated_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
   employees?: Employee;
   hotels?: Hotel;
   internal_trips?: InternalTrip;
@@ -642,6 +658,7 @@ export interface OperationFile {
 export interface FlightTicket {
   id: string;
   booking_id?: string;
+  package_id?: string;
   customer_id?: string;
   pnr?: string;
   airline?: string;
@@ -658,6 +675,7 @@ export interface FlightTicket {
   created_at: string;
   customers?: Customer;
   bookings?: Booking;
+  packages?: Package;
   user_profiles?: Employee;
 }
 
@@ -665,6 +683,7 @@ export interface WorkflowTimelineEvent {
   id: string;
   customer_id?: string;
   booking_id?: string;
+  package_id?: string;
   stage: string;
   stage_label: string;
   department?: string;
@@ -672,72 +691,6 @@ export interface WorkflowTimelineEvent {
   employee_name?: string;
   status: string;
   notes?: string;
-  created_at: string;
-}
-
-export type TravelGroupStatus = 'تجميع' | 'مؤكد' | 'سافر' | 'عاد' | 'ملغي';
-
-export interface TravelGroup {
-  id: string;
-  name: string;
-  code: string;
-  package_id?: string;
-  internal_trip_id?: string;
-  travel_date?: string;
-  return_date?: string;
-  airline?: string;
-  flight_number?: string;
-  hotel_mecca?: string;
-  hotel_medina?: string;
-  supervisor?: string;
-  max_capacity: number;
-  status: TravelGroupStatus;
-  notes?: string;
-  created_at: string;
-  packages?: { name: string; category?: string };
-  internal_trips?: { name: string };
-  travel_group_members?: { id: string }[];
-  member_count?: number;
-}
-
-export interface TravelGroupMember {
-  id: string;
-  group_id: string;
-  customer_id: string;
-  added_at: string;
-  notes?: string;
-  rooming_type?: 'منفرد' | 'عائلة';
-  family_id?: string;
-  room_id?: string;
-  gender?: 'ذكر' | 'أنثى';
-  customers: {
-    id: string;
-    name: string;
-    phone: string;
-    client_code: string;
-    national_id?: string;
-    passport_number?: string;
-    service_type?: string;
-    email?: string;
-    gender?: string;
-  };
-}
-
-export interface GroupFamily {
-  id: string;
-  group_id: string;
-  family_name: string;
-  created_at: string;
-}
-
-export interface GroupRoom {
-  id: string;
-  group_id: string;
-  room_number?: string;
-  room_type: 'ثنائي' | 'ثلاثي' | 'رباعي';
-  is_family: boolean;
-  family_id?: string;
-  gender?: 'رجال' | 'نساء' | 'عائلة';
   created_at: string;
 }
 
@@ -768,3 +721,21 @@ export interface VIPTripLog {
   created_at: string;
   user?: Employee;
 }
+
+export interface ApprovalRequest {
+  id: string;
+  type: string;
+  record_id: string;
+  record_type: string;
+  requested_by?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_by?: string;
+  reviewed_at?: string;
+  created_at: string;
+  record_details?: any;
+  requester?: Employee;
+  reviewer?: Employee;
+}
+
+

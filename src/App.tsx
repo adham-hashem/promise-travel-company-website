@@ -25,27 +25,26 @@ import Hotels from './pages/Hotels';
 import Invoices from './pages/Invoices';
 import Inquiries from './pages/Inquiries';
 import ClientSearch from './pages/ClientSearch';
-import ErrorBoundary from './ErrorBoundary';
 import Tasks from './pages/Tasks';
 import CalendarPage from './pages/CalendarPage';
 import ProfitAnalysis from './pages/ProfitAnalysis';
 import Suppliers from './pages/Suppliers';
 import VisaManagement from './pages/VisaManagement';
 import FlightTickets from './pages/FlightTickets';
-import SuperAdminPanel from './pages/SuperAdminPanel';
-import SalesAgentPortal from './pages/SalesAgentPortal';
 import TravelGroups from './pages/TravelGroups';
-import InternalGroups from './pages/InternalGroups';
+import Accommodation from './pages/Accommodation';
 import VIPTrips from './pages/VIPTrips';
 import VIPDetails from './pages/VIPDetails';
+import SuperAdminPanel from './pages/SuperAdminPanel';
+import SalesAgentPortal from './pages/SalesAgentPortal';
+import InternalGroups from './pages/InternalGroups';
 import QuotationForm from './pages/QuotationForm';
 import Layout from './components/Layout';
 import WebsiteRouter from './components/public/WebsiteRouter';
 import type { Page } from './types';
-import { ALL_PAGES, getRoleHomePage } from './lib/permissions';
+import type { Permissions } from './lib/permissions';
 
-
-/*
+// Maps each page to the permission required to view it
 const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   customers: 'customers_view',
   'customer-add': 'customers_add',
@@ -75,84 +74,45 @@ const PAGE_PERMISSIONS: Partial<Record<Page, keyof Permissions>> = {
   suppliers: 'reports_view',
   visa: 'bookings_view',
   'flight-tickets': 'bookings_view',
-  'super-admin': 'settings_access',
-  'vip-trips': 'vip_management_access',
-  'vip-details': 'vip_management_access',
+  'travel-groups': 'operations_access',
+  'accommodation': 'operations_access',
 };
-*/
 
 function AppInner() {
-  const { session, profile, loading, signOut, canAccessPage } = useAuth();
-  
-  const [currentPage, setCurrentPage] = useState<Page>(() => {
-    if (typeof window === 'undefined') return 'dashboard';
-    const h = window.location.hash.replace(/^#/, '').toLowerCase();
-    if (h.startsWith('/admin/')) {
-      return h.substring(7) as Page;
-    }
-    return 'dashboard';
-  });
-  
+  const { session, profile, loading, signOut, can } = useAuth();
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
   const [search, setSearch] = useState('');
-  
   const [adminRoute, setAdminRoute] = useState(() => {
     if (typeof window === 'undefined') return false;
     const h = window.location.hash.replace(/^#/, '').toLowerCase();
-    return h === '/admin' || h === '/dashboard' || h.startsWith('/admin/');
+    return h === '/admin' || h === '/dashboard';
   });
 
+  // Listen for hash changes so staff can navigate to /admin or /dashboard.
   useEffect(() => {
     const onHash = () => {
       const h = window.location.hash.replace(/^#/, '').toLowerCase();
-      const isAdmin = h === '/admin' || h === '/dashboard' || h.startsWith('/admin/');
-      setAdminRoute(isAdmin);
-      if (isAdmin && h.startsWith('/admin/')) {
-        const page = h.substring(7) as Page;
-        setCurrentPage(page);
-      }
+      setAdminRoute(h === '/admin' || h === '/dashboard');
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  useEffect(() => {
-    if (adminRoute && session && profile) {
-      window.location.hash = `/admin/${currentPage}`;
-    }
-  }, [currentPage, adminRoute, session, profile]);
-
+  // When the profile loads, if they were on a page they don't have access to, redirect
   useEffect(() => {
     if (!profile) return;
-    
-    const homePage = getRoleHomePage(profile.role);
-    const hash = window.location.hash;
-    const isRoot = !hash || hash === '#' || hash === '#/' || hash === '#/admin' || hash === '#/admin/dashboard';
-    
-    if (isRoot && currentPage === 'dashboard' && homePage !== 'dashboard') {
-      if (canAccessPage(homePage)) {
-        setCurrentPage(homePage);
-        return;
-      }
+    const requiredPerm = PAGE_PERMISSIONS[currentPage];
+    if (requiredPerm && !can(requiredPerm)) {
+      setCurrentPage('dashboard');
     }
-
-    if (!canAccessPage(currentPage)) {
-      if (canAccessPage(homePage)) {
-        setCurrentPage(homePage);
-      } else {
-        const allowed = ALL_PAGES.find(p => canAccessPage(p.key));
-        if (allowed) {
-          setCurrentPage(allowed.key);
-        } else {
-          setCurrentPage('dashboard');
-        }
-      }
-    }
-  }, [profile, currentPage]);
+  }, [profile]);
 
   const navigate = (page: Page, id?: string) => {
-    if (!canAccessPage(page)) {
-      return;
+    // Guard navigation
+    const requiredPerm = PAGE_PERMISSIONS[page];
+    if (requiredPerm && !can(requiredPerm)) {
+      return; // silently block
     }
     setCurrentPage(page);
     if (id) setSelectedCustomerId(id);
@@ -176,6 +136,8 @@ function AppInner() {
     );
   }
 
+  // Dashboard is private — only reachable via /admin or /dashboard hash route.
+  // Default (customers) view is the public website.
   if (!adminRoute) {
     return <WebsiteRouter />;
   }
@@ -184,6 +146,7 @@ function AppInner() {
     return <Login />;
   }
 
+  // Block inactive users
   if (profile.status === 'غير نشط') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-navy-950 to-navy-800 flex items-center justify-center p-4" dir="rtl">
@@ -199,52 +162,55 @@ function AppInner() {
     );
   }
 
+  const showSearch = currentPage === 'customers' || currentPage === 'bookings';
+
   return (
-    <ErrorBoundary><Layout
+    <Layout
       currentPage={currentPage}
       onNavigate={navigate}
       onLogout={logout}
-      searchValue={search}
-      onSearchChange={setSearch}
+      searchValue={showSearch ? search : undefined}
+      onSearchChange={showSearch ? setSearch : undefined}
     >
-      {currentPage === 'dashboard' && canAccessPage('dashboard') && <Dashboard />}
-      {currentPage === 'customers' && canAccessPage('customers') && <Customers onNavigate={navigate} searchValue={search} />}
-      {currentPage === 'customer-add' && canAccessPage('customer-add') && <AddCustomer onNavigate={navigate} />}
-      {currentPage === 'customer-details' && canAccessPage('customer-details') && <CustomerDetails customerId={selectedCustomerId} onNavigate={navigate} />}
-      {currentPage === 'bookings' && canAccessPage('bookings') && <Bookings searchValue={search} />}
-      {currentPage === 'packages' && canAccessPage('packages') && <Packages />}
-      {currentPage === 'offers' && canAccessPage('offers') && <Offers />}
-      {currentPage === 'employees' && canAccessPage('employees') && <Employees onNavigate={navigate} />}
-      {currentPage === 'reports' && canAccessPage('reports') && <Reports />}
-      {currentPage === 'settings' && canAccessPage('settings') && <Settings />}
-      {currentPage === 'super-admin' && canAccessPage('super-admin') && <SuperAdminPanel />}
-      {currentPage === 'internal-trips' && canAccessPage('internal-trips') && <InternalTrips />}
-      {currentPage === 'internal-bookings' && canAccessPage('internal-bookings') && <InternalTripBookings />}
-      {currentPage === 'internal-customers' && canAccessPage('internal-customers') && <InternalCustomers />}
-      {currentPage === 'internal-reports' && canAccessPage('internal-reports') && <InternalReports />}
-      {currentPage === 'revenue' && canAccessPage('revenue') && <Revenue />}
-      {currentPage === 'payments' && canAccessPage('payments') && <Payments />}
-      {currentPage === 'installments' && canAccessPage('installments') && <Installments />}
-      {currentPage === 'expenses' && canAccessPage('expenses') && <Expenses />}
-      {currentPage === 'commissions' && canAccessPage('commissions') && <Commissions />}
-      {currentPage === 'operations' && canAccessPage('operations') && <OperationsDashboard />}
-      {currentPage === 'hotels' && canAccessPage('hotels') && <Hotels />}
-      {currentPage === 'invoices' && canAccessPage('invoices') && <Invoices />}
-      {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries />}
-      {currentPage === 'client-search' && canAccessPage('client-search') && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
-      {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} />}
-      {currentPage === 'calendar' && canAccessPage('calendar') && <CalendarPage />}
-      {currentPage === 'profit' && canAccessPage('profit') && <ProfitAnalysis />}
-      {currentPage === 'suppliers' && canAccessPage('suppliers') && <Suppliers />}
-      {currentPage === 'visa' && canAccessPage('visa') && <VisaManagement onNavigate={navigate} />}
-      {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
-      {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
-      {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
-      {currentPage === 'internal-groups' && canAccessPage('internal-groups') && <InternalGroups onNavigate={navigate} />}
-      {currentPage === 'vip-trips' && canAccessPage('vip-trips') && <VIPTrips onNavigate={navigate} />}
-      {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails tripId={selectedCustomerId} onNavigate={navigate} />}
-      {currentPage === 'quotation-form' && canAccessPage('quotation-form') && <QuotationForm />}
-    </Layout></ErrorBoundary>
+      {currentPage === 'dashboard' && <Dashboard />}
+      {currentPage === 'customers' && can('customers_view') && <Customers onNavigate={navigate} searchValue={search} />}
+      {currentPage === 'customer-add' && can('customers_add') && <AddCustomer onNavigate={navigate} />}
+      {currentPage === 'customer-details' && can('customers_view') && <CustomerDetails customerId={selectedCustomerId} onNavigate={navigate} />}
+      {currentPage === 'bookings' && can('bookings_view') && <Bookings searchValue={search} />}
+      {currentPage === 'packages' && can('packages_view') && <Packages />}
+      {currentPage === 'offers' && can('offers_view') && <Offers />}
+      {currentPage === 'employees' && can('employees_view') && <Employees onNavigate={navigate} />}
+      {currentPage === 'reports' && can('reports_view') && <Reports />}
+      {currentPage === 'settings' && can('settings_access') && <Settings />}
+      {currentPage === 'internal-trips' && can('reports_view') && <InternalTrips />}
+      {currentPage === 'internal-bookings' && can('reports_view') && <InternalTripBookings />}
+      {currentPage === 'internal-customers' && can('reports_view') && <InternalCustomers />}
+      {currentPage === 'internal-reports' && can('reports_view') && <InternalReports />}
+      {currentPage === 'revenue' && can('accounting_revenue') && <Revenue />}
+      {currentPage === 'payments' && can('accounting_payments') && <Payments />}
+      {currentPage === 'installments' && can('accounting_installments') && <Installments />}
+      {currentPage === 'expenses' && can('accounting_expenses') && <Expenses />}
+      {currentPage === 'commissions' && can('accounting_commissions') && <Commissions />}
+      {currentPage === 'operations' && can('operations_access') && <OperationsDashboard />}
+      {currentPage === 'hotels' && can('hotels_view') && <Hotels />}
+      {currentPage === 'invoices' && can('invoices_view') && <Invoices />}
+      {currentPage === 'inquiries' && can('inquiries_view') && <Inquiries />}
+      {currentPage === 'client-search' && <ClientSearch onNavigate={navigate} />}
+      {currentPage === 'tasks' && can('reports_view') && <Tasks onNavigate={navigate} />}
+      {currentPage === 'calendar' && can('reports_view') && <CalendarPage />}
+      {currentPage === 'profit' && can('reports_view') && <ProfitAnalysis />}
+      {currentPage === 'suppliers' && can('reports_view') && <Suppliers />}
+      {currentPage === 'visa' && can('bookings_view') && <VisaManagement onNavigate={navigate} />}
+      {currentPage === 'flight-tickets' && can('bookings_view') && <FlightTickets onNavigate={navigate} />}
+      {currentPage === 'travel-groups' && can('operations_access') && <TravelGroups onNavigate={navigate} />}
+      {currentPage === 'accommodation' && can('operations_access') && <Accommodation onNavigate={navigate} />}
+      {currentPage === 'vip-trips' && can('vip_management_access') && <VIPTrips onNavigate={navigate} />}
+      {currentPage === 'vip-details' && can('vip_management_access') && <VIPDetails tripId={selectedCustomerId} onNavigate={navigate} />}
+      {currentPage === 'super-admin' && can('settings_access') && <SuperAdminPanel />}
+      {currentPage === 'sales-portal' && can('inquiries_view') && <SalesAgentPortal />}
+      {currentPage === 'internal-groups' && can('operations_access') && <InternalGroups onNavigate={navigate} />}
+      {currentPage === 'quotation-form' && can('inquiries_view') && <QuotationForm />}
+    </Layout>
   );
 }
 
@@ -255,3 +221,5 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+

@@ -2,7 +2,7 @@ import ServicePage from './ServicePage';
 import type { PublicPage, NavigateProps } from '../../components/public/WebsiteRouter';
 
 interface Props {
-  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
+  onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }) => void;
 }
 
 export default function UmrahPage({ onNavigate }: Props) {

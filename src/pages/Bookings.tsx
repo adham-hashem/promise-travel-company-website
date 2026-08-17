@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CalendarCheck, Clock, XCircle, Eye, Globe, Download } from 'lucide-react';
+import { CalendarCheck, Clock, XCircle, Eye, Globe } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Booking, BookingStatus } from '../types';
 import BookingDetailsModal from '../components/BookingDetailsModal';
 
@@ -21,7 +20,13 @@ const paymentColors: Record<string, string> = {
   'غير مدفوع': 'bg-gray-100 text-gray-600',
 };
 
-
+const MOCK: Booking[] = [
+  { id: '1', customer_id: 'c1', status: 'مؤكد', payment_status: 'مدفوع بالكامل', total_amount: 18000, paid_amount: 18000, booking_date: '2026-06-10', created_at: '2026-06-10', customers: { id: 'c1', name: 'محمد عبد الرحمن', phone: '01012345678', status: 'تم الحجز', created_at: '' }, packages: { id: 'p1', name: 'باقة عمرة رمضان', type: 'عمرة', price: 18000, is_active: true, created_at: '' } },
+  { id: '2', customer_id: 'c2', status: 'معلق', payment_status: 'مدفوع جزئياً', total_amount: 15000, paid_amount: 5000, booking_date: '2026-06-12', created_at: '2026-06-12', customers: { id: 'c2', name: 'سارة أحمد إبراهيم', phone: '01123456789', status: 'متابعة', created_at: '' }, packages: { id: 'p2', name: 'باقة العمرة الفاخرة', type: 'عمرة', price: 15000, is_active: true, created_at: '' } },
+  { id: '3', customer_id: 'c3', status: 'مؤكد', payment_status: 'مدفوع بالكامل', total_amount: 45000, paid_amount: 45000, booking_date: '2026-05-20', created_at: '2026-05-20', customers: { id: 'c3', name: 'عمر خالد الفيومي', phone: '01234567890', status: 'مكتمل', created_at: '' }, packages: { id: 'p4', name: 'باقة الحج الفاخرة', type: 'حج', price: 45000, is_active: true, created_at: '' } },
+  { id: '4', customer_id: 'c4', status: 'ملغي', payment_status: 'غير مدفوع', total_amount: 8500, paid_amount: 0, booking_date: '2026-06-01', created_at: '2026-06-01', customers: { id: 'c4', name: 'نور الدين عمر', phone: '01345678901', status: 'ملغي', created_at: '' }, packages: { id: 'p1', name: 'باقة العمرة الاقتصادية', type: 'عمرة', price: 8500, is_active: true, created_at: '' } },
+  { id: '5', customer_id: 'c5', status: 'معلق', payment_status: 'غير مدفوع', total_amount: 25000, paid_amount: 0, booking_date: '2026-06-18', created_at: '2026-06-18', customers: { id: 'c5', name: 'هدى محمود عمر', phone: '01456789012', status: 'متابعة', created_at: '' }, packages: { id: 'p3', name: 'باقة الحج الاقتصادية', type: 'حج', price: 25000, is_active: true, created_at: '' } },
+];
 
 interface Props { searchValue: string; }
 
@@ -37,40 +42,12 @@ export default function Bookings({ searchValue }: Props) {
         .from('bookings')
         .select('*, customers(*), packages(*)')
         .order('created_at', { ascending: false });
-      setBookings((data as Booking[]) || []);
+      if (data && data.length > 0) setBookings(data as Booking[]);
+      else setBookings(MOCK);
       setLoading(false);
     }
     load();
   }, []);
-
-  const handleExportExcel = () => {
-    const data = filtered.map(b => ({
-      'اسم العميل': b.customers?.name || '—',
-      'المصدر': b.source || '—',
-      'الباقة': b.packages?.name || '—',
-      'حالة الحجز': b.status,
-      'حالة الدفع': b.payment_status || 'غير مدفوع',
-      'المبلغ الإجمالي': b.total_amount,
-      'المدفوع': b.paid_amount || 0,
-      'تاريخ الحجز': new Date(b.created_at).toLocaleDateString('ar-EG'),
-    }));
-    exportToExcel(data, 'الحجوزات');
-  };
-
-  const handleExportPDF = () => {
-    const headers = ['اسم العميل', 'المصدر', 'الباقة', 'حالة الحجز', 'حالة الدفع', 'المبلغ الإجمالي', 'المدفوع', 'تاريخ الحجز'];
-    const rows = filtered.map(b => [
-      b.customers?.name || '—',
-      b.source || '—',
-      b.packages?.name || '—',
-      b.status,
-      b.payment_status || 'غير مدفوع',
-      `${b.total_amount} ج.م`,
-      `${b.paid_amount || 0} ج.م`,
-      new Date(b.created_at).toLocaleDateString('ar-EG'),
-    ]);
-    exportToPDF('تقرير الحجوزات', headers, rows);
-  };
 
   const filtered = bookings.filter((b) => {
     const matchSearch = !searchValue || b.customers?.name?.includes(searchValue);
@@ -118,15 +95,7 @@ export default function Bookings({ searchValue }: Props) {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={handleExportExcel} className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-              <Download size={13} /> Excel
-            </button>
-            <button onClick={handleExportPDF} className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1 border-red-200 text-red-700 hover:bg-red-50">
-              <Download size={13} /> PDF
-            </button>
-            <p className="text-sm text-gray-500 font-bold">{filtered.length} حجز</p>
-          </div>
+          <p className="text-sm text-gray-500">{filtered.length} حجز</p>
         </div>
 
         {loading ? (
@@ -157,14 +126,7 @@ export default function Bookings({ searchValue }: Props) {
                         <div className="w-8 h-8 rounded-lg bg-gradient-navy flex items-center justify-center text-white font-bold text-xs">
                           {b.customers?.name?.charAt(0)}
                         </div>
-                        <div>
-                          <span className="font-semibold text-gray-800 block">{b.customers?.name}</span>
-                          {b.source === 'Website' && (b.customers as any)?.sales_agent_submitted === false && (
-                            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
-                              طلب موقع معلق ⚡
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-semibold text-gray-800">{b.customers?.name}</span>
                       </div>
                     </td>
                     <td>
@@ -172,8 +134,6 @@ export default function Bookings({ searchValue }: Props) {
                         <span className="badge bg-gold-100 text-gold-700 flex items-center gap-1 w-fit">
                           <Globe size={10} /> موقع
                         </span>
-                      ) : b.source ? (
-                        <span className="badge bg-gray-100 text-gray-600">{b.source.replace(/^مندوب:\s*/, '')}</span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

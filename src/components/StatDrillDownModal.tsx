@@ -180,32 +180,30 @@ export default function StatDrillDownModal({ type, onClose }: Props) {
                 <p className="font-medium">لا توجد مهام {type === 'overdue' ? 'متأخرة' : 'لليوم'}</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full data-table">
-                  <thead>
-                    <tr>
-                      <th>المهمة</th><th>الموظف</th><th>تاريخ الاستحقاق</th><th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tasks
-                      .filter((t) =>
-                        !search ||
-                        t.title.includes(search) ||
-                        (t.employees?.name || '').includes(search),
-                      )
-                      .map((t) => (
-                        <tr key={t.id}>
-                          <td><p className="font-semibold text-gray-800 text-sm">{t.title}</p>
-                            {t.description && <p className="text-xs text-gray-400">{t.description}</p>}</td>
-                          <td className="text-gray-600 text-sm">{t.employees?.name || '—'}</td>
-                          <td className="text-gray-500 text-xs">{new Date(t.due_date).toLocaleDateString('ar-EG')}</td>
-                          <td><span className={`badge ${getTaskColor(t.status)}`}>{t.status}</span></td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+              <table className="w-full data-table">
+                <thead>
+                  <tr>
+                    <th>المهمة</th><th>الموظف</th><th>تاريخ الاستحقاق</th><th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks
+                    .filter((t) =>
+                      !search ||
+                      t.title.includes(search) ||
+                      (t.employees?.name || '').includes(search),
+                    )
+                    .map((t) => (
+                      <tr key={t.id}>
+                        <td><p className="font-semibold text-gray-800 text-sm">{t.title}</p>
+                          {t.description && <p className="text-xs text-gray-400">{t.description}</p>}</td>
+                        <td className="text-gray-600 text-sm">{t.employees?.name || '—'}</td>
+                        <td className="text-gray-500 text-xs">{new Date(t.due_date).toLocaleDateString('ar-EG')}</td>
+                        <td><span className={`badge ${getTaskColor(t.status)}`}>{t.status}</span></td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             )
           ) : type === 'bookings' ? (
             filteredBookings.length === 0 ? (
@@ -213,27 +211,25 @@ export default function StatDrillDownModal({ type, onClose }: Props) {
                 <p className="font-medium">لا توجد حجوزات في هذه الفترة</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full data-table">
-                  <thead>
-                    <tr>
-                      <th>العميل</th><th>الباقة</th><th>الموظف</th><th>التاريخ</th><th>الحالة</th><th>القيمة</th>
+              <table className="w-full data-table">
+                <thead>
+                  <tr>
+                    <th>العميل</th><th>الباقة</th><th>الموظف</th><th>التاريخ</th><th>الحالة</th><th>القيمة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBookings.slice(0, 100).map((b) => (
+                    <tr key={b.id}>
+                      <td className="font-semibold text-gray-800 text-sm">{b.customers?.name || '—'}</td>
+                      <td className="text-gray-600 text-xs">{b.packages?.name || '—'}</td>
+                      <td className="text-gray-600 text-xs">{empName(b.employee_id)}</td>
+                      <td className="text-gray-500 text-xs">{new Date(b.booking_date || b.created_at).toLocaleDateString('ar-EG')}</td>
+                      <td><span className={`badge ${getBookingColor(b.status)}`}>{b.status}</span></td>
+                      <td className="text-gray-700 text-xs font-semibold">{Number(b.total_amount || 0).toLocaleString('ar-EG')} ج.م</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBookings.slice(0, 100).map((b) => (
-                      <tr key={b.id}>
-                        <td className="font-semibold text-gray-800 text-sm">{b.customers?.name || '—'}</td>
-                        <td className="text-gray-600 text-xs">{b.packages?.name || '—'}</td>
-                        <td className="text-gray-600 text-xs">{empName(b.employee_id)}</td>
-                        <td className="text-gray-500 text-xs">{new Date(b.booking_date || b.created_at).toLocaleDateString('ar-EG')}</td>
-                        <td><span className={`badge ${getBookingColor(b.status)}`}>{b.status}</span></td>
-                        <td className="text-gray-700 text-xs font-semibold">{Number(b.total_amount || 0).toLocaleString('ar-EG')} ج.م</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             )
           ) : type === 'clients' ? (
             customers.length === 0 ? (
@@ -241,34 +237,32 @@ export default function StatDrillDownModal({ type, onClose }: Props) {
                 <p className="font-medium">لا يوجد عملاء</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full data-table">
-                  <thead>
-                    <tr>
-                      <th>العميل</th><th>الهاتف</th><th>المحافظة</th><th>الموظف المسؤول</th><th>الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {customers
-                      .filter((c) =>
-                        !search ||
-                        c.name.includes(search) ||
-                        (c.phone || '').includes(search) ||
-                        (c.employees?.name || '').includes(search),
-                      )
-                      .slice(0, 200)
-                      .map((c) => (
-                        <tr key={c.id}>
-                          <td className="font-semibold text-gray-800 text-sm">{c.name}</td>
-                          <td className="text-gray-600 text-xs" dir="ltr">{c.phone || '—'}</td>
-                          <td className="text-gray-600 text-xs">{c.governorate || '—'}</td>
-                          <td className="text-gray-600 text-xs">{c.employees?.name || '—'}</td>
-                          <td><span className={`badge ${getCustomerColor(c.status)}`}>{c.status}</span></td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+              <table className="w-full data-table">
+                <thead>
+                  <tr>
+                    <th>العميل</th><th>الهاتف</th><th>المحافظة</th><th>الموظف المسؤول</th><th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers
+                    .filter((c) =>
+                      !search ||
+                      c.name.includes(search) ||
+                      (c.phone || '').includes(search) ||
+                      (c.employees?.name || '').includes(search),
+                    )
+                    .slice(0, 200)
+                    .map((c) => (
+                      <tr key={c.id}>
+                        <td className="font-semibold text-gray-800 text-sm">{c.name}</td>
+                        <td className="text-gray-600 text-xs" dir="ltr">{c.phone || '—'}</td>
+                        <td className="text-gray-600 text-xs">{c.governorate || '—'}</td>
+                        <td className="text-gray-600 text-xs">{c.employees?.name || '—'}</td>
+                        <td><span className={`badge ${getCustomerColor(c.status)}`}>{c.status}</span></td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             )
           ) : null}
         </div>
