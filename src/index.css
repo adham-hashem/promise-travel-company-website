@@ -120,3 +120,88 @@ body {
 .animate-slideIn {
   animation: slideIn 0.3s ease-out forwards;
 }
+
+/* Public site gradients and utilities */
+.bg-gradient-emerald {
+  background: linear-gradient(135deg, #022c22 0%, #065f46 100%);
+}
+
+.bg-gradient-emerald-soft {
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+}
+
+.gradient-emerald {
+  background: linear-gradient(135deg, #022c22 0%, #065f46 100%);
+}
+
+.gradient-emerald-soft {
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+}
+
+.public-section {
+  @apply py-20;
+}
+
+.public-card {
+  @apply bg-white rounded-3xl shadow-sm border border-gray-100 transition-all duration-300;
+}
+
+.public-card:hover {
+  @apply shadow-xl -translate-y-1;
+}
+
+.public-hero-overlay {
+  background: linear-gradient(to top, rgba(2, 44, 34, 0.92) 0%, rgba(6, 78, 59, 0.65) 45%, rgba(6, 78, 59, 0.2) 100%);
+}
+
+.public-btn-gold {
+  @apply bg-gradient-gold text-emerald-950 font-black rounded-xl shadow-lg transition-all duration-300;
+}
+
+.public-btn-gold:hover {
+  @apply shadow-xl scale-105;
+}
+
+.public-btn-outline {
+  @apply border-2 border-emerald-950 text-emerald-950 font-bold rounded-xl transition-all duration-300;
+}
+
+.public-btn-outline:hover {
+  @apply bg-emerald-950 text-white;
+}
+
+.public-input {
+  @apply w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent transition-all duration-200 focus:bg-white;
+}
+
+.public-eyebrow {
+  @apply inline-flex items-center gap-2 text-gold-600 font-bold text-sm;
+}
+
+.public-heading {
+  @apply text-3xl md:text-4xl font-black text-emerald-950;
+}
+
+.public-body {
+  @apply text-gray-500 leading-relaxed;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(212,160,23,0.15), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}

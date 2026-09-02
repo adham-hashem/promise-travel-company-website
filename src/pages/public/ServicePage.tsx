@@ -1,184 +1,109 @@
 import { useEffect, useState } from 'react';
-import { Clock, Hotel, Plane, ArrowLeft, Loader2, MapPin } from 'lucide-react';
+import { Clock, Hotel, Plane, Star, ArrowLeft, Loader2, MapPin, Link2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
+import ShareButton from '../../components/public/ShareButton';
+import { packageShareUrl } from '../../lib/share-urls';
 
 interface Props {
-  type?: 'حج' | 'عمرة';
+  type: 'حج' | 'عمرة';
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
 }
 
 const heroByType = {
-  حج: {
-    img: '/صفحة الحج .webp',
-    title: 'باقات الحج',
-    subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
-  },
-  عمرة: {
-    img: '/صفحة العمرة.webp',
-    title: 'باقات العمرة',
-    subtitle: 'اختر الباقة المناسبة لك وابدأ رحلتك المباركة.',
-  },
+  'حج': { img: 'https://images.pexels.com/photos/35332386/pexels-photo-35332386.jpeg?auto=compress&cs=tinysrgb&w=1920', title: 'برامج الحج المتكاملة', subtitle: 'فريضة العمر بأيدٍ أمينة، إقامة مريحة وإشراف متخصص' },
+  'عمرة': { img: 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=1920', title: 'برامج العمرة على مدار العام', subtitle: 'عمرة مريحة بأفضل الفنادق وأقربها للحرم الشريف' },
 };
+
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
+      className="w-full mt-2 flex items-center justify-center gap-1.5 text-gray-400 hover:text-gold-600 font-medium text-[11px] py-1.5 rounded-lg hover:bg-gray-50 transition-all"
+    >
+      {copied ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Link2 size={12} />}
+      {copied ? 'تم نسخ الرابط' : 'نسخ رابط الباقة'}
+    </button>
+  );
+}
 
 export default function ServicePage({ type, onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[]>([]);
-  const [expandedPackages, setExpandedPackages] = useState<Record<string, boolean>>({});
-  const toggleExpand = (id: string) => setExpandedPackages(prev => ({ ...prev, [id]: !prev[id] }));
   const [loading, setLoading] = useState(true);
-  const hero = heroByType[type || 'حج'];
+  const hero = heroByType[type];
 
   useEffect(() => {
     (async () => {
-      const query = supabase.from('packages').select('*').eq('is_active', true).order('created_at', { ascending: false });
-
-      const { data } = type ? await query.eq('type', type) : await query.in('type', ['حج', 'عمرة']);
-
+      const { data } = await supabase.from('packages').select('*').eq('is_active', true).eq('type', type).order('created_at', { ascending: false });
       setPackages((data as Package[]) || []);
       setLoading(false);
     })();
   }, [type]);
 
-  const visiblePackages = packages;
+  const features = type === 'حج' ? ['إقامة قرب المشاعر المقدسة', 'مرشد ديني متخصص', 'نقل مكيف بين المشاعر', 'وجبات إفطار وسحور'] : ['فنادق قريبة من الحرم', 'تأشيرة عمرة معتمدة', 'تذاكر طيران ذهاب وعودة', 'نقل من وإلى المطار'];
 
   return (
     <div>
-      {/* Hero */}
-      <section className="relative h-[60vh] min-h-[420px] overflow-hidden">
-        <img src={hero.img} alt={hero.title} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-white/10" />
-        <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-16 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-white/20 backdrop-blur border border-white/30 text-white px-4 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
-            <MapPin size={12} /> {type === 'حج' ? 'مكة المكرمة والمشاعر' : 'مكة المكرمة والمدينة'}
-          </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3 drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]">{hero.title}</h1>
-          <p className="text-white text-lg max-w-2xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">{hero.subtitle}</p>
+      <section className="relative min-h-[420px] overflow-hidden">
+        <img src={hero.img} alt={hero.title} className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 public-hero-overlay" />
+        <div className="relative max-w-7xl mx-auto px-4 py-28 text-white">
+          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4"><MapPin size={12} /> {type === 'حج' ? 'مكة المكرمة والمشاعر' : 'مكة المكرمة والمدينة'}</span>
+          <h1 className="text-3xl md:text-5xl font-black mb-3">{hero.title}</h1>
+          <p className="text-white/80 text-lg max-w-2xl">{hero.subtitle}</p>
         </div>
       </section>
 
-      <section className="bg-[#F8F9FB] py-10">
+      <section className="bg-emerald-50 py-6 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {features.map((f) => (
+            <div key={f} className="flex items-center gap-2 text-emerald-950"><div className="w-8 h-8 rounded-lg bg-gradient-gold flex items-center justify-center text-emerald-950 flex-shrink-0"><Star size={14} fill="currentColor" /></div><span className="text-xs font-semibold">{f}</span></div>
+          ))}
+        </div>
+      </section>
+
+      <section className="py-16">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-black text-[#0B1F44]">{hero.title}</h2>
-              <p className="mt-1 text-sm text-[#0B1F44]/60">{hero.subtitle}</p>
-            </div>
-            <button
-              onClick={() => onNavigate('offers')}
-              className="flex items-center gap-1 text-sm font-bold text-[#D4A017] transition-all hover:gap-2"
-            >
-              عرض العروض <ArrowLeft size={14} />
-            </button>
+          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+            <div><h2 className="text-2xl md:text-3xl font-black text-emerald-950">باقات {type} المتاحة</h2><p className="text-gray-500 text-sm mt-1">اختر الباقة المناسبة لك وابدأ رحلتك المباركة</p></div>
+            <button onClick={() => onNavigate('offers')} className="text-gold-600 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">عرض العروض <ArrowLeft size={14} /></button>
           </div>
-
           {loading ? (
-            <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-[#0B1F44]" /></div>
-          ) : visiblePackages.length === 0 ? (
-            <div className="rounded-[24px] border border-[#0B1F44]/10 bg-white py-16 text-center shadow-[0_20px_60px_-22px_rgba(11,31,68,0.18)]">
-              <Plane size={48} className="mx-auto mb-3 opacity-30 text-[#0B1F44]" />
-              <p className="font-medium text-[#0B1F44]">لا توجد باقات متاحة حالياً</p>
-              <p className="mt-1 text-sm text-[#0B1F44]/60">سيتم إضافتها قريباً بإذن الله</p>
-            </div>
+            <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-gold-600" /></div>
+          ) : packages.length === 0 ? (
+            <div className="text-center py-16 text-gray-400"><Plane size={48} className="mx-auto mb-3 opacity-30" /><p className="font-medium">لا توجد باقات متاحة حالياً</p><p className="text-sm mt-1">سيتم إضافتها قريباً بإذن الله</p></div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              {visiblePackages.map((p) => (
-                <article
-                  key={p.id}
-                  className="group flex h-full flex-col overflow-hidden rounded-[20px] border border-[#0B1F44]/10 bg-white shadow-[0_16px_45px_-22px_rgba(11,31,68,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_-20px_rgba(11,31,68,0.35)]"
-                >
-                  <div className="relative h-[220px] overflow-hidden">
-                    <img
-                      src={p.image_url || 'https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=800'}
-                      alt={p.name}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F44]/90 via-[#0B1F44]/15 to-transparent" />
-                    {p.featured ? (
-                      <span className="absolute right-3 top-3 rounded-full bg-[#D4A017] px-2.5 py-1 text-[10px] font-black text-[#0B1F44] shadow-lg">
-                        مميزة
-                      </span>
-                    ) : null}
-                    <div className="absolute inset-x-0 bottom-0 p-4">
-                      <h3 className="text-lg font-black text-white">{p.name}</h3>
-                    </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {packages.map((p) => {
+                const pkgUrl = packageShareUrl(p.id);
+                return (
+                <div key={p.id} className="public-card overflow-hidden">
+                  <div className="relative h-52 overflow-hidden">
+                    <img src={p.image_url || 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    {p.featured && <span className="absolute top-3 right-3 bg-gradient-gold text-emerald-950 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><Star size={10} fill="currentColor" /> مميزة</span>}
+                    <div className="absolute top-3 left-3" onClick={(e) => e.stopPropagation()}><ShareButton title={p.name} compact shareUrl={pkgUrl} /></div>
                   </div>
-
-                  <div className="flex flex-1 flex-col p-4">
-                     {p.description ? (
-                      <div className="text-right mb-3">
-                        <p className="text-sm leading-relaxed text-[#0B1F44]/60">
-                          {p.description.length > 80
-                            ? p.description.slice(0, 80) + '...'
-                            : p.description}
-                        </p>
-                        <div className="flex justify-center mt-3">
-                          <button
-                            type="button"
-                            onClick={() => onNavigate('package-details', undefined, p.id)}
-                            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#D4A017] bg-[#D4A017]/15 hover:bg-[#D4A017]/25 px-5 py-2 rounded-full transition-all focus:outline-none border border-[#D4A017]/30 shadow-md hover:scale-105 active:scale-95"
-                          >
-                            ▼ عرض المزيد
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="mt-3 space-y-2.5 text-sm text-[#0B1F44]/70">
-                      {p.duration_days ? (
-                        <div className="flex items-center gap-2">
-                          <Clock size={13} className="text-[#D4A017]" />
-                          <span>{p.duration_days} يوم</span>
-                        </div>
-                      ) : null}
-                      {p.hotel_makkah ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#D4A017] text-xs">🕋</span>
-                          <span>فندق مكة: {p.hotel_makkah}</span>
-                        </div>
-                      ) : null}
-                      {p.hotel_madinah ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#D4A017] text-xs">🕌</span>
-                          <span>فندق المدينة: {p.hotel_madinah}</span>
-                        </div>
-                      ) : null}
-                      {!p.hotel_makkah && !p.hotel_madinah && p.hotel ? (
-                        <div className="flex items-center gap-2">
-                          <Hotel size={13} className="text-[#D4A017]" />
-                          <span>{p.hotel}</span>
-                        </div>
-                      ) : null}
-                      {p.airline ? (
-                        <div className="flex items-center gap-2">
-                          <Plane size={13} className="text-[#D4A017]" />
-                          <span>{p.airline}</span>
-                        </div>
-                      ) : null}
+                  <div className="p-5">
+                    <h3 className="font-black text-emerald-950 text-lg mb-3">{p.name}</h3>
+                    {p.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>}
+                    <div className="space-y-2 text-xs text-gray-600 mb-4">
+                      {p.duration_days && <div className="flex items-center gap-2"><Clock size={13} className="text-gold-600" /> {p.duration_days} يوم</div>}
+                      {p.hotel && <div className="flex items-center gap-2"><Hotel size={13} className="text-gold-600" /> {p.hotel}</div>}
+                      {p.airline && <div className="flex items-center gap-2"><Plane size={13} className="text-gold-600" /> {p.airline}</div>}
                     </div>
-
-                    <div className="mt-4 rounded-[16px] border border-[#0B1F44]/10 bg-[#F8F9FB] p-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#0B1F44]/45">ابتداءً من</p>
-                      <p className="mt-1 text-xl font-black text-[#D4A017]">
-                        {Number((() => {
-                          if (Number(p.price) > 0) return Number(p.price);
-                          const roomPrices = [p.price_double, p.price_triple, p.price_quad].filter(x => Number(x) > 0);
-                          return roomPrices.length > 0 ? Math.min(...roomPrices) : 0;
-                        })()).toLocaleString('ar-EG')}
-                        <span className="ml-1 text-sm font-semibold text-[#0B1F44]/75">ج.م</span>
-                      </p>
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 mb-3">
+                      <div><p className="text-xs text-gray-400">يبدأ من</p><p className="font-black text-emerald-950 text-lg">{Number(p.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p></div>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })}
-                      className="mt-4 w-full rounded-full bg-[#D4A017] px-3 py-2.5 text-sm font-black text-[#0B1F44] shadow-[0_10px_25px_-12px_rgba(212,160,23,0.8)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#C08F0F]"
-                    >
-                      احجز الآن
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => onNavigate('package-details', undefined, p.id)} className="flex-1 bg-emerald-950 text-white font-bold text-xs px-3 py-2.5 rounded-xl hover:bg-emerald-900 transition-all">عرض التفاصيل</button>
+                      <button onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })} className="flex-1 bg-gradient-gold text-emerald-950 font-bold text-xs px-3 py-2.5 rounded-xl hover:shadow-lg transition-all">احجز الآن</button>
+                    </div>
+                    <CopyLinkButton url={pkgUrl} />
                   </div>
-                </article>
-              ))}
+                </div>
+              );})}
             </div>
           )}
         </div>
