@@ -166,11 +166,23 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-navy-950 to-navy-800 flex items-center justify-center" dir="rtl">
-        <div className="flex flex-col items-center gap-4">
-          <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise" className="w-16 h-16 rounded-2xl object-contain bg-white p-1 shadow-lg" />
-          <div className="w-8 h-8 border-4 border-gold-400/30 border-t-gold-400 rounded-full animate-spin" />
-          <p className="text-white/60 text-sm">جارٍ التحميل...</p>
+      <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-800 flex items-center justify-center px-4" dir="rtl">
+        <div className="relative flex flex-col items-center gap-5 text-center">
+          <div className="absolute -inset-10 rounded-full bg-gold-400/10 blur-3xl" />
+          <div className="relative h-24 w-24 rounded-3xl bg-white/95 p-2 shadow-2xl ring-1 ring-gold-300/40">
+            <img
+              src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg"
+              alt="Promise Travel"
+              className="h-full w-full rounded-2xl object-cover"
+            />
+          </div>
+          <div className="relative flex flex-col items-center gap-3">
+            <div className="h-9 w-9 rounded-full border-4 border-gold-300/25 border-t-gold-300 animate-spin" />
+            <div>
+              <p className="text-white font-black text-lg">Promise</p>
+              <p className="text-gold-200/90 text-sm font-semibold">جارٍ التحميل...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
