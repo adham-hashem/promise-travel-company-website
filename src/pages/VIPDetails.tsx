@@ -76,6 +76,7 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
         client_type: 'فردي',
         is_vip: true,
         vip_trip_id: tripId,
+        assigned_employee_id: trip?.assigned_employee_id || null,
         status: 'جديد',
         source: 'رحلة VIP',
         service_type: 'حج'

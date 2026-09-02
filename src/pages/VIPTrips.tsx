@@ -31,11 +31,23 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
   const loadData = async () => {
     setLoading(true);
     try {
+      const roleStr = (profile?.role as string) || '';
+      const canSeeAllVipTrips =
+        roleStr === 'super_admin' ||
+        roleStr === 'superadmin' ||
+        roleStr === 'مالك النظام' ||
+        roleStr === 'مدير النظام';
+      let tripsQuery = supabase
+        .from('vip_trips')
+        .select('*, assigned_employee:user_profiles!vip_trips_assigned_employee_id_fkey(*), customers(count)')
+        .order('created_at', { ascending: false });
+
+      if (!canSeeAllVipTrips && profile?.id) {
+        tripsQuery = tripsQuery.eq('assigned_employee_id', profile.id);
+      }
+
       const [tripsRes, empRes] = await Promise.all([
-        supabase
-          .from('vip_trips')
-          .select('*, assigned_employee:user_profiles!vip_trips_assigned_employee_id_fkey(*), customers(count)')
-          .order('created_at', { ascending: false }),
+        tripsQuery,
         supabase.from('employees').select('*').eq('is_active', true)
       ]);
 

@@ -169,7 +169,10 @@ export default function AddCustomer({ onNavigate }: Props) {
     setError('');
 
     try {
-      const assignedEmp = employees.find(e => e.id === form.assigned_employee_id);
+      const effectiveAssignedEmployeeId = isVip
+        ? (vipForm.assigned_vip_manager || form.assigned_employee_id)
+        : form.assigned_employee_id;
+      const assignedEmp = employees.find(e => e.id === effectiveAssignedEmployeeId);
       const isSalesAgent = assignedEmp?.role === 'مندوب مبيعات' || assignedEmp?.role === 'مدير المبيعات';
 
       const { data: customer, error: custErr } = await supabase
@@ -181,7 +184,7 @@ export default function AddCustomer({ onNavigate }: Props) {
           email: form.email || null,
           service_type: form.service_type || null,
           requested_package_id: isVip ? null : (form.requested_package_id || null),
-          assigned_employee_id: form.assigned_employee_id || null,
+          assigned_employee_id: effectiveAssignedEmployeeId || null,
           status: form.status,
           source: isSalesAgent 
             ? (form.source ? (form.source.startsWith('مندوب:') || form.source === 'مندوب مبيعات' ? form.source : 'مندوب: ' + form.source) : 'مندوب مبيعات')
@@ -236,7 +239,7 @@ export default function AddCustomer({ onNavigate }: Props) {
             additional_services: vipForm.additional_services || null,
             travelers_count: Number(vipForm.travelers_count) || 1,
             special_notes: vipForm.special_notes || null,
-            assigned_vip_manager: vipForm.assigned_vip_manager || form.assigned_employee_id || null,
+            assigned_vip_manager: effectiveAssignedEmployeeId || null,
           });
 
         if (vipErr) {
