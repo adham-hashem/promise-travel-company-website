@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Loader2, CheckCircle2, Moon, Plane, MapPin, Hotel as HotelIcon,
-  User, Phone, Mail, FileText, Send, Calendar, Users, Upload,
+  User, Phone, Mail, FileText, Send, Users, Upload,
   Eye, Trash2, Globe, Hash, BedDouble, Baby,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -347,23 +347,23 @@ export default function BookingPage({ preset, onDone }: Props) {
                     <div>
                       <label className="form-label">عدد البالغين</label>
                       <div className="relative">
-                        <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pr-12 pl-4 bg-white" dir="ltr" />
+                        <User size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left" dir="ltr" />
                       </div>
                     </div>
                     <div>
                       <label className="form-label">عدد الأطفال {hasPrice(selectedPackage.price_child) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_child).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pr-12 pl-4 bg-white disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
+                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_child) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر طفل لهذه الباقة</p>}
                     </div>
                     <div>
                       <label className="form-label">عدد الرضع {hasPrice(selectedPackage.price_infant) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_infant).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pr-12 pl-4 bg-white disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
+                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_infant) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر رضيع لهذه الباقة</p>}
                     </div>
@@ -442,17 +442,14 @@ export default function BookingPage({ preset, onDone }: Props) {
                   <div>
                     <label className="form-label">عدد الأفراد</label>
                     <div className="relative">
-                      <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                      <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="1" dir="ltr" />
+                      <Users size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+                      <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pl-12 pr-4 text-left" placeholder="1" dir="ltr" />
                     </div>
                   </div>
                 ) : null}
                 <div className={form.service_type === 'حج' || form.service_type === 'عمرة' ? 'sm:col-span-2' : ''}>
                   <label className="form-label">تاريخ السفر المفضل</label>
-                  <div className="relative">
-                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-12 pl-4 text-left" dir="ltr" />
-                  </div>
+                  <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input px-4 text-left" dir="ltr" />
                 </div>
               </div>
 
