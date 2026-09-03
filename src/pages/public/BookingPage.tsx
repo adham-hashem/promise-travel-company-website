@@ -353,23 +353,23 @@ export default function BookingPage({ preset, onDone }: Props) {
                     <div>
                       <label className="form-label">عدد البالغين</label>
                       <div className="relative">
-                        <User size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left" dir="ltr" />
+                        <User size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left" dir="ltr" />
                       </div>
                     </div>
                     <div>
                       <label className="form-label">عدد الأطفال {hasPrice(selectedPackage.price_child) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_child).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
+                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_child) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر طفل لهذه الباقة</p>}
                     </div>
                     <div>
                       <label className="form-label">عدد الرضع {hasPrice(selectedPackage.price_infant) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_infant).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pl-12 pr-4 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
+                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_infant) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر رضيع لهذه الباقة</p>}
                     </div>
