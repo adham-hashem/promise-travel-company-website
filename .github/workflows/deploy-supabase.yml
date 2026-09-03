@@ -44,15 +44,22 @@ jobs:
 
       - name: Push Database Migrations
         env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "Pushing migrations through SUPABASE_DB_URL..."
+            supabase db push --db-url "$SUPABASE_DB_URL"
+            exit 0
+          fi
+
           if [ -z "$SUPABASE_PROJECT_ID" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
-            echo "SUPABASE_PROJECT_ID or SUPABASE_DB_PASSWORD is missing."
+            echo "SUPABASE_DB_URL is missing, and SUPABASE_PROJECT_ID or SUPABASE_DB_PASSWORD is missing."
             exit 1
           fi
 
           DB_PASSWORD_ENCODED=$(python -c 'import os; from urllib.parse import quote; print(quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')
 
-          echo "Pushing migrations directly to Supabase database..."
+          echo "SUPABASE_DB_URL is not set. Falling back to direct database host..."
           supabase db push --db-url "postgresql://postgres:${DB_PASSWORD_ENCODED}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
