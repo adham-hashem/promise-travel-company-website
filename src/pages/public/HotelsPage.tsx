@@ -69,12 +69,12 @@ export default function HotelsPage({ onNavigate }: Props) {
               {cities.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <div className="relative col-span-2">
-              <Search size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="اسم الفندق" className="public-input pr-9" />
+              <Search size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="اسم الفندق" className="public-input pl-10 pr-4 text-right" dir="rtl" />
             </div>
-            <div className="relative"><Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" /><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} dir="ltr" className="public-input pr-9" /></div>
-            <div className="relative"><Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" /><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} dir="ltr" className="public-input pr-9" /></div>
-            <div className="relative"><Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" /><input type="number" min="1" value={guests} onChange={(e) => setGuests(e.target.value)} className="public-input pr-9" placeholder="الأشخاص" /></div>
+            <div className="relative"><Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" /><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} dir="ltr" className="public-input pr-10 pl-4 text-left" /></div>
+            <div className="relative"><Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" /><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} dir="ltr" className="public-input pr-10 pl-4 text-left" /></div>
+            <div className="relative"><Users size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" /><input type="number" min="1" value={guests} onChange={(e) => setGuests(e.target.value)} className="public-input pl-10 pr-4 text-right" placeholder="الأشخاص" dir="rtl" /></div>
           </div>
           <div className="flex items-center gap-3 mt-3">
             <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${activeFilters > 0 ? 'bg-emerald-950 text-white' : 'bg-gray-100 text-emerald-950 hover:bg-gray-200'}`}>
