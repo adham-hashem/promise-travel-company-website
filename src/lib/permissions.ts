@@ -95,6 +95,7 @@ export type PageKey =
   | 'reports'
   | 'employees'
   | 'settings'
+  | 'approval-requests'
   | 'super-admin'
   | 'travel-groups'
   | 'sales-portal'
@@ -128,6 +129,7 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'travel-groups', label: 'الأفواج (Travel Groups)', group: 'قسم التشغيل' },
   { key: 'internal-groups', label: 'المجموعات (الرحلات الداخلية)', group: 'قسم التشغيل' },
   { key: 'employees', label: 'إدارة الموظفين والشركاء', group: 'الإدارة والتحكم' },
+  { key: 'approval-requests', label: 'طلبات الموافقة', group: 'الإدارة والتحكم' },
   { key: 'settings', label: 'إعدادات النظام', group: 'الإدارة والتحكم' },
   { key: 'super-admin', label: 'لوحة التحكم الفائقة Super Admin', group: 'الإدارة والتحكم' },
   { key: 'sales-portal', label: 'بوابة مندوب المبيعات', group: 'إدارة المبيعات والأعمال' },

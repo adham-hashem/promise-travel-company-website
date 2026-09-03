@@ -33,6 +33,7 @@ import Suppliers from './pages/Suppliers';
 import VisaManagement from './pages/VisaManagement';
 import FlightTickets from './pages/FlightTickets';
 import SuperAdminPanel from './pages/SuperAdminPanel';
+import ApprovalRequests from './pages/ApprovalRequests';
 import SalesAgentPortal from './pages/SalesAgentPortal';
 import TravelGroups from './pages/TravelGroups';
 import InternalGroups from './pages/InternalGroups';
@@ -229,6 +230,7 @@ function AppInner() {
       {currentPage === 'employees' && canAccessPage('employees') && <Employees onNavigate={navigate} />}
       {currentPage === 'reports' && canAccessPage('reports') && <Reports />}
       {currentPage === 'settings' && canAccessPage('settings') && <Settings />}
+      {currentPage === 'approval-requests' && canAccessPage('approval-requests') && <ApprovalRequests />}
       {currentPage === 'super-admin' && canAccessPage('super-admin') && <SuperAdminPanel />}
       {currentPage === 'internal-trips' && canAccessPage('internal-trips') && <InternalTrips />}
       {currentPage === 'internal-bookings' && canAccessPage('internal-bookings') && <InternalTripBookings />}

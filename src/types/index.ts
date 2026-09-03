@@ -107,7 +107,12 @@ export type TaskStatus = 'جديدة' | 'قيد التنفيذ' | 'مكتملة'
 export type NotificationType =
   | 'new_lead' | 'task_assigned' | 'follow_up' | 'overdue_task'
   | 'new_customer' | 'new_booking' | 'new_payment' | 'new_invoice'
-  | 'missing_document' | 'travel_soon' | 'website_booking';
+  | 'missing_document' | 'document_required' | 'travel_soon' | 'urgent_travel_issue'
+  | 'website_booking' | 'installment_overdue' | 'installment_due_soon'
+  | 'installment_due_today' | 'booking_pending' | 'approval_request'
+  | 'new_visa' | 'visa_review' | 'visa_approved' | 'visa_rejected' | 'visa_expired'
+  | 'visa_incomplete' | 'accounts_approved' | 'operations_ready' | 'flight_ready'
+  | 'ticket_issued';
 
 export interface AppNotification {
   id: string;
@@ -116,6 +121,11 @@ export interface AppNotification {
   title: string;
   body?: string;
   is_read: boolean;
+  target_page?: Page;
+  target_record_id?: string;
+  requires_action?: boolean;
+  resolved_at?: string;
+  unique_key?: string;
   created_at: string;
 }
 
@@ -382,6 +392,7 @@ export type Page =
   | 'employees'
   | 'reports'
   | 'settings'
+  | 'approval-requests'
   | 'internal-trips'
   | 'internal-bookings'
   | 'internal-customers'
@@ -466,6 +477,9 @@ export interface ApprovalRequest {
   requested_by?: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
+  notes?: string;
+  amount?: number;
+  customer_id?: string;
   reviewed_by?: string;
   reviewed_at?: string;
   created_at: string;

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, Loader2, X, Wallet, Upload, Eye,
   Download, CheckCircle2, XCircle, FileText, Clock, Search, Package, User, Plane,
+  RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -558,6 +559,35 @@ export default function Payments() {
     }
   };
 
+  const handleRefundRequest = async (p: PayRow) => {
+    const reason = prompt('يرجى إدخال سبب طلب إرجاع هذه الدفعة (مطلوب موافقة المدير):');
+    if (!reason) return;
+
+    try {
+      const { error } = await supabase.from('approval_requests').insert({
+        type: 'refund_payment',
+        record_id: p.id,
+        record_type: 'payments',
+        reason,
+        status: 'pending',
+        amount: p.amount || 0,
+        customer_id: p.customer_id || null,
+        record_details: {
+          ...p,
+          customer_name: p.customers?.name,
+          package_name: p.packages?.name,
+          amount: p.amount || 0,
+        },
+        requested_by: profile?.id || null
+      });
+
+      if (error) throw error;
+      alert('تم إرسال طلب إرجاع الدفعة إلى الإدارة للاعتماد.');
+    } catch (err: any) {
+      alert('حدث خطأ أثناء إرسال الطلب: ' + err.message);
+    }
+  };
+
   const handleDeleteFile = async (fileId: string, customerName: string) => {
     if (!confirm(`هل أنت متأكد من حذف ملف العميل "${customerName}" نهائياً من الحسابات والتشغيل؟`)) return;
     
@@ -977,6 +1007,7 @@ export default function Payments() {
                       )}
                       <button onClick={() => printReceipt(p)} title="طباعة إيصال" className="p-1.5 rounded-lg hover:bg-navy-50 text-navy-600"><Printer size={15} /></button>
                       <button onClick={() => openEdit(p)} title="تعديل" className="p-1.5 rounded-lg hover:bg-gold-50 text-gold-600"><Pencil size={15} /></button>
+                      <button onClick={() => handleRefundRequest(p)} title="طلب إرجاع دفعة" className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-600"><RotateCcw size={15} /></button>
                       <button onClick={() => handleDelete(p)} title="حذف" className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"><Trash2 size={15} /></button>
                     </div>
                   </td>

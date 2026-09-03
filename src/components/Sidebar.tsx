@@ -123,6 +123,7 @@ const NAV_SECTIONS: NavSection[] = [
     anyPermission: ['employees_view', 'settings_access', 'reports_view'],
     items: [
       { id: 'super-admin', label: 'لوحة التحكم Super Admin', icon: ShieldAlert, permissionKey: 'settings_access' },
+      { id: 'approval-requests', label: 'طلبات الموافقة', icon: ShieldAlert, permissionKey: 'settings_access' },
       { id: 'employees', label: 'الموظفون والصلاحيات', icon: UserCog, permissionKey: 'employees_view' },
       { id: 'suppliers', label: 'إدارة الموردين', icon: Truck, permissionKey: 'reports_view' },
       { id: 'reports', label: 'التقارير الشاملة', icon: BarChart3, permissionKey: 'reports_view' },
@@ -139,7 +140,7 @@ const SECTION_ACTIVE_PAGES: Record<string, Page[]> = {
   sales_more: ['bookings', 'visa', 'packages', 'offers', 'hotels'],
   internal: ['internal-trips', 'internal-groups', 'internal-bookings', 'internal-customers', 'internal-reports'],
   print_orders: ['quotation-form'],
-  hr_admin: ['employees', 'suppliers', 'reports', 'settings', 'super-admin'],
+  hr_admin: ['employees', 'approval-requests', 'suppliers', 'reports', 'settings', 'super-admin'],
 };
 
 interface Props {

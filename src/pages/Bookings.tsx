@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalendarCheck, Clock, XCircle, Eye, Globe, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Booking, BookingStatus } from '../types';
 import BookingDetailsModal from '../components/BookingDetailsModal';
@@ -26,6 +27,7 @@ const paymentColors: Record<string, string> = {
 interface Props { searchValue: string; }
 
 export default function Bookings({ searchValue }: Props) {
+  const { profile } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<BookingStatus | 'الكل'>('الكل');
@@ -70,6 +72,37 @@ export default function Bookings({ searchValue }: Props) {
       new Date(b.created_at).toLocaleDateString('ar-EG'),
     ]);
     exportToPDF('تقرير الحجوزات', headers, rows);
+  };
+
+  const requestCancelBooking = async (booking: Booking) => {
+    if (booking.status === 'ملغي') return;
+    const reason = prompt('يرجى إدخال سبب طلب إلغاء هذا الحجز (مطلوب موافقة المدير):');
+    if (!reason) return;
+
+    const { error } = await supabase.from('approval_requests').insert({
+      type: 'cancel_booking',
+      record_id: booking.id,
+      record_type: 'bookings',
+      requested_by: profile?.id || null,
+      reason,
+      status: 'pending',
+      amount: booking.total_amount || 0,
+      customer_id: booking.customer_id,
+      record_details: {
+        booking_id: booking.id,
+        customer_id: booking.customer_id,
+        customer_name: booking.customers?.name,
+        package_name: booking.packages?.name,
+        amount: booking.total_amount || 0,
+        status: booking.status,
+      },
+    });
+
+    if (error) {
+      alert('فشل إرسال طلب الإلغاء: ' + error.message);
+      return;
+    }
+    alert('تم إرسال طلب إلغاء الحجز إلى المدير للموافقة.');
   };
 
   const filtered = bookings.filter((b) => {
@@ -198,6 +231,16 @@ export default function Bookings({ searchValue }: Props) {
                       >
                         <Eye size={15} />
                       </button>
+                      {b.status !== 'ملغي' && (
+                        <button
+                          onClick={() => requestCancelBooking(b)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                          aria-label="طلب إلغاء الحجز"
+                          title="طلب إلغاء الحجز"
+                        >
+                          <XCircle size={15} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
