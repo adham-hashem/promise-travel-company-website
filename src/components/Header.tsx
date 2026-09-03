@@ -269,7 +269,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-3 md:gap-4 fixed top-0 left-0 right-0 md:right-64 z-20 shadow-sm">
+    <header className="h-16 bg-white border-b border-gray-100 flex items-center px-3 sm:px-4 md:px-6 gap-2 sm:gap-3 md:gap-4 fixed top-0 left-0 right-0 md:right-64 z-20 shadow-sm overflow-visible">
       {onToggleSidebar && (
         <button
           onClick={onToggleSidebar}
@@ -353,7 +353,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
         </button>
 
         {showDropdown && (
-          <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
+          <div className="absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
               <p className="text-sm font-bold text-navy-900">الإشعارات</p>
               {unreadCount > 0 && (
@@ -408,7 +408,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
         </button>
 
         {showProfileMenu && (
-          <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
+          <div className="absolute left-0 top-full mt-2 w-48 max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-fadeIn">
             <button
               onClick={() => { setShowPwdModal(true); setShowProfileMenu(false); }}
               className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-right"

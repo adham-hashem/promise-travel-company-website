@@ -40,8 +40,8 @@ export default function Layout({ children, currentPage, onNavigate, onLogout, se
         />
       )}
 
-      <main className="mr-0 md:mr-64 pt-16 min-h-screen">
-        <div className="p-4 md:p-6 animate-fadeIn">
+      <main className="mr-0 md:mr-64 pt-16 min-h-screen max-w-full overflow-x-hidden">
+        <div className="p-3 sm:p-4 md:p-6 animate-fadeIn max-w-full">
           {children}
         </div>
       </main>

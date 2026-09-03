@@ -9,6 +9,15 @@
 body {
   direction: rtl;
   background-color: #f4f6fa;
+  overflow-x: hidden;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+}
+
+#root {
+  min-width: 0;
 }
 
 ::-webkit-scrollbar {
@@ -47,6 +56,10 @@ body {
 
 .data-table th {
   @apply text-right text-xs font-semibold text-navy-600 uppercase tracking-wider py-3 px-4 bg-navy-50;
+}
+
+.data-table {
+  min-width: 720px;
 }
 
 .data-table td {
