@@ -284,12 +284,8 @@ export default function SuperAdminPanel() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      // Delete tasks linked to the employee
-      await supabase.from('tasks').delete().eq('employee_id', deleteTarget.id);
-      // Delete from employees table
-      await supabase.from('employees').delete().eq('id', deleteTarget.id);
-      // Delete from user_profiles
-      await supabase.from('user_profiles').delete().eq('id', deleteTarget.id);
+      const { error } = await supabase.rpc('delete_app_user', { p_user_id: deleteTarget.id });
+      if (error) throw error;
       setDeleteTarget(null);
       if (selectedAdmin?.id === deleteTarget.id) setSelectedAdmin(null);
       await fetchProfiles();

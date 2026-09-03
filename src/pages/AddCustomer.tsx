@@ -8,7 +8,10 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { compressImage } from '../lib/imageCompressor';
 import { ensureVipAccountingArtifacts } from '../lib/vipAccounting';
+import { grantVipAccess } from '../lib/vipAccess';
 import type { Package, Employee, Page, ServiceType, CustomerStatus } from '../types';
+
+type AssignableVipManager = Employee & { status?: string };
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
@@ -58,6 +61,7 @@ export default function AddCustomer({ onNavigate }: Props) {
   const [step, setStep] = useState(0);
   const [packages, setPackages] = useState<Package[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [vipManagers, setVipManagers] = useState<AssignableVipManager[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -112,6 +116,22 @@ export default function AddCustomer({ onNavigate }: Props) {
     supabase.from('employees').select('*').eq('is_active', true).then(({ data }) => {
       if (data) setEmployees(data as Employee[]);
     });
+    supabase
+      .from('user_profiles')
+      .select('id, name, email, phone, role, status, created_at')
+      .eq('status', 'نشط')
+      .order('name')
+      .then(({ data }) => {
+        if (data) {
+          setVipManagers((data as AssignableVipManager[]).map((manager) => ({
+            ...manager,
+            clients_count: manager.clients_count || 0,
+            bookings_count: manager.bookings_count || 0,
+            target_percentage: manager.target_percentage || 0,
+            is_active: true,
+          })));
+        }
+      });
   }, []);
 
   const update = (field: string, value: string) => setForm({ ...form, [field]: value });
@@ -170,9 +190,10 @@ export default function AddCustomer({ onNavigate }: Props) {
     setError('');
 
     try {
-      const effectiveAssignedEmployeeId = isVip
-        ? (vipForm.assigned_vip_manager || form.assigned_employee_id)
-        : form.assigned_employee_id;
+      const effectiveVipManagerId = isVip
+        ? (vipForm.assigned_vip_manager || profile?.id || '')
+        : '';
+      const effectiveAssignedEmployeeId = form.assigned_employee_id;
       const assignedEmp = employees.find(e => e.id === effectiveAssignedEmployeeId);
       const isSalesAgent = assignedEmp?.role === 'مندوب مبيعات' || assignedEmp?.role === 'مدير المبيعات';
 
@@ -240,7 +261,7 @@ export default function AddCustomer({ onNavigate }: Props) {
             additional_services: vipForm.additional_services || null,
             travelers_count: Number(vipForm.travelers_count) || 1,
             special_notes: vipForm.special_notes || null,
-            assigned_vip_manager: effectiveAssignedEmployeeId || null,
+            assigned_vip_manager: effectiveVipManagerId || null,
           });
 
         if (vipErr) {
@@ -248,10 +269,43 @@ export default function AddCustomer({ onNavigate }: Props) {
           throw new Error('فشل حفظ تفاصيل طلب VIP: ' + vipErr.message);
         }
 
+        const { data: vipTrip, error: vipTripErr } = await supabase
+          .from('vip_trips')
+          .insert({
+            name: `طلب VIP - ${form.name}`,
+            assigned_employee_id: effectiveVipManagerId || null,
+            destination: vipForm.travel_city || null,
+            departure_date: vipForm.departure_date || null,
+            return_date: vipForm.return_date || null,
+          })
+          .select('id')
+          .single();
+
+        if (vipTripErr) {
+          console.error('Error creating VIP trip:', vipTripErr);
+          throw new Error('فشل إنشاء رحلة VIP وربطها بالموظف: ' + vipTripErr.message);
+        }
+
+        if (vipTrip?.id) {
+          await grantVipAccess(effectiveVipManagerId || null);
+
+          await supabase
+            .from('customers')
+            .update({ vip_trip_id: vipTrip.id })
+            .eq('id', custId);
+
+          await supabase.from('vip_trip_logs').insert({
+            trip_id: vipTrip.id,
+            user_id: profile?.id,
+            action: 'إنشاء طلب VIP من العميل',
+            details: `تم إنشاء وربط عميل VIP: ${form.name}`,
+          });
+        }
+
         await ensureVipAccountingArtifacts({
           customerId: custId,
           customerName: form.name,
-          assignedEmployeeId: effectiveAssignedEmployeeId || null,
+          assignedEmployeeId: effectiveVipManagerId || null,
           serviceType: form.service_type,
           tripName: vipForm.travel_city || 'طلب VIP خاص',
           destination: vipForm.travel_city || null,
@@ -519,7 +573,7 @@ export default function AddCustomer({ onNavigate }: Props) {
                   <Briefcase size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
                   <select value={vipForm.assigned_vip_manager} onChange={(e) => setVipForm({...vipForm, assigned_vip_manager: e.target.value})} className="form-input pr-9">
                     <option value="">اختر المشرف المسؤول</option>
-                    {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                    {vipManagers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
                   </select>
                 </div>
               </div>

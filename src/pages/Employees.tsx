@@ -41,12 +41,13 @@ export default function Employees({ onNavigate }: Props) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await supabase.from('employees').delete().eq('id', deleteTarget.id);
-      await supabase.from('user_profiles').delete().eq('id', deleteTarget.id);
+      const { error } = await supabase.rpc('delete_app_user', { p_user_id: deleteTarget.id });
+      if (error) throw error;
       setDeleteTarget(null);
       await load();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting employee:', err);
+      alert('فشل حذف الموظف وإلغاء حساب الدخول: ' + (err?.message || 'خطأ غير معروف'));
     } finally {
       setDeleting(false);
     }
@@ -296,7 +297,7 @@ export default function Employees({ onNavigate }: Props) {
             <p className="text-sm text-gray-600 text-center mb-6 leading-relaxed">
               هل أنت تأكد من رغبتك في حذف الموظف <span className="font-bold text-navy-900">{deleteTarget.name}</span>؟
               <br />
-              <span className="text-xs text-red-500 font-semibold mt-1 block">ملاحظة: سيتم حذف بيانات الموظف والمهام المرتبطة به نهائياً.</span>
+              <span className="text-xs text-red-500 font-semibold mt-1 block">ملاحظة: سيتم حذف الموظف وإلغاء حساب الدخول المرتبط به من النظام.</span>
             </p>
             <div className="flex items-center gap-3">
               <button

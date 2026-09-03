@@ -1,10 +1,30 @@
 import { useEffect, useState, useRef } from 'react';
 import { Plus, Pencil, Trash2, Package as PackageIcon, Upload, X, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Package } from '../types';
+import type { Package, PackageItineraryDay } from '../types';
 import { compressImage } from '../lib/imageCompressor';
 
-const emptyForm = { name: '', type: 'عمرة' as 'حج' | 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', price_double: '', price_triple: '', price_quad: '', price_child: '', price_infant: '', image_url: '', description: '', featured: false };
+type PackageForm = {
+  name: string;
+  type: 'حج' | 'عمرة';
+  hotel: string;
+  hotel_makkah: string;
+  hotel_madinah: string;
+  airline: string;
+  duration_days: string;
+  price: string;
+  price_double: string;
+  price_triple: string;
+  price_quad: string;
+  price_child: string;
+  price_infant: string;
+  image_url: string;
+  description: string;
+  itinerary: PackageItineraryDay[];
+  featured: boolean;
+};
+
+const emptyForm: PackageForm = { name: '', type: 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', price_double: '', price_triple: '', price_quad: '', price_child: '', price_infant: '', image_url: '', description: '', itinerary: [], featured: false };
 
 export default function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -41,6 +61,13 @@ export default function Packages() {
       price_infant: String(p.price_infant || ''),
       image_url: p.image_url || '',
       description: p.description || '',
+      itinerary: Array.isArray(p.itinerary)
+        ? p.itinerary.map((day, index) => ({
+            day: index + 1,
+            title: day.title || '',
+            desc: day.desc || '',
+          }))
+        : [],
       featured: p.featured || false
     });
     setEditId(p.id); setShowModal(true);
@@ -56,6 +83,13 @@ export default function Packages() {
       price_child: parseFloat(form.price_child) || 0,
       price_infant: parseFloat(form.price_infant) || 0,
     };
+    const itinerary = form.itinerary
+      .map((day, index) => ({
+        day: index + 1,
+        title: day.title.trim(),
+        desc: day.desc.trim(),
+      }))
+      .filter((day) => day.title || day.desc);
     const payload = {
       name: form.name,
       type: form.type,
@@ -68,6 +102,7 @@ export default function Packages() {
       ...parsedPrices,
       image_url: form.image_url || undefined,
       description: form.description || undefined,
+      itinerary,
       featured: form.featured
     };
     const dbPayload = {
@@ -82,6 +117,7 @@ export default function Packages() {
       ...parsedPrices,
       image_url: form.image_url || null,
       description: form.description || null,
+      itinerary,
       featured: form.featured
     };
     if (editId) {
@@ -117,7 +153,7 @@ export default function Packages() {
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
       const filePath = `packages/${fileName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, compressedFile, {
           cacheControl: '3600',
@@ -195,6 +231,12 @@ export default function Packages() {
                   )}
                   {p.airline && <div className="flex justify-between"><span className="text-gray-400">شركة الطيران</span><span className="font-medium">{p.airline}</span></div>}
                   {p.duration_days && <div className="flex justify-between"><span className="text-gray-400">المدة</span><span className="font-medium">{p.duration_days} يوم</span></div>}
+                  {Array.isArray(p.itinerary) && p.itinerary.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">مسار البرنامج</span>
+                      <span className="font-medium">{p.itinerary.length} أيام مفصلة</span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                   <span className="text-xs text-gray-400">السعر</span>
@@ -333,6 +375,73 @@ export default function Packages() {
                 <div className="col-span-2">
                   <label className="form-label">وصف الباقة (للموقع)</label>
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="form-input min-h-[70px] resize-none" placeholder="وصف تسويقي يظهر على الموقع" />
+                </div>
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div>
+                      <label className="form-label mb-0">مسار البرنامج يومًا بيوم (للموقع)</label>
+                      <p className="text-[11px] text-gray-500 mt-0.5">كل يوم يظهر في صفحة تفاصيل الباقة للزوار بنفس الترتيب.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({
+                        ...prev,
+                        itinerary: [...prev.itinerary, { day: prev.itinerary.length + 1, title: '', desc: '' }],
+                      }))}
+                      className="btn-outline text-xs py-2 px-3 flex-shrink-0"
+                    >
+                      <Plus size={14} /> إضافة يوم
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {form.itinerary.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-xs text-gray-500">
+                        لا يوجد مسار مضاف لهذه الباقة حتى الآن.
+                      </div>
+                    ) : (
+                      form.itinerary.map((day, index) => (
+                        <div key={index} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-[70px_1fr_auto] gap-3 items-start">
+                            <div className="rounded-lg bg-white border border-gray-100 px-3 py-2 text-center">
+                              <p className="text-[10px] text-gray-400">اليوم</p>
+                              <p className="text-sm font-black text-navy-900">{index + 1}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <input
+                                value={day.title}
+                                onChange={(e) => setForm((prev) => ({
+                                  ...prev,
+                                  itinerary: prev.itinerary.map((item, i) => i === index ? { ...item, title: e.target.value } : item),
+                                }))}
+                                className="form-input text-xs bg-white"
+                                placeholder="عنوان اليوم"
+                              />
+                              <textarea
+                                value={day.desc}
+                                onChange={(e) => setForm((prev) => ({
+                                  ...prev,
+                                  itinerary: prev.itinerary.map((item, i) => i === index ? { ...item, desc: e.target.value } : item),
+                                }))}
+                                className="form-input text-xs bg-white min-h-[64px] resize-none"
+                                placeholder="تفاصيل اليوم"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setForm((prev) => ({
+                                ...prev,
+                                itinerary: prev.itinerary.filter((_, i) => i !== index).map((item, i) => ({ ...item, day: i + 1 })),
+                              }))}
+                              className="p-2 rounded-lg text-red-500 hover:bg-red-50"
+                              title="حذف اليوم"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
                 <div className="col-span-2">
                   <label className="flex items-center gap-2 cursor-pointer">

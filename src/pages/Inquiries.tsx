@@ -3,12 +3,12 @@ import {
   MessageSquare, Plus, Search, Eye, Pencil, Trash2, X,
   Phone, Globe, MessageCircle, PhoneCall, MapPin,
   Facebook, Instagram, ArrowRightLeft, CheckCircle2,
-  Clock, AlertCircle, XCircle, Undo2, Download,
+  Clock, AlertCircle, XCircle, Download, FileText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
-import type { Inquiry, InquiryStatus, InquirySource, InquiryServiceType, Employee } from '../types';
+import type { Inquiry, InquiryStatus, InquirySource, InquiryServiceType, Employee, DocumentRecord } from '../types';
 
 const STATUS_COLORS: Record<InquiryStatus, string> = {
   'جديد': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -180,6 +180,11 @@ function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModal
     }]).select().maybeSingle();
 
     if (newCustomer) {
+      await supabase
+        .from('documents')
+        .update({ customer_id: newCustomer.id })
+        .eq('inquiry_id', inquiry.id);
+
       // Link inquiry to the new customer
       await supabase.from('inquiries').update({
         status: 'تم التحويل',
@@ -333,6 +338,31 @@ interface DetailModalProps {
 function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModalProps) {
   const StatusIcon = STATUS_ICONS[inquiry.status];
   const SourceIcon = SOURCE_ICONS[inquiry.source];
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingDocs(true);
+    supabase
+      .from('documents')
+      .select('*')
+      .eq('inquiry_id', inquiry.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (active) {
+          setDocuments((data as DocumentRecord[]) || []);
+          setLoadingDocs(false);
+        }
+      });
+    return () => { active = false; };
+  }, [inquiry.id]);
+
+  const openDocument = (doc: DocumentRecord) => {
+    const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path);
+    if (data.publicUrl) window.open(data.publicUrl, '_blank');
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -389,6 +419,37 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModal
               <p className="text-sm text-gray-700">{inquiry.notes}</p>
             </div>
           )}
+
+          <div className="bg-gray-50 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
+                <FileText size={14} className="text-gold-600" /> مستندات الحجز من الموقع
+              </p>
+              <span className="text-[11px] text-gray-500">{documents.length} مستند</span>
+            </div>
+            {loadingDocs ? (
+              <p className="text-xs text-gray-500">جارٍ تحميل المستندات...</p>
+            ) : documents.length === 0 ? (
+              <p className="text-xs text-gray-500">لا توجد مستندات مرفقة لهذا الاستعلام.</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => openDocument(doc)}
+                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-white border border-gray-100 px-3 py-2 text-right hover:border-gold-200 hover:bg-gold-50/30 transition-colors"
+                  >
+                    <span>
+                      <span className="block text-xs font-bold text-navy-900">{doc.doc_type}</span>
+                      <span className="block text-[11px] text-gray-500 truncate max-w-[220px]">{doc.file_name || doc.file_path}</span>
+                    </span>
+                    <Eye size={14} className="text-gold-600 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button onClick={onEdit} className="btn-secondary justify-center"><Pencil size={14} />تعديل</button>

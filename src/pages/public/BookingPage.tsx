@@ -135,63 +135,57 @@ export default function BookingPage({ preset, onDone }: Props) {
 
     try {
       const serviceTypeMap: Record<string, string> = {
-        'حج': 'حج', 'عمرة': 'عمرة', 'داخلي': 'سياحة داخلية', 'فندق': 'حجز فندق',
+        'حج': 'حج', 'عمرة': 'عمرة', 'داخلي': 'رحلة داخلية', 'فندق': 'فندق',
       };
       const serviceType = serviceTypeMap[form.service_type] || 'عمرة';
+      const travelersTotal = isPackageBooking && form.package_id ? packageTravelerCount : Number(form.travelers) || 1;
+      const selectedHotel = form.hotel_id ? hotels.find((h) => h.id === form.hotel_id) : null;
+      const selectedTrip = form.service_type === 'داخلي' && form.package_id ? trips.find((t) => t.id === form.package_id) : null;
+      const packagePricingNotes = isPackageBooking && form.package_id
+        ? `الغرفة: ${form.room_type || 'غير محددة'} — بالغين: ${adultCount} — أطفال: ${childCount} — رضع: ${infantCount} — الإجمالي التقريبي: ${packageTotal.toLocaleString('ar-EG')} ج.م`
+        : '';
+      const bookingNotes = [
+        'استعلام حجز من واجهة الزائر - يبدأ من قسم الاستعلامات قبل التشغيل',
+        `نوع الخدمة: ${serviceType}`,
+        `عدد المسافرين: ${travelersTotal}`,
+        form.whatsapp ? `واتساب: ${form.whatsapp}` : '',
+        form.email ? `البريد: ${form.email}` : '',
+        form.travel_date ? `تاريخ السفر المطلوب: ${form.travel_date}` : '',
+        selectedPackage ? `الباقة: ${selectedPackage.name}` : '',
+        selectedHotel ? `الفندق المطلوب: ${selectedHotel.name}` : '',
+        selectedTrip ? `الرحلة الداخلية: ${selectedTrip.name}` : '',
+        packagePricingNotes,
+        form.notes ? `ملاحظات العميل: ${form.notes}` : '',
+      ].filter(Boolean).join(' — ');
 
-      // 1. Check if customer exists by phone
-      const { data: existing } = await supabase
-        .from('customers')
-        .select('id, client_code')
-        .eq('phone', form.phone)
-        .maybeSingle();
+      const inquiryNumber = `INQ-${Date.now().toString().slice(-6)}`;
+      const { data: inquiry, error: inquiryErr } = await supabase
+        .from('inquiries')
+        .insert({
+          inquiry_number: inquiryNumber,
+          customer_name: form.name,
+          phone: form.phone,
+          service_type: serviceType as never,
+          source: 'الموقع الإلكتروني',
+          status: 'جديد',
+          notes: bookingNotes,
+        })
+        .select('id, inquiry_number')
+        .single();
+      if (inquiryErr) throw new Error(inquiryErr.message);
+      if (!inquiry) throw new Error('تعذر إنشاء الاستعلام');
 
-      let customerId = existing?.id;
-      let clientCode = existing?.client_code || null;
-      const bookingAgeGroup = adultCount > 0 ? 'بالغ' : childCount > 0 ? 'طفل' : infantCount > 0 ? 'رضيع' : 'بالغ';
-      const customerPackageFields = isPackageBooking && form.package_id ? {
-        requested_package_id: form.package_id,
-        room_type_makkah: form.room_type || null,
-        room_type_madinah: form.room_type || null,
-        age_group: bookingAgeGroup,
-      } : {};
-
-      // 2. Create customer if not exists (source='Website')
-      if (!customerId) {
-        const { data: newCust, error: custErr } = await supabase
-          .from('customers')
-          .insert({
-            name: form.name,
-            phone: form.phone,
-            whatsapp: form.whatsapp || null,
-            email: form.email || null,
-            service_type: serviceType as never,
-            source: 'Website',
-            notes: form.notes || null,
-            status: 'جديد',
-            documents_status: 'ناقص مستندات',
-            ...customerPackageFields,
-          })
-          .select('id, client_code')
-          .single();
-        if (custErr) throw new Error(custErr.message);
-        customerId = newCust!.id;
-        clientCode = newCust!.client_code || null;
-      } else if (Object.keys(customerPackageFields).length > 0) {
-        await supabase.from('customers').update(customerPackageFields).eq('id', customerId);
-      }
-
-      // 3. Upload optional documents
+      // Upload optional documents against the inquiry so admins can review them before conversion.
       for (const docType of optionalDocs) {
         const file = docFiles[docType.id];
         if (!file) continue;
         const ext = file.name.split('.').pop();
-        const filePath = `${customerId}/${Date.now()}_${docType.id}.${ext}`;
+        const filePath = `website-inquiries/${inquiry.id}/${Date.now()}_${docType.id}.${ext}`;
         const uploadFile = file.type.startsWith('image/') ? await compressImage(file) : file;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, uploadFile);
         if (upErr) continue;
         await supabase.from('documents').insert({
-          customer_id: customerId,
+          inquiry_id: inquiry.id,
           doc_type: docType.id,
           file_path: filePath,
           file_name: file.name,
@@ -200,55 +194,7 @@ export default function BookingPage({ preset, onDone }: Props) {
         });
       }
 
-      // 4. Create booking (source='Website')
-      const travelersTotal = isPackageBooking && form.package_id ? packageTravelerCount : Number(form.travelers) || 1;
-      const packagePricingNotes = isPackageBooking && form.package_id
-        ? `الغرفة: ${form.room_type || 'غير محددة'} — بالغين: ${adultCount} — أطفال: ${childCount} — رضع: ${infantCount}`
-        : '';
-      const bookingNotes = `حجز من الموقع — عدد المسافرين: ${travelersTotal}${packagePricingNotes ? ' — ' + packagePricingNotes : ''}${form.notes ? ' — ' + form.notes : ''}`;
-      const bookingData: Record<string, unknown> = {
-        customer_id: customerId,
-        status: 'معلق',
-        payment_status: 'غير مدفوع',
-        booking_date: new Date().toISOString().split('T')[0],
-        notes: bookingNotes,
-        source: 'Website',
-        num_travelers: travelersTotal,
-      };
-      if (form.travel_date) bookingData.travel_date = form.travel_date;
-
-      if (form.service_type === 'داخلي') {
-        // Internal trips don't have package_id in bookings table
-      } else if (form.service_type === 'فندق') {
-        // Hotel booking — no package, store hotel reference in notes
-        if (form.hotel_id) {
-          const hotel = hotels.find((h) => h.id === form.hotel_id);
-          if (hotel) bookingData.notes = `حجز فندق: ${hotel.name} — ${bookingNotes}`;
-        }
-      } else if (form.package_id) {
-        bookingData.package_id = form.package_id;
-        if (selectedPackage) bookingData.total_amount = packageTotal;
-      }
-
-      const { data: booking, error: bkErr } = await supabase
-        .from('bookings')
-        .insert(bookingData)
-        .select('id')
-        .single();
-      if (bkErr) throw new Error(bkErr.message);
-
-      // 5. Create operation file
-      if (booking) {
-        await supabase.from('operation_files').insert({
-          booking_id: booking.id,
-          customer_id: customerId,
-          file_status: 'جديد',
-          travel_date: form.travel_date || null,
-          notes: 'تم الإنشاء تلقائياً من حجز الموقع',
-        });
-      }
-
-      setCreatedCode(clientCode);
+      setCreatedCode(inquiry.inquiry_number);
       setDone(true);
       setTimeout(() => { onDone(); }, 3000);
     } catch (e) {
@@ -270,7 +216,7 @@ export default function BookingPage({ preset, onDone }: Props) {
           {createdCode && (
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 mt-3 mb-4">
               <Hash size={16} className="text-gold-600" />
-              <span className="font-mono font-black text-emerald-800">كود العميل: {createdCode}</span>
+              <span className="font-mono font-black text-emerald-800">رقم الطلب: {createdCode}</span>
             </div>
           )}
           <p className="text-gold-600 font-semibold text-sm">جارٍ تحويلك للصفحة الرئيسية...</p>

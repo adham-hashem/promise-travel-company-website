@@ -61,6 +61,12 @@ export interface TravelChecklist {
 export type CommType = 'مكالمة' | 'واتساب' | 'زيارة' | 'بريد إلكتروني';
 export type PackageType = 'حج' | 'عمرة';
 
+export interface PackageItineraryDay {
+  day: number;
+  title: string;
+  desc: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -132,6 +138,7 @@ export interface Package {
   is_active: boolean;
   image_url?: string;
   description?: string;
+  itinerary?: PackageItineraryDay[];
   featured?: boolean;
   created_at: string;
 }
@@ -525,6 +532,7 @@ export interface DocumentRecord {
   id: string;
   customer_id?: string;
   booking_id?: string;
+  inquiry_id?: string;
   uploaded_by?: string;
   doc_type: DocType;
   file_path: string;
@@ -609,6 +617,7 @@ export interface Inquiry {
   created_at: string;
   updated_at: string;
   employees?: Employee;
+  documents?: DocumentRecord[];
 }
 
 // ===== Operations types =====

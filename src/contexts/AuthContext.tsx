@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (userId: string, userObj?: User | null) => {
+  const loadProfile = async (userId: string, userObj?: User | null): Promise<boolean> => {
     let { data } = await supabase
       .from('user_profiles')
       .select('*')
@@ -44,6 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (!data && userObj) {
+      const { count } = await supabase
+        .from('user_profiles')
+        .select('id', { count: 'exact', head: true });
+
+      if ((count || 0) > 0) {
+        setProfile(null);
+        return false;
+      }
+
       const fallbackProfile = {
         id: userId,
         name: userObj.user_metadata?.name || userObj.email?.split('@')[0] || 'المدير العام',
@@ -65,8 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
+      if (data.status !== 'نشط') {
+        setProfile(null);
+        return false;
+      }
       setProfile(data as UserProfile);
+      return true;
     }
+
+    setProfile(null);
+    return false;
   };
 
   const refreshProfile = async () => {
@@ -78,7 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id, session.user).finally(() => setLoading(false));
+        loadProfile(session.user.id, session.user).then((active) => {
+          if (!active) supabase.auth.signOut();
+        }).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -89,7 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await loadProfile(session.user.id, session.user);
+          const active = await loadProfile(session.user.id, session.user);
+          if (!active) await supabase.auth.signOut();
         } else {
           setProfile(null);
         }
@@ -102,7 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string): Promise<string | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return error.message;
-    if (data.user) await loadProfile(data.user.id, data.user);
+    if (data.user) {
+      const active = await loadProfile(data.user.id, data.user);
+      if (!active) {
+        await supabase.auth.signOut();
+        return 'هذا الحساب غير نشط أو تم حذفه من النظام';
+      }
+    }
     return null;
   };
 
@@ -113,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = (permission: keyof Permissions): boolean => {
     if (!profile) return false;
+    if (profile.status !== 'نشط') return false;
     if (profile.role === 'super_admin' || profile.role === 'مالك النظام') return true;
     const perms = profile.permissions && Object.keys(profile.permissions).length > 0
       ? profile.permissions
@@ -122,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canAccessPage = (pageKey: string): boolean => {
     if (!profile) return false;
+    if (profile.status !== 'نشط') return false;
     if (profile.role === 'super_admin' || profile.role === 'مالك النظام') return true;
 
     // Default fallbacks by role

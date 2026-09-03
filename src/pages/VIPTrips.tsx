@@ -3,6 +3,9 @@ import { Plus, Search, Plane, Users, Calendar, ArrowLeft, Star, Clock } from 'lu
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { VIPTrip, Employee } from '../types';
+import { grantVipAccess } from '../lib/vipAccess';
+
+type AssignableVipEmployee = Employee & { status?: string };
 
 interface VIPTripsProps {
   onNavigate: (page: string, params?: any) => void;
@@ -13,7 +16,7 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
   const [trips, setTrips] = useState<VIPTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<AssignableVipEmployee[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTrip, setNewTrip] = useState({
@@ -48,14 +51,24 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
 
       const [tripsRes, empRes] = await Promise.all([
         tripsQuery,
-        supabase.from('employees').select('*').eq('is_active', true)
+        supabase
+          .from('user_profiles')
+          .select('id, name, email, phone, role, status, created_at')
+          .eq('status', 'نشط')
+          .order('name')
       ]);
 
       if (tripsRes.data) {
         setTrips(tripsRes.data as any[]);
       }
       if (empRes.data) {
-        setEmployees(empRes.data as Employee[]);
+        setEmployees((empRes.data as AssignableVipEmployee[]).map((employee) => ({
+          ...employee,
+          clients_count: employee.clients_count || 0,
+          bookings_count: employee.bookings_count || 0,
+          target_percentage: employee.target_percentage || 0,
+          is_active: true,
+        })));
       }
     } catch (err) {
       console.error(err);
@@ -80,6 +93,7 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
         .single();
         
       if (error) throw error;
+      await grantVipAccess(newTrip.assigned_employee_id || null);
       
       // Log event
       await supabase.from('vip_trip_logs').insert({

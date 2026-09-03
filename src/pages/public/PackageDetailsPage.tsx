@@ -14,24 +14,6 @@ interface Props {
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
 }
 
-const itineraryByType: Record<string, { day: number; title: string; desc: string }[]> = {
-  'عمرة': [
-    { day: 1, title: 'الوصول إلى مكة المكرمة', desc: 'الاستقبال في المطار والانتقال إلى الفندق والراحة قبل أداء العمرة.' },
-    { day: 2, title: 'أداء العمرة', desc: 'الإحرام وأداء مناسك العمرة مع مرشد ديني متخصص.' },
-    { day: 3, title: 'زيارة المشاعر', desc: 'زيارة الأماكن المقدسة والاطمئنان على راحة الضيوف.' },
-    { day: 4, title: 'التوجه إلى المدينة المنورة', desc: 'الانتقال إلى المدينة وزيارة المسجد النبوي الشريف.' },
-    { day: 5, title: 'العودة', desc: 'التوجه إلى المطار للعودة إلى الوطن بعد رحلة مباركة.' },
-  ],
-  'حج': [
-    { day: 1, title: 'الوصول والإحرام', desc: 'الاستقبال في المطار والإحرام والانتقال إلى مكان الإقامة.' },
-    { day: 2, title: 'التوجه إلى منى', desc: 'الانتقال إلى منى والاطمئنان على ترتيبات الإقامة.' },
-    { day: 3, title: 'يوم عرفة', desc: 'التوجه إلى عرفات والدعاء والوقوف بأرض عرفات.' },
-    { day: 4, title: 'المبيت بمزدلفة ورمي الجمرات', desc: 'الانتقال إلى مزدلفة ثم رمي الجمرات.'.replace('الانتقال إلى مزدلفة ثم رمي الجمرات.', 'المبيت في مزدلفة ثم التوجه لرمي الجمرات.') },
-    { day: 5, title: 'أيام التشريق', desc: 'إكمال رمي الجمرات ومراعاة راحة الحجاج.' },
-    { day: 6, title: 'المبيت بمنى والوداع', desc: 'إتمام المناسك والاستعداد للعودة.' },
-  ],
-};
-
 export default function PackageDetailsPage({ packageId, onNavigate }: Props) {
   const [pkg, setPkg] = useState<Package | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -67,7 +49,15 @@ export default function PackageDetailsPage({ packageId, onNavigate }: Props) {
   }
 
   const image = pkg.image_url || (pkg.type === 'حج' ? 'https://images.pexels.com/photos/35332386/pexels-photo-35332386.jpeg?auto=compress&cs=tinysrgb&w=1600' : 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=1600');
-  const itinerary = itineraryByType[pkg.type] || [];
+  const itinerary = Array.isArray(pkg.itinerary)
+    ? pkg.itinerary
+        .map((day, index) => ({
+          day: Number(day.day) || index + 1,
+          title: day.title || '',
+          desc: day.desc || '',
+        }))
+        .filter((day) => day.title || day.desc)
+    : [];
   const includedServices = pkg.type === 'حج'
     ? ['تأشيرة الحج', 'تذاكر الطيران ذهاباً وعودة', 'الإقامة في فنادق مصنّفة', 'النقل المكيف بين المشاعر', 'مرشد ديني متخصص', 'وجبات إفطار وسحور', 'تأمين سياحي شامل']
     : ['تأشيرة العمرة', 'تذاكر الطيران ذهاباً وعودة', 'الإقامة قرب الحرم', 'النقل من وإلى المطار', 'مرشد ديني', 'تأمين سياحي'];
