@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { compressImage } from '../lib/imageCompressor';
+import { ensureVipAccountingArtifacts } from '../lib/vipAccounting';
 import type { Package, Employee, Page, ServiceType, CustomerStatus } from '../types';
 
 interface Props {
@@ -246,6 +247,19 @@ export default function AddCustomer({ onNavigate }: Props) {
           console.error('Error inserting VIP request:', vipErr);
           throw new Error('فشل حفظ تفاصيل طلب VIP: ' + vipErr.message);
         }
+
+        await ensureVipAccountingArtifacts({
+          customerId: custId,
+          customerName: form.name,
+          assignedEmployeeId: effectiveAssignedEmployeeId || null,
+          serviceType: form.service_type,
+          tripName: vipForm.travel_city || 'طلب VIP خاص',
+          destination: vipForm.travel_city || null,
+          departureDate: vipForm.departure_date || null,
+          returnDate: vipForm.return_date || null,
+          travelersCount: vipForm.travelers_count,
+          notes: vipForm.special_notes || form.notes || null,
+        });
       }
 
       const docTypeKey: Record<string, string> = {

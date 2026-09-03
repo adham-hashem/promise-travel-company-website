@@ -89,6 +89,15 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
         details: 'تم إنشاء رحلة VIP جديدة'
       });
 
+      if (newTrip.assigned_employee_id) {
+        await supabase.from('notifications').insert({
+          employee_id: newTrip.assigned_employee_id,
+          type: 'task_assigned',
+          title: 'تم تكليفك برحلة VIP جديدة',
+          body: `الرحلة: ${newTrip.name} - الوجهة: ${newTrip.destination || 'غير محددة'} - رقم الرحلة الداخلي: ${data.id}`,
+        });
+      }
+
       setShowAddModal(false);
       onNavigate('vip-details', data.id);
     } catch (err: any) {
