@@ -86,6 +86,12 @@ export default function BookingPage({ preset, onDone }: Props) {
     if (preset?.type) loadOptions(preset.type, preset.packageId || '');
   }, [preset?.type, preset?.packageId]);
 
+  useEffect(() => {
+    if (done) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [done]);
+
   const selectedPackage = packages?.find((p) => p.id === form.package_id) || null;
   const toCount = (value: string) => {
     const parsed = parseInt(value, 10);
@@ -196,7 +202,7 @@ export default function BookingPage({ preset, onDone }: Props) {
 
       setCreatedCode(inquiry.inquiry_number);
       setDone(true);
-      setTimeout(() => { onDone(); }, 3000);
+      setTimeout(() => { onDone(); }, 15000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى');
     } finally {
@@ -206,8 +212,8 @@ export default function BookingPage({ preset, onDone }: Props) {
 
   if (done) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center px-4 py-20">
-        <div className="max-w-md text-center">
+      <div className="min-h-[70vh] flex items-start justify-center px-4 pt-10 pb-20">
+        <div className="max-w-md text-center bg-white rounded-3xl border border-emerald-100 shadow-xl p-8 animate-fadeIn">
           <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 animate-fadeIn">
             <CheckCircle2 size={48} className="text-emerald-600" />
           </div>
@@ -219,7 +225,7 @@ export default function BookingPage({ preset, onDone }: Props) {
               <span className="font-mono font-black text-emerald-800">رقم الطلب: {createdCode}</span>
             </div>
           )}
-          <p className="text-gold-600 font-semibold text-sm">جارٍ تحويلك للصفحة الرئيسية...</p>
+          <p className="text-gold-600 font-semibold text-sm">سيتم تحويلك للصفحة الرئيسية خلال 15 ثانية...</p>
         </div>
       </div>
     );
