@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Clock, Hotel, Plane, Star, ArrowLeft, Loader2, MapPin, Link2, CheckCircle2 } from 'lucide-react';
+import { Plane, Star, ArrowLeft, Loader2, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
-import ShareButton from '../../components/public/ShareButton';
-import { packageShareUrl } from '../../lib/share-urls';
+import PublicPackageCard from '../../components/public/PublicPackageCard';
 
 interface Props {
   type: 'حج' | 'عمرة';
@@ -15,19 +14,6 @@ const heroByType = {
   'حج': { img: 'https://images.pexels.com/photos/35332386/pexels-photo-35332386.jpeg?auto=compress&cs=tinysrgb&w=1920', title: 'برامج الحج المتكاملة', subtitle: 'فريضة العمر بأيدٍ أمينة، إقامة مريحة وإشراف متخصص' },
   'عمرة': { img: 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=1920', title: 'برامج العمرة على مدار العام', subtitle: 'عمرة مريحة بأفضل الفنادق وأقربها للحرم الشريف' },
 };
-
-function CopyLinkButton({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
-      className="w-full mt-2 flex items-center justify-center gap-1.5 text-gray-400 hover:text-gold-600 font-medium text-[11px] py-1.5 rounded-lg hover:bg-gray-50 transition-all"
-    >
-      {copied ? <CheckCircle2 size={12} className="text-emerald-600" /> : <Link2 size={12} />}
-      {copied ? 'تم نسخ الرابط' : 'نسخ رابط الباقة'}
-    </button>
-  );
-}
 
 export default function ServicePage({ type, onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -76,34 +62,7 @@ export default function ServicePage({ type, onNavigate }: Props) {
             <div className="text-center py-16 text-gray-400"><Plane size={48} className="mx-auto mb-3 opacity-30" /><p className="font-medium">لا توجد باقات متاحة حالياً</p><p className="text-sm mt-1">سيتم إضافتها قريباً بإذن الله</p></div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {packages.map((p) => {
-                const pkgUrl = packageShareUrl(p.id);
-                return (
-                <div key={p.id} className="public-card overflow-hidden">
-                  <div className="relative h-52 overflow-hidden">
-                    <img src={p.image_url || 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    {p.featured && <span className="absolute top-3 right-3 bg-gradient-gold text-emerald-950 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><Star size={10} fill="currentColor" /> مميزة</span>}
-                    <div className="absolute top-3 left-3" onClick={(e) => e.stopPropagation()}><ShareButton title={p.name} compact shareUrl={pkgUrl} /></div>
-                  </div>
-                  <div className="p-5">
-                    <h3 className="font-black text-emerald-950 text-lg mb-3">{p.name}</h3>
-                    {p.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>}
-                    <div className="space-y-2 text-xs text-gray-600 mb-4">
-                      {p.duration_days && <div className="flex items-center gap-2"><Clock size={13} className="text-gold-600" /> {p.duration_days} يوم</div>}
-                      {p.hotel && <div className="flex items-center gap-2"><Hotel size={13} className="text-gold-600" /> {p.hotel}</div>}
-                      {p.airline && <div className="flex items-center gap-2"><Plane size={13} className="text-gold-600" /> {p.airline}</div>}
-                    </div>
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 mb-3">
-                      <div><p className="text-xs text-gray-400">يبدأ من</p><p className="font-black text-emerald-950 text-lg">{Number(p.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p></div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => onNavigate('package-details', undefined, p.id)} className="flex-1 bg-emerald-950 text-white font-bold text-xs px-3 py-2.5 rounded-xl hover:bg-emerald-900 transition-all">عرض التفاصيل</button>
-                      <button onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })} className="flex-1 bg-gradient-gold text-emerald-950 font-bold text-xs px-3 py-2.5 rounded-xl hover:shadow-lg transition-all">احجز الآن</button>
-                    </div>
-                    <CopyLinkButton url={pkgUrl} />
-                  </div>
-                </div>
-              );})}
+              {packages.map((p) => <PublicPackageCard key={p.id} p={p} onNavigate={onNavigate} />)}
             </div>
           )}
         </div>

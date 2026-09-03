@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
-  Plane, Moon, MapPin, Star, Clock, Hotel as HotelIcon, ArrowLeft,
+  Plane, Moon, MapPin, Star, Hotel as HotelIcon, ArrowLeft,
   ShieldCheck, Award, Users, Headphones, Plus, Minus, Tag, Bus,
-  CheckCircle2, Sparkles, Compass, Users2, Link2,
+  CheckCircle2, Sparkles, Compass, Users2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Package, Offer, Hotel } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
 import ShareButton from '../../components/public/ShareButton';
-import { packageShareUrl } from '../../lib/share-urls';
+import PublicPackageCard from '../../components/public/PublicPackageCard';
 
 interface Props {
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }, id?: string) => void;
@@ -162,7 +162,7 @@ export default function Home({ onNavigate }: Props) {
             <div className="text-center py-12"><p className="text-white/60">ستتوفر برامج الحج قريباً بإذن الله</p></div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
-              {hajjPackages.map((p) => <PackageCard key={p.id} p={p} onNavigate={onNavigate} dark />)}
+              {hajjPackages.map((p) => <PublicPackageCard key={p.id} p={p} onNavigate={onNavigate} dark />)}
             </div>
           )}
           <div className="text-center mt-10">
@@ -431,52 +431,6 @@ export default function Home({ onNavigate }: Props) {
   );
 }
 
-function CopyLinkButton({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }}
-      className="w-9 h-9 flex items-center justify-center bg-white/90 backdrop-blur text-emerald-950 hover:bg-white shadow-sm rounded-xl transition-all"
-      aria-label="نسخ الرابط"
-    >
-      {copied ? <CheckCircle2 size={16} className="text-emerald-600" /> : <Link2 size={16} />}
-    </button>
-  );
-}
-
-function PackageCard({ p, onNavigate, dark }: { p: Package; onNavigate: Props['onNavigate']; dark?: boolean }) {
-  const pkgUrl = packageShareUrl(p.id);
-  return (
-    <div className={`group rounded-3xl overflow-hidden shadow-lg transition-all hover:scale-[1.02] ${dark ? 'bg-white' : 'public-card'}`}>
-      <div className="relative h-52 overflow-hidden">
-        <img src={p.image_url || 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-        {p.featured && <span className="absolute top-3 right-3 bg-gradient-gold text-emerald-950 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><Star size={10} fill="currentColor" /> مميزة</span>}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <ShareButton title={p.name} compact shareUrl={pkgUrl} />
-          <CopyLinkButton url={pkgUrl} />
-        </div>
-      </div>
-      <div className="p-5">
-        <h3 className="font-black text-emerald-950 text-lg mb-3">{p.name}</h3>
-        {p.description && <p className="text-gray-500 text-xs mb-3 line-clamp-2">{p.description}</p>}
-        <div className="space-y-2 text-xs text-gray-600 mb-4">
-          {p.duration_days && <div className="flex items-center gap-2"><Clock size={13} className="text-gold-600" /> {p.duration_days} يوم</div>}
-          {p.hotel && <div className="flex items-center gap-2"><HotelIcon size={13} className="text-gold-600" /> {p.hotel}</div>}
-          {p.airline && <div className="flex items-center gap-2"><Plane size={13} className="text-gold-600" /> {p.airline}</div>}
-        </div>
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <div><p className="text-xs text-gray-400">ابتداءً من</p><p className="font-black text-emerald-950 text-lg">{Number(p.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p></div>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <button onClick={() => onNavigate('package-details', undefined, p.id)} className="flex-1 bg-emerald-950 text-white font-bold text-xs px-3 py-2.5 rounded-xl hover:bg-emerald-900 transition-all">عرض التفاصيل</button>
-          <button onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })} className="flex-1 bg-gradient-gold text-emerald-950 font-bold text-xs px-3 py-2.5 rounded-xl hover:shadow-lg transition-all">احجز الآن</button>
-        </div>
-        <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(pkgUrl); }} className="w-full mt-2 flex items-center justify-center gap-1.5 text-gray-400 hover:text-gold-600 font-medium text-[11px] py-1.5 rounded-lg hover:bg-gray-50 transition-all"><Link2 size={12} /> نسخ رابط الباقة</button>
-      </div>
-    </div>
-  );
-}
-
 function PackageSection({ title, eyebrow, packages, onNavigate, viewAllPage }: { title: string; eyebrow: string; packages: Package[]; onNavigate: Props['onNavigate']; viewAllPage: PublicPage }) {
   return (
     <section className="py-20">
@@ -491,7 +445,7 @@ function PackageSection({ title, eyebrow, packages, onNavigate, viewAllPage }: {
         {packages.length === 0 ? (
           <div className="text-center py-16 text-gray-400"><Plane size={48} className="mx-auto mb-3 opacity-30" /><p className="font-medium">ستتوفر البرامج قريباً بإذن الله</p></div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6">{packages.map((p) => <PackageCard key={p.id} p={p} onNavigate={onNavigate} />)}</div>
+          <div className="grid md:grid-cols-3 gap-6">{packages.map((p) => <PublicPackageCard key={p.id} p={p} onNavigate={onNavigate} />)}</div>
         )}
       </div>
     </section>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Star, MapPin, CheckCircle2, Loader2, Hotel as HotelIcon, ArrowRight, Clock, Plane, Bed } from 'lucide-react';
+import { Star, MapPin, CheckCircle2, Loader2, Hotel as HotelIcon, ArrowRight, Bed } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Hotel, Package } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
 import ShareButton from '../../components/public/ShareButton';
+import PublicPackageCard from '../../components/public/PublicPackageCard';
 
 interface Props {
   hotelId: string;
@@ -114,14 +115,7 @@ export default function HotelDetailsPage({ hotelId, onNavigate }: Props) {
                 <h2 className="text-lg font-black text-emerald-950 mb-4">الباقات المرتبطة بهذا الفندق</h2>
                 <div className="grid sm:grid-cols-2 gap-4">
                   {packages.map((p) => (
-                    <div key={p.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group hover:shadow-lg transition-all flex">
-                      <div className="w-28 flex-shrink-0 overflow-hidden bg-emerald-100">{p.image_url ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-gradient-emerald"><Plane size={20} className="text-gold-400/50" /></div>}</div>
-                      <div className="p-4 flex-1 flex flex-col">
-                        <h3 className="font-bold text-emerald-950 text-sm mb-1 line-clamp-1">{p.name}</h3>
-                        {p.duration_days && <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-2"><Clock size={12} className="text-gold-600" /> {p.duration_days} يوم</div>}
-                        <div className="mt-auto flex items-center justify-between"><p className="font-black text-emerald-950 text-sm">{Number(p.price).toLocaleString('ar-EG')}<span className="text-[10px] font-medium mr-1">ج.م</span></p><button onClick={() => onNavigate('booking', { packageId: p.id, type: p.type })} className="bg-gradient-gold text-emerald-950 font-bold text-[11px] px-3 py-1.5 rounded-lg hover:shadow-md transition-all">احجز</button></div>
-                      </div>
-                    </div>
+                    <PublicPackageCard key={p.id} p={p} onNavigate={onNavigate} compact />
                   ))}
                 </div>
               </div>
