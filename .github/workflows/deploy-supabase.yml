@@ -49,8 +49,15 @@ jobs:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           if [ -n "$SUPABASE_DB_URL" ]; then
-            echo "Pushing migrations through SUPABASE_DB_URL..."
-            supabase db push --db-url "$SUPABASE_DB_URL"
+            if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+              echo "SUPABASE_DB_URL is set, but SUPABASE_DB_PASSWORD is missing."
+              exit 1
+            fi
+
+            DB_URL_WITH_PASSWORD=$(python -c 'import os; from urllib.parse import urlsplit, urlunsplit, quote; u=urlsplit(os.environ["SUPABASE_DB_URL"]); username=u.username or ""; password=quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""); host=u.hostname or ""; port=f":{u.port}" if u.port else ""; netloc=f"{username}:{password}@{host}{port}"; print(urlunsplit((u.scheme, netloc, u.path or "/postgres", u.query, u.fragment)))')
+
+            echo "Pushing migrations through SUPABASE_DB_URL with encoded database password..."
+            supabase db push --db-url "$DB_URL_WITH_PASSWORD"
             exit 0
           fi
 
