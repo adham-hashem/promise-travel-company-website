@@ -202,7 +202,6 @@ export default function BookingPage({ preset, onDone }: Props) {
 
       setCreatedCode(inquiry.inquiry_number);
       setDone(true);
-      setTimeout(() => { onDone(); }, 15000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى');
     } finally {
@@ -225,7 +224,13 @@ export default function BookingPage({ preset, onDone }: Props) {
               <span className="font-mono font-black text-emerald-800">رقم الطلب: {createdCode}</span>
             </div>
           )}
-          <p className="text-gold-600 font-semibold text-sm">سيتم تحويلك للصفحة الرئيسية خلال 15 ثانية...</p>
+          <button
+            type="button"
+            onClick={onDone}
+            className="mt-4 w-full bg-gradient-gold text-emerald-950 font-black py-3 rounded-xl shadow-lg hover:scale-[1.02] transition-all"
+          >
+            الذهاب إلى الصفحة الرئيسية
+          </button>
         </div>
       </div>
     );
