@@ -40,19 +40,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          version: 1.223.0
+          version: 2.116.0
 
-      - name: Link & Push Database Migrations
+      - name: Push Database Migrations
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
-          if [ -n "$SUPABASE_PROJECT_ID" ] && [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ]; then
-            echo "Pushing migrations automatically to Supabase..."
-            supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
-            supabase db push
-          else
-            echo "Supabase secrets not set in GitHub repository settings. Skipping CLI push."
+          if [ -z "$SUPABASE_PROJECT_ID" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "SUPABASE_PROJECT_ID or SUPABASE_DB_PASSWORD is missing."
             exit 1
           fi
+
+          DB_PASSWORD_ENCODED=$(python -c 'import os; from urllib.parse import quote; print(quote(os.environ["SUPABASE_DB_PASSWORD"], safe=""))')
+
+          echo "Pushing migrations directly to Supabase database..."
+          supabase db push --db-url "postgresql://postgres:${DB_PASSWORD_ENCODED}@db.${SUPABASE_PROJECT_ID}.supabase.co:5432/postgres"
