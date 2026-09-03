@@ -347,23 +347,23 @@ export default function BookingPage({ preset, onDone }: Props) {
                     <div>
                       <label className="form-label">عدد البالغين</label>
                       <div className="relative">
-                        <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pr-12 bg-white" />
+                        <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pr-12 pl-4 bg-white" dir="ltr" />
                       </div>
                     </div>
                     <div>
                       <label className="form-label">عدد الأطفال {hasPrice(selectedPackage.price_child) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_child).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pr-12 bg-white disabled:bg-gray-100 disabled:text-gray-400" />
+                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pr-12 pl-4 bg-white disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_child) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر طفل لهذه الباقة</p>}
                     </div>
                     <div>
                       <label className="form-label">عدد الرضع {hasPrice(selectedPackage.price_infant) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_infant).toLocaleString('ar-EG')} ج.م)</span>}</label>
                       <div className="relative">
-                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pr-12 bg-white disabled:bg-gray-100 disabled:text-gray-400" />
+                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pr-12 pl-4 bg-white disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
                       </div>
                       {!hasPrice(selectedPackage.price_infant) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر رضيع لهذه الباقة</p>}
                     </div>
@@ -405,15 +405,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">الاسم بالكامل <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <User size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pr-12" placeholder="الاسم بالكامل" />
+                    <User size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
+                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pl-12 pr-4 text-right" placeholder="الاسم بالكامل" dir="rtl" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">رقم الهاتف <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400" />
-                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pl-12 pr-4" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
               </div>
@@ -423,15 +423,15 @@ export default function BookingPage({ preset, onDone }: Props) {
                 <div>
                   <label className="form-label">رقم واتساب</label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400" />
-                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pl-12 pr-4" placeholder="01xxxxxxxxx" />
+                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="01xxxxxxxxx" />
                   </div>
                 </div>
                 <div>
                   <label className="form-label">البريد الإلكتروني</label>
                   <div className="relative">
-                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400" />
-                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pl-12 pr-4" placeholder="example@email.com" />
+                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="example@email.com" />
                   </div>
                 </div>
               </div>
@@ -442,16 +442,16 @@ export default function BookingPage({ preset, onDone }: Props) {
                   <div>
                     <label className="form-label">عدد الأفراد</label>
                     <div className="relative">
-                      <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                      <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-12" placeholder="1" />
+                      <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                      <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="1" dir="ltr" />
                     </div>
                   </div>
                 ) : null}
                 <div className={form.service_type === 'حج' || form.service_type === 'عمرة' ? 'sm:col-span-2' : ''}>
                   <label className="form-label">تاريخ السفر المفضل</label>
                   <div className="relative">
-                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-12" dir="ltr" />
+                    <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
+                    <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input pr-12 pl-4 text-left" dir="ltr" />
                   </div>
                 </div>
               </div>
@@ -460,8 +460,8 @@ export default function BookingPage({ preset, onDone }: Props) {
               <div>
                 <label className="form-label">ملاحظات إضافية</label>
                 <div className="relative">
-                  <FileText size={16} className="absolute top-4 right-3 text-gray-400" />
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pr-12 min-h-[90px] resize-none" placeholder="أي تفاصيل إضافية تود إخبارنا بها" />
+                  <FileText size={16} className="absolute top-4 left-3 text-gray-400 pointer-events-none" />
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pl-12 pr-4 min-h-[90px] resize-none text-right" placeholder="أي تفاصيل إضافية تود إخبارنا بها" dir="rtl" />
                 </div>
               </div>
 
