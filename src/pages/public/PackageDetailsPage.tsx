@@ -58,11 +58,12 @@ export default function PackageDetailsPage({ packageId, onNavigate }: Props) {
         }))
         .filter((day) => day.title || day.desc)
     : [];
-  const includedServices = pkg.type === 'حج'
-    ? ['تأشيرة الحج', 'تذاكر الطيران ذهاباً وعودة', 'الإقامة في فنادق مصنّفة', 'النقل المكيف بين المشاعر', 'مرشد ديني متخصص', 'وجبات إفطار وسحور', 'تأمين سياحي شامل']
-    : ['تأشيرة العمرة', 'تذاكر الطيران ذهاباً وعودة', 'الإقامة قرب الحرم', 'النقل من وإلى المطار', 'مرشد ديني', 'تأمين سياحي'];
-  const notIncluded = ['المصاريف الشخصية', 'وجبات الغداء والعشاء (حسب الباقة)', 'التسوق والهدايا', 'أي خدمات إضافية غير مذكورة'];
-  const conditions = ['يتم تأكيد الحجز بعد دفع جزء من المبلغ.', 'الأسعار قابلة للتعديل حسب التوافر وموعد السفر.', 'يجب توفير جواز سفر ساري لمدة لا تقل عن 6 أشهر.', 'إلغاء الحجز قبل 14 يوماً من السفر بدون رسوم.'];
+  const toTextList = (value: unknown) => Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const includedServices = toTextList(pkg.included_services);
+  const notIncluded = toTextList(pkg.excluded_services);
+  const conditions = toTextList(pkg.booking_conditions);
 
   return (
     <div className="bg-[#fbfaf7] pb-20">
@@ -153,36 +154,44 @@ export default function PackageDetailsPage({ packageId, onNavigate }: Props) {
           )}
 
           {/* Included / Not included */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="public-card p-7">
-              <h2 className="text-lg font-black text-emerald-950 mb-5 flex items-center gap-2"><CheckCircle2 size={20} className="text-emerald-600" /> الخدمات المشمولة</h2>
-              <ul className="space-y-3">
-                {includedServices.map((s) => (
-                  <li key={s} className="flex items-center gap-2 text-sm text-gray-600">
-                    <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" /> {s}
-                  </li>
-                ))}
-              </ul>
+          {(includedServices.length > 0 || notIncluded.length > 0) && (
+            <div className="grid md:grid-cols-2 gap-6">
+              {includedServices.length > 0 && (
+                <div className="public-card p-7">
+                  <h2 className="text-lg font-black text-emerald-950 mb-5 flex items-center gap-2"><CheckCircle2 size={20} className="text-emerald-600" /> الخدمات المشمولة</h2>
+                  <ul className="space-y-3">
+                    {includedServices.map((s) => (
+                      <li key={s} className="flex items-center gap-2 text-sm text-gray-600">
+                        <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" /> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {notIncluded.length > 0 && (
+                <div className="public-card p-7">
+                  <h2 className="text-lg font-black text-emerald-950 mb-5 flex items-center gap-2"><ShieldCheck size={20} className="text-gray-400" /> الخدمات غير المشمولة</h2>
+                  <ul className="space-y-3">
+                    {notIncluded.map((s) => (
+                      <li key={s} className="flex items-center gap-2 text-sm text-gray-500">
+                        <span className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0" /> {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            <div className="public-card p-7">
-              <h2 className="text-lg font-black text-emerald-950 mb-5 flex items-center gap-2"><ShieldCheck size={20} className="text-gray-400" /> الخدمات غير المشمولة</h2>
-              <ul className="space-y-3">
-                {notIncluded.map((s) => (
-                  <li key={s} className="flex items-center gap-2 text-sm text-gray-500">
-                    <span className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0" /> {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          )}
 
           {/* Conditions */}
-          <div className="public-card p-7">
-            <h2 className="text-lg font-black text-emerald-950 mb-5">شروط الحجز</h2>
-            <ul className="space-y-3 text-sm text-gray-600 leading-relaxed list-disc pr-5">
-              {conditions.map((c) => <li key={c}>{c}</li>)}
-            </ul>
-          </div>
+          {conditions.length > 0 && (
+            <div className="public-card p-7">
+              <h2 className="text-lg font-black text-emerald-950 mb-5">شروط الحجز</h2>
+              <ul className="space-y-3 text-sm text-gray-600 leading-relaxed list-disc pr-5">
+                {conditions.map((c) => <li key={c}>{c}</li>)}
+              </ul>
+            </div>
+          )}
 
           {/* Linked hotels */}
           {hotels.length > 0 && (

@@ -139,6 +139,9 @@ export interface Package {
   image_url?: string;
   description?: string;
   itinerary?: PackageItineraryDay[];
+  included_services?: string[];
+  excluded_services?: string[];
+  booking_conditions?: string[];
   featured?: boolean;
   created_at: string;
 }

@@ -21,10 +21,40 @@ type PackageForm = {
   image_url: string;
   description: string;
   itinerary: PackageItineraryDay[];
+  included_services: string[];
+  excluded_services: string[];
+  booking_conditions: string[];
   featured: boolean;
 };
 
-const emptyForm: PackageForm = { name: '', type: 'عمرة', hotel: '', hotel_makkah: '', hotel_madinah: '', airline: '', duration_days: '', price: '', price_double: '', price_triple: '', price_quad: '', price_child: '', price_infant: '', image_url: '', description: '', itinerary: [], featured: false };
+type PackageListField = 'included_services' | 'excluded_services' | 'booking_conditions';
+
+const emptyForm: PackageForm = {
+  name: '',
+  type: 'عمرة',
+  hotel: '',
+  hotel_makkah: '',
+  hotel_madinah: '',
+  airline: '',
+  duration_days: '',
+  price: '',
+  price_double: '',
+  price_triple: '',
+  price_quad: '',
+  price_child: '',
+  price_infant: '',
+  image_url: '',
+  description: '',
+  itinerary: [],
+  included_services: [],
+  excluded_services: [],
+  booking_conditions: [],
+  featured: false
+};
+
+const normalizeTextList = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
+
+const readTextList = (value: unknown) => Array.isArray(value) ? value.map((item) => String(item || '')) : [];
 
 export default function Packages() {
   const [packages, setPackages] = useState<Package[]>([]);
@@ -68,6 +98,9 @@ export default function Packages() {
             desc: day.desc || '',
           }))
         : [],
+      included_services: readTextList(p.included_services),
+      excluded_services: readTextList(p.excluded_services),
+      booking_conditions: readTextList(p.booking_conditions),
       featured: p.featured || false
     });
     setEditId(p.id); setShowModal(true);
@@ -90,6 +123,9 @@ export default function Packages() {
         desc: day.desc.trim(),
       }))
       .filter((day) => day.title || day.desc);
+    const included_services = normalizeTextList(form.included_services);
+    const excluded_services = normalizeTextList(form.excluded_services);
+    const booking_conditions = normalizeTextList(form.booking_conditions);
     const payload = {
       name: form.name,
       type: form.type,
@@ -103,6 +139,9 @@ export default function Packages() {
       image_url: form.image_url || undefined,
       description: form.description || undefined,
       itinerary,
+      included_services,
+      excluded_services,
+      booking_conditions,
       featured: form.featured
     };
     const dbPayload = {
@@ -118,6 +157,9 @@ export default function Packages() {
       image_url: form.image_url || null,
       description: form.description || null,
       itinerary,
+      included_services,
+      excluded_services,
+      booking_conditions,
       featured: form.featured
     };
     if (editId) {
@@ -174,6 +216,58 @@ export default function Packages() {
       setUploading(false);
     }
   };
+
+  const addListItem = (field: PackageListField) => {
+    setForm((prev) => ({ ...prev, [field]: [...prev[field], ''] }));
+  };
+
+  const updateListItem = (field: PackageListField, index: number, value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: prev[field].map((item, i) => i === index ? value : item),
+    }));
+  };
+
+  const removeListItem = (field: PackageListField, index: number) => {
+    setForm((prev) => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
+  };
+
+  const renderTextListEditor = (field: PackageListField, title: string, emptyText: string, placeholder: string) => (
+    <div className="col-span-2 rounded-xl border border-gray-100 bg-gray-50 p-4">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <label className="form-label mb-0">{title}</label>
+        <button type="button" onClick={() => addListItem(field)} className="btn-outline text-xs py-2 px-3 flex-shrink-0">
+          <Plus size={14} /> إضافة
+        </button>
+      </div>
+      <div className="space-y-2">
+        {form[field].length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 bg-white p-3 text-center text-xs text-gray-500">
+            {emptyText}
+          </div>
+        ) : (
+          form[field].map((item, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                value={item}
+                onChange={(e) => updateListItem(field, index, e.target.value)}
+                className="form-input text-xs bg-white"
+                placeholder={placeholder}
+              />
+              <button
+                type="button"
+                onClick={() => removeListItem(field, index)}
+                className="p-2 rounded-lg text-red-500 hover:bg-red-50 flex-shrink-0"
+                title="حذف"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -376,6 +470,9 @@ export default function Packages() {
                   <label className="form-label">وصف الباقة (للموقع)</label>
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="form-input min-h-[70px] resize-none" placeholder="وصف تسويقي يظهر على الموقع" />
                 </div>
+                {renderTextListEditor('included_services', 'الخدمات المشمولة (للموقع)', 'لا توجد خدمات مشمولة مضافة لهذه الباقة.', 'مثال: تأشيرة العمرة')}
+                {renderTextListEditor('excluded_services', 'الخدمات غير المشمولة (للموقع)', 'لا توجد خدمات غير مشمولة مضافة لهذه الباقة.', 'مثال: المصاريف الشخصية')}
+                {renderTextListEditor('booking_conditions', 'شروط الحجز (للموقع)', 'لا توجد شروط حجز مضافة لهذه الباقة.', 'مثال: يتم تأكيد الحجز بعد دفع جزء من المبلغ')}
                 <div className="col-span-2">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div>
