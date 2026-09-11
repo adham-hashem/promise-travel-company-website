@@ -26,6 +26,12 @@ const optionalDocs = [
   { id: 'صورة شخصية', label: 'الصورة الشخصية' },
 ];
 
+const websiteDocFileKeys: Record<string, string> = {
+  'جواز سفر': 'passport',
+  'بطاقة رقم قومي': 'national_id',
+  'صورة شخصية': 'personal_photo',
+};
+
 export default function BookingPage({ preset, onDone }: Props) {
   const [packages, setPackages] = useState<Package[] | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -185,13 +191,14 @@ export default function BookingPage({ preset, onDone }: Props) {
       for (const docType of optionalDocs) {
         const file = docFiles[docType.id];
         if (!file) continue;
-        const ext = file.name.split('.').pop();
-        const filePath = `website-inquiries/${inquiry.id}/${Date.now()}_${docType.id}.${ext}`;
+        const ext = (file.name.split('.').pop() || 'bin').replace(/[^a-zA-Z0-9]/g, '') || 'bin';
+        const safeDocType = websiteDocFileKeys[docType.id] || 'document';
+        const filePath = `website-inquiries/${inquiry.id}/${Date.now()}_${safeDocType}.${ext}`;
         const uploadFile = file.type.startsWith('image/') ? await compressImage(file) : file;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, uploadFile);
-        if (upErr) continue;
+        if (upErr) throw new Error(`فشل رفع مستند ${docType.label}: ${upErr.message}`);
         const { data: publicFile } = supabase.storage.from('documents').getPublicUrl(filePath);
-        await supabase.from('documents').insert({
+        const { error: docErr } = await supabase.from('documents').insert({
           inquiry_id: inquiry.id,
           doc_type: docType.id,
           file_path: filePath,
@@ -200,6 +207,7 @@ export default function BookingPage({ preset, onDone }: Props) {
           file_size: uploadFile.size,
           status: 'مرفوع',
         });
+        if (docErr) throw new Error(`فشل حفظ مستند ${docType.label}: ${docErr.message}`);
       }
 
       setCreatedCode(inquiry.inquiry_number);

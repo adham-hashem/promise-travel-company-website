@@ -1,636 +1,631 @@
-import { useState, useRef } from 'react';
-import { 
-  FileText, User, Calendar, Plane, Building2, Utensils, 
-  Map, Bus, Users, DollarSign, FileCheck, Printer, RefreshCw,
-  Info, Wallet
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Briefcase, Calendar, CheckCircle2, FileCheck, FileText, Hotel, Plus, Printer, RefreshCw, Save, Search, Trash2, User } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import type { Customer } from '../types';
+
+type QuotationKind = 'program' | 'services';
+type QuotationStatus = 'draft' | 'issued' | 'converted';
+
+interface QuotationServiceItem {
+  id: string;
+  serviceName: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  tax: number;
+}
+
+interface ProgramGrade {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
+const defaultProgramGrades = ['VIP', '4 نجوم', 'اقتصادي مميز', 'اقتصادي عادي'];
+const serviceSuggestions = ['تأشيرة', 'حجز طيران', 'حجز فندق', 'تذاكر ذهاب وعودة', 'مواصلات', 'قطار', 'استقبال وتوديع', 'تأمين سفر'];
+
+const newItem = (serviceName = ''): QuotationServiceItem => ({
+  id: crypto.randomUUID(),
+  serviceName,
+  description: '',
+  quantity: 1,
+  unitPrice: 0,
+  discount: 0,
+  tax: 0,
+});
+
+const lineTotal = (item: QuotationServiceItem) =>
+  Math.max(0, (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0));
+
+const money = (value: number) => `${value.toLocaleString('ar-EG')} ج.م`;
 
 export default function QuotationForm() {
+  const { profile, can } = useAuth();
+  const canEditQuotation = can('inquiries_edit') || can('customers_edit');
+  const canManageGrades = can('settings_edit');
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [programGrades, setProgramGrades] = useState<ProgramGrade[]>([]);
+  const [newGradeName, setNewGradeName] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [savedQuotationId, setSavedQuotationId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [form, setForm] = useState({
-    // Client Data
-    clientName: '',
+    quotationKind: 'services' as QuotationKind,
     quotationDate: new Date().toISOString().split('T')[0],
-    programGrade: 'VIP', // VIP, Economy, etc.
-    programSection: 'حج', // حج, عمرة, سياحة
-    
-    // Trip Data
+    validUntil: '',
+    customerId: '',
+    clientName: '',
+    title: '',
+    programSection: 'سياحة خارجية',
+    programGrade: 'VIP',
     departureDate: '',
     returnDate: '',
     daysCount: 0,
     nightsCount: 0,
-    
-    // Hotel Mecca
-    meccaHotelName: '',
-    meccaHotelStars: 5,
-    meccaHotelNights: 0,
-    
-    // Hotel Medina
-    medinaHotelName: '',
-    medinaHotelStars: 5,
-    medinaHotelNights: 0,
-    
-    // Meals
-    mealsType: 'إفطار فقط', // إفطار, نصف إقامة, إقامة كاملة, بدون
-    mealsDescription: '',
-    
-    // Flight
-    airline: '',
-    flightClass: 'سياحية',
-    
-    // Itinerary
-    departureCity: 'القاهرة',
-    arrivalCity: 'جدة',
-    departureRoute: '',
-    returnRoute: '',
-    
-    // Transport
-    transportType: 'حافلة VIP',
-    transportClass: 'ممتازة',
-    
-    // Supervision
-    supervisionProgram: 'إشراف ديني وإداري متميز طوال الرحلة.\nتنظيم مزارات مكة المكرمة والمدينة المنورة (جبل النور، غار ثور، جبل أحد، مسجد قباء، الخ).',
-    
-    // Cost
-    pricePerPerson: 0,
-    personsCount: 1,
-    pricePerChild: 0,
-    childrenCount: 0,
-    additionalFees: 0,
-    discounts: 0,
-    
-    // Policies
-    paymentPolicy: '1. يتم سداد 50% من إجمالي قيمة البرنامج عند الحجز.\n2. يتم سداد باقي المبلغ قبل السفر بـ 15 يوماً كحد أقصى.\n3. في حالة الإلغاء قبل السفر بـ 30 يوماً، يتم خصم 20% من إجمالي المبلغ.\n4. الأسعار قابلة للتغيير في حال حدوث تغيير في أسعار الصرف أو ضرائب الطيران.',
-    termsAndConditions: '• جواز سفر صالح لمدة 6 أشهر على الأقل من تاريخ السفر.\n• التطعيمات اللازمة وتصريح السفر (إن وجد).\n• الشركة غير مسؤولة عن أي تأخير خارج عن إرادتها في مواعيد الطيران.\n• التسكين في الفنادق يبدأ الساعة 2 ظهراً والمغادرة الساعة 12 ظهراً.\n• الأسعار مبنية على الوضع الحالي وفي حال وجود ضرائب أو رسوم إضافية تفرضها السلطات يتم إضافتها على السعر.',
+    programDetails: '',
+    hotelDetails: '',
+    flightDetails: '',
+    transportDetails: '',
+    paymentPolicy: 'يتم تحديد طريقة السداد طبقًا للاتفاق النهائي مع العميل.',
+    termsAndConditions: 'الأسعار قابلة للتغيير حسب توافر الخدمة وتحديثات شركات الطيران والفنادق والجهات الرسمية.',
   });
+  const [items, setItems] = useState<QuotationServiceItem[]>([newItem()]);
 
-  const totalCost = 
-    (form.pricePerPerson * form.personsCount) + 
-    (form.pricePerChild * form.childrenCount) + 
-    form.additionalFees - form.discounts;
+  useEffect(() => {
+    supabase.from('customers').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+      setCustomers((data as Customer[]) || []);
+    });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    setForm(prev => ({
-      ...prev,
-      [name]: type === 'number' ? (Number(value) || 0) : value
-    }));
+    loadProgramGrades();
+  }, []);
+
+  const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
+  const filteredCustomers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase();
+    if (!query) return customers.slice(0, 8);
+    return customers.filter((customer) =>
+      customer.name.toLowerCase().includes(query)
+      || customer.phone?.includes(query)
+      || customer.client_code?.toLowerCase().includes(query)
+    ).slice(0, 8);
+  }, [customers, customerSearch]);
+
+  const activeItems = items.filter((item) => item.serviceName.trim() || item.description.trim() || lineTotal(item) > 0);
+  const subtotal = activeItems.reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)), 0);
+  const totalDiscount = activeItems.reduce((sum, item) => sum + (Number(item.discount) || 0), 0);
+  const totalTax = activeItems.reduce((sum, item) => sum + (Number(item.tax) || 0), 0);
+  const total = activeItems.reduce((sum, item) => sum + lineTotal(item), 0);
+
+  const updateField = (name: string, value: string | number) => {
+    setForm((current) => ({ ...current, [name]: value }));
   };
 
-  const handlePrint = () => {
+  const updateItem = (id: string, field: keyof QuotationServiceItem, value: string | number) => {
+    setItems((current) => current.map((item) => (
+      item.id === id
+        ? { ...item, [field]: ['quantity', 'unitPrice', 'discount', 'tax'].includes(field) ? Number(value) || 0 : value }
+        : item
+    )));
+  };
+
+  const validate = () => {
+    if (!form.customerId) return 'اختر العميل المرتبط بعرض السعر.';
+    if (!form.title.trim()) return 'اكتب عنوان عرض السعر.';
+    if (activeItems.length === 0) return 'أضف خدمة واحدة على الأقل.';
+    if (activeItems.some((item) => !item.serviceName.trim())) return 'كل بند يجب أن يحتوي على اسم الخدمة.';
+    return '';
+  };
+
+  const loadProgramGrades = async () => {
+    const { data } = await supabase
+      .from('quotation_program_grades')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    const loaded = (data as ProgramGrade[] | null) || [];
+    setProgramGrades(loaded.length ? loaded : defaultProgramGrades.map((name) => ({ id: name, name, is_active: true })));
+  };
+
+  const addProgramGrade = async () => {
+    const name = newGradeName.trim();
+    if (!name) return;
+    const { error } = await supabase.from('quotation_program_grades').insert({
+      name,
+      sort_order: programGrades.length + 1,
+      is_active: true,
+    });
+    if (error) {
+      alert('تعذر إضافة درجة البرنامج: ' + error.message);
+      return;
+    }
+    setNewGradeName('');
+    loadProgramGrades();
+  };
+
+  const archiveProgramGrade = async (grade: ProgramGrade) => {
+    if (!confirm(`هل تريد إخفاء درجة البرنامج "${grade.name}" من عروض السعر الجديدة؟`)) return;
+    const { error } = await supabase.from('quotation_program_grades').update({ is_active: false }).eq('id', grade.id);
+    if (error) {
+      alert('تعذر تعديل درجة البرنامج: ' + error.message);
+      return;
+    }
+    loadProgramGrades();
+  };
+
+  const resetForm = () => {
+    if (!confirm('هل أنت متأكد من إعادة تعيين عرض السعر؟')) return;
+    setSavedQuotationId(null);
+    setCustomerSearch('');
+    setForm({
+      quotationKind: 'services',
+      quotationDate: new Date().toISOString().split('T')[0],
+      validUntil: '',
+      customerId: '',
+      clientName: '',
+      title: '',
+      programSection: 'سياحة خارجية',
+      programGrade: 'VIP',
+      departureDate: '',
+      returnDate: '',
+      daysCount: 0,
+      nightsCount: 0,
+      programDetails: '',
+      hotelDetails: '',
+      flightDetails: '',
+      transportDetails: '',
+      paymentPolicy: 'يتم تحديد طريقة السداد طبقًا للاتفاق النهائي مع العميل.',
+      termsAndConditions: 'الأسعار قابلة للتغيير حسب توافر الخدمة وتحديثات شركات الطيران والفنادق والجهات الرسمية.',
+    });
+    setItems([newItem()]);
+  };
+
+  const saveQuotation = async (status: QuotationStatus = 'draft') => {
+    const validationError = validate();
+    if (validationError) {
+      alert(validationError);
+      return null;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        customer_id: form.customerId,
+        quotation_number: savedQuotationId ? undefined : `QT-${Date.now().toString().slice(-7)}`,
+        quotation_type: form.quotationKind,
+        title: form.title,
+        quotation_date: form.quotationDate,
+        valid_until: form.validUntil || null,
+        program_section: form.quotationKind === 'program' ? form.programSection : null,
+        program_grade: form.quotationKind === 'program' ? form.programGrade : null,
+        departure_date: form.quotationKind === 'program' && form.departureDate ? form.departureDate : null,
+        return_date: form.quotationKind === 'program' && form.returnDate ? form.returnDate : null,
+        days_count: form.quotationKind === 'program' ? form.daysCount : null,
+        nights_count: form.quotationKind === 'program' ? form.nightsCount : null,
+        program_details: form.quotationKind === 'program' && form.programDetails.trim() ? form.programDetails : null,
+        hotel_details: form.quotationKind === 'program' && form.hotelDetails.trim() ? form.hotelDetails : null,
+        flight_details: form.flightDetails.trim() ? form.flightDetails : null,
+        transport_details: form.transportDetails.trim() ? form.transportDetails : null,
+        payment_policy: form.paymentPolicy || null,
+        terms_and_conditions: form.termsAndConditions || null,
+        subtotal,
+        total_discount: totalDiscount,
+        total_tax: totalTax,
+        total_amount: total,
+        status,
+        created_by: profile?.id || null,
+      };
+
+      const { data: quotation, error: quotationError } = savedQuotationId
+        ? await supabase.from('quotations').update(payload).eq('id', savedQuotationId).select('id').single()
+        : await supabase.from('quotations').insert(payload).select('id').single();
+
+      if (quotationError) throw quotationError;
+      const quotationId = quotation.id as string;
+
+      await supabase.from('quotation_items').delete().eq('quotation_id', quotationId);
+      const { error: itemsError } = await supabase.from('quotation_items').insert(activeItems.map((item, index) => ({
+        quotation_id: quotationId,
+        service_name: item.serviceName,
+        description: item.description || null,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        discount: item.discount,
+        tax: item.tax,
+        line_total: lineTotal(item),
+        sort_order: index + 1,
+      })));
+      if (itemsError) throw itemsError;
+
+      setSavedQuotationId(quotationId);
+      alert(status === 'issued' ? 'تم حفظ وإصدار عرض السعر.' : 'تم حفظ عرض السعر.');
+      return quotationId;
+    } catch (err: any) {
+      alert('تعذر حفظ عرض السعر: ' + (err?.message || 'حدث خطأ غير متوقع'));
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const convertToBooking = async () => {
+    if (!form.customerId) {
+      alert('اختر العميل أولاً.');
+      return;
+    }
+    if (total <= 0) {
+      alert('لا يمكن تحويل عرض سعر بدون إجمالي.');
+      return;
+    }
+
+    setConverting(true);
+    try {
+      const quotationId = savedQuotationId || await saveQuotation('issued');
+      if (!quotationId) return;
+
+      const { error } = await supabase.from('bookings').insert({
+        customer_id: form.customerId,
+        status: 'مؤكد',
+        payment_status: 'غير مدفوع',
+        total_amount: total,
+        paid_amount: 0,
+        source: 'Quotation',
+        travel_date: form.departureDate || null,
+        num_travelers: 1,
+        notes: `تم تحويل عرض السعر إلى حجز: ${form.title}`,
+      });
+      if (error) throw error;
+
+      await supabase.from('quotations').update({ status: 'converted', converted_at: new Date().toISOString() }).eq('id', quotationId);
+      alert('تم تحويل عرض السعر إلى حجز بنجاح.');
+    } catch (err: any) {
+      alert('تعذر تحويل عرض السعر إلى حجز: ' + (err?.message || 'حدث خطأ غير متوقع'));
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const printQuotation = () => {
     const printContent = document.getElementById('quotation-print')?.innerHTML;
     if (!printContent) return;
-    
+
     const win = window.open('', '_blank');
     if (!win) {
-       alert('يرجى السماح بالنوافذ المنبثقة (Pop-ups) للطباعة');
-       return;
+      alert('يرجى السماح بالنوافذ المنبثقة للطباعة');
+      return;
     }
-    
-    const html = `
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-      <head>
-        <meta charset="UTF-8">
-        <title>عرض سعر برنامج سياحي</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-        <style>
-          body { 
-            font-family: 'Cairo', sans-serif; 
-            margin: 0; 
-            padding: 10mm; 
-            direction: rtl; 
-            background: white; 
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .print-header { border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-          .print-title { font-size: 24px; font-weight: 800; color: #0f172a; margin: 0; }
-          .print-subtitle { font-size: 13px; color: #64748b; margin-top: 5px; font-weight: bold; }
-          .print-section { margin-bottom: 25px; page-break-inside: avoid; }
-          .print-section-title { font-size: 18px; font-weight: bold; color: #b48600; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; display: flex; align-items: center; gap: 8px; }
-          .print-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
-          .print-table th, .print-table td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; }
-          .print-table th { background-color: #f8fafc; color: #0f172a; font-weight: bold; width: 25%; }
-          .print-table td { background-color: #ffffff; color: #334155; }
-          .print-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-          .print-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #f8fafc; }
-          .print-box-title { font-weight: bold; color: #0f172a; margin-bottom: 8px; font-size: 14px; }
-          .print-text { font-size: 13px; color: #475569; line-height: 1.8; white-space: pre-wrap; }
-          .print-total-box { margin-top: 15px; background: #0f172a; color: white; padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-          .print-total-label { font-size: 18px; font-weight: bold; color: #e2e8f0; }
-          .print-total-value { font-size: 24px; font-weight: bold; color: #fbbf24; }
-          .print-footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; page-break-inside: avoid; }
-          .signature-area { display: flex; justify-content: space-around; margin-top: 40px; margin-bottom: 30px; }
-          .signature-box { text-align: center; width: 30%; }
-          .signature-line { border-top: 1px solid #cbd5e1; margin-top: 50px; padding-top: 5px; font-weight: bold; color: #0f172a; }
-          
-          /* Utility Classes used in JSX */
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: bold; }
-          .text-sm { font-size: 0.875rem; }
-          .text-xs { font-size: 0.75rem; }
-          .text-base { font-size: 1rem; }
-          .text-gray-800 { color: #1f2937; }
-          .text-gray-500 { color: #6b7280; }
-          .text-gray-400 { color: #9ca3af; }
-          .text-gray-600 { color: #4b5563; }
-          .text-red-600 { color: #dc2626; }
-          .text-navy-900 { color: #0f172a; }
-          .mt-1 { margin-top: 0.25rem; }
-          .mt-2 { margin-top: 0.5rem; }
-          .ml-2 { margin-left: 0.5rem; }
-          .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-          
-          @media print {
-             @page { margin: 0; }
-          }
-        </style>
-      </head>
-      <body>
-        ${printContent}
-      </body>
-      </html>
-    `;
-    
-    win.document.write(html);
+
+    win.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>${form.title || 'عرض سعر'}</title>
+<style>
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  @page { size: A4; margin: 12mm; }
+  body { margin: 0; color: #183b38; font-family: "Cairo", "Tahoma", "Arial", sans-serif; background: #fff; line-height: 1.6; }
+  .quote-sheet { max-width: 190mm; margin: 0 auto; }
+  .quote-header { display: flex; justify-content: space-between; align-items: center; gap: 18px; border-bottom: 3px solid #0f5f56; padding-bottom: 14px; margin-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 58px; height: 58px; border-radius: 12px; object-fit: cover; border: 2px solid #d8ebe7; }
+  h1 { margin: 0; color: #0b4f48; font-size: 25px; font-weight: 900; }
+  .muted { color: #5d7773; font-size: 12px; }
+  .meta { text-align: left; font-size: 12px; color: #315c57; }
+  .section { margin: 16px 0; page-break-inside: avoid; }
+  .section-title { color: #0f5f56; font-size: 16px; font-weight: 900; margin-bottom: 8px; border-bottom: 1px solid #cce2de; padding-bottom: 5px; }
+  .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .info-box { border: 1px solid #cce2de; background: #f4fbf9; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .info-box strong { display: block; color: #0b4f48; font-size: 11px; margin-bottom: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #0f5f56; color: white; padding: 9px; text-align: right; border: 1px solid #0f5f56; }
+  td { border: 1px solid #cce2de; padding: 8px; vertical-align: top; }
+  .text-center { text-align: center; }
+  .total-panel { background: #0f5f56; color: white; border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-weight: 900; }
+  .total-panel span:last-child { font-size: 22px; color: #e4c766; }
+  .text-block { border: 1px solid #cce2de; border-radius: 8px; padding: 10px; white-space: pre-wrap; font-size: 12px; color: #244f4a; background: #fff; }
+  .signatures { display: flex; justify-content: space-around; gap: 18px; margin-top: 38px; page-break-inside: avoid; }
+  .signature { flex: 1; text-align: center; border-top: 1px solid #93b9b3; padding-top: 8px; color: #0b4f48; font-weight: 800; font-size: 12px; }
+  .footer { text-align: center; margin-top: 24px; padding-top: 10px; border-top: 1px solid #d8ebe7; color: #78928e; font-size: 10px; }
+</style>
+</head>
+<body>${printContent}</body>
+</html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => {
-      win.print();
-      win.close();
-    }, 500);
+    setTimeout(() => win.print(), 400);
   };
 
-  const handleReset = () => {
-    if (confirm('هل أنت متأكد من إعادة تعيين جميع البيانات؟')) {
-      setForm({
-        clientName: '',
-        quotationDate: new Date().toISOString().split('T')[0],
-        programGrade: 'VIP',
-        programSection: 'حج',
-        departureDate: '',
-        returnDate: '',
-        daysCount: 0,
-        nightsCount: 0,
-        meccaHotelName: '',
-        meccaHotelStars: 5,
-        meccaHotelNights: 0,
-        medinaHotelName: '',
-        medinaHotelStars: 5,
-        medinaHotelNights: 0,
-        mealsType: 'إفطار فقط',
-        mealsDescription: '',
-        airline: '',
-        flightClass: 'سياحية',
-        departureCity: 'القاهرة',
-        arrivalCity: 'جدة',
-        departureRoute: '',
-        returnRoute: '',
-        transportType: 'حافلة VIP',
-        transportClass: 'ممتازة',
-        supervisionProgram: 'إشراف ديني وإداري متميز طوال الرحلة.\nتنظيم مزارات مكة المكرمة والمدينة المنورة.',
-        pricePerPerson: 0,
-        personsCount: 1,
-        pricePerChild: 0,
-        childrenCount: 0,
-        additionalFees: 0,
-        discounts: 0,
-        paymentPolicy: '1. يتم سداد 50% من إجمالي قيمة البرنامج عند الحجز.\n2. يتم سداد باقي المبلغ قبل السفر بـ 15 يوماً كحد أقصى.',
-        termsAndConditions: '• جواز سفر صالح لمدة 6 أشهر على الأقل من تاريخ السفر.\n• التطعيمات اللازمة وتصريح السفر (إن وجد).',
-      });
-    }
-  };
-
-  // Section UI helper
-  const SectionHeader = ({ title, icon: Icon }: { title: string, icon: React.ElementType }) => (
+  const SectionHeader = ({ title, icon: Icon }: { title: string; icon: React.ElementType }) => (
     <div className="flex items-center gap-2 text-navy-900 mb-4 pb-2 border-b border-gray-200">
-      <div className="p-2 bg-navy-50 text-navy-700 rounded-lg"><Icon size={18} /></div>
+      <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg"><Icon size={18} /></div>
       <h3 className="text-lg font-bold">{title}</h3>
     </div>
   );
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* Page Header (No Print) */}
-      <div className="flex items-center justify-between no-print">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">طلب عرض سعر</h1>
-          <p className="text-gray-500 text-sm mt-0.5">إنشاء نموذج عرض سعر بصيغة PDF</p>
+          <p className="text-gray-500 text-sm mt-0.5">نظام مرن لعروض البرامج السياحية والخدمات المنفصلة</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={handleReset} className="btn-secondary flex items-center gap-2">
-            <RefreshCw size={16} /> إعادة تعيين
-          </button>
-          <button onClick={handlePrint} className="btn-gold flex items-center gap-2">
-            <Printer size={16} /> طباعة / تحميل PDF
-          </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={resetForm} className="btn-secondary flex items-center gap-2"><RefreshCw size={16} /> إعادة تعيين</button>
+          <button onClick={() => saveQuotation('draft')} disabled={saving || !canEditQuotation} className="btn-secondary flex items-center gap-2 disabled:opacity-50"><Save size={16} /> حفظ</button>
+          <button onClick={() => saveQuotation('issued')} disabled={saving || !canEditQuotation} className="btn-gold flex items-center gap-2 disabled:opacity-50"><FileCheck size={16} /> إصدار العرض</button>
+          <button onClick={printQuotation} className="btn-gold flex items-center gap-2"><Printer size={16} /> طباعة / تحميل PDF</button>
         </div>
       </div>
 
-      {/* Form Area (No Print) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 no-print">
-        
-        {/* 1. Client Data */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="بيانات العميل والبرنامج" icon={User} />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <SectionHeader title="بيانات العميل" icon={User} />
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">اسم العميل (الجهة)</label>
-              <input type="text" name="clientName" value={form.clientName} onChange={handleChange} className="input-field" placeholder="اسم العميل الموجه له العرض" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">تاريخ العرض</label>
-              <input type="date" name="quotationDate" value={form.quotationDate} onChange={handleChange} className="input-field" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">القسم</label>
-                <select name="programSection" value={form.programSection} onChange={handleChange} className="input-field">
-                  <option value="حج">حج</option>
-                  <option value="عمرة">عمرة</option>
-                  <option value="سياحة داخلية">سياحة داخلية</option>
-                  <option value="سياحة خارجية">سياحة خارجية</option>
-                  <option value="أخرى">أخرى</option>
-                </select>
+              <label className="form-label">بحث عن عميل</label>
+              <div className="relative">
+                <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} className="input-field pr-9" placeholder="الاسم، الهاتف، أو كود العميل" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">درجة البرنامج</label>
-                <input type="text" name="programGrade" value={form.programGrade} onChange={handleChange} className="input-field" placeholder="مثال: VIP, اقتصادي" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Trip Data */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="بيانات الرحلة" icon={Calendar} />
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">تاريخ الذهاب</label>
-                <input type="date" name="departureDate" value={form.departureDate} onChange={handleChange} className="input-field" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">تاريخ العودة</label>
-                <input type="date" name="returnDate" value={form.returnDate} onChange={handleChange} className="input-field" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">عدد الأيام</label>
-                <input type="number" name="daysCount" value={form.daysCount || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">عدد الليالي</label>
-                <input type="number" name="nightsCount" value={form.nightsCount || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Hotels */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="الإقامة الفندقية" icon={Building2} />
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-              <p className="text-xs font-bold text-gray-500 mb-2">مكة المكرمة</p>
-              <div className="grid grid-cols-6 gap-2">
-                <div className="col-span-3">
-                  <input type="text" name="meccaHotelName" value={form.meccaHotelName} onChange={handleChange} className="input-field text-sm px-2 py-1.5" placeholder="اسم الفندق" />
-                </div>
-                <div className="col-span-1.5">
-                  <input type="number" name="meccaHotelStars" value={form.meccaHotelStars || ''} onChange={handleChange} className="input-field text-sm px-2 py-1.5 text-center" placeholder="النجوم" />
-                </div>
-                <div className="col-span-1.5">
-                  <input type="number" name="meccaHotelNights" value={form.meccaHotelNights || ''} onChange={handleChange} className="input-field text-sm px-2 py-1.5 text-center" placeholder="الليالي" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-              <p className="text-xs font-bold text-gray-500 mb-2">المدينة المنورة</p>
-              <div className="grid grid-cols-6 gap-2">
-                <div className="col-span-3">
-                  <input type="text" name="medinaHotelName" value={form.medinaHotelName} onChange={handleChange} className="input-field text-sm px-2 py-1.5" placeholder="اسم الفندق" />
-                </div>
-                <div className="col-span-1.5">
-                  <input type="number" name="medinaHotelStars" value={form.medinaHotelStars || ''} onChange={handleChange} className="input-field text-sm px-2 py-1.5 text-center" placeholder="النجوم" />
-                </div>
-                <div className="col-span-1.5">
-                  <input type="number" name="medinaHotelNights" value={form.medinaHotelNights || ''} onChange={handleChange} className="input-field text-sm px-2 py-1.5 text-center" placeholder="الليالي" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Flight & Itinerary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="الطيران ومسار الرحلة" icon={Plane} />
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">شركة الطيران</label>
-                <input type="text" name="airline" value={form.airline} onChange={handleChange} className="input-field" placeholder="مثال: مصر للطيران" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">درجة الطيران</label>
-                <input type="text" name="flightClass" value={form.flightClass} onChange={handleChange} className="input-field" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">مدينة المغادرة</label>
-                <input type="text" name="departureCity" value={form.departureCity} onChange={handleChange} className="input-field" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">مدينة الوصول</label>
-                <input type="text" name="arrivalCity" value={form.arrivalCity} onChange={handleChange} className="input-field" />
+              <div className="mt-2 max-h-44 overflow-y-auto border border-gray-100 rounded-xl">
+                {filteredCustomers.map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => {
+                      updateField('customerId', customer.id);
+                      updateField('clientName', customer.name);
+                      setCustomerSearch(`${customer.name} ${customer.client_code ? `(${customer.client_code})` : ''}`);
+                    }}
+                    className={`w-full text-right px-3 py-2 border-b border-gray-50 last:border-b-0 hover:bg-emerald-50 ${form.customerId === customer.id ? 'bg-emerald-50 text-emerald-900 font-bold' : 'text-gray-700'}`}
+                  >
+                    <span className="block text-sm">{customer.name}</span>
+                    <span className="block text-[11px] text-gray-400">{customer.client_code || 'بدون كود'} - {customer.phone}</span>
+                  </button>
+                ))}
+                {filteredCustomers.length === 0 && <div className="px-3 py-4 text-xs text-gray-400 text-center">لا توجد نتائج</div>}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">مسار الرحلة بالتفصيل</label>
-              <input type="text" name="departureRoute" value={form.departureRoute} onChange={handleChange} className="input-field mb-2" placeholder="الذهاب: (مثال: القاهرة - جدة)" />
-              <input type="text" name="returnRoute" value={form.returnRoute} onChange={handleChange} className="input-field" placeholder="العودة: (مثال: المدينة - القاهرة)" />
+              <label className="form-label">اسم العميل في العرض</label>
+              <input value={form.clientName} onChange={(e) => updateField('clientName', e.target.value)} className="input-field" placeholder="اسم العميل أو الجهة" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">تاريخ العرض</label>
+                <input type="date" value={form.quotationDate} onChange={(e) => updateField('quotationDate', e.target.value)} className="input-field" />
+              </div>
+              <div>
+                <label className="form-label">صالح حتى</label>
+                <input type="date" value={form.validUntil} onChange={(e) => updateField('validUntil', e.target.value)} className="input-field" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 5. Transport & Meals */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="التنقلات والوجبات" icon={Bus} />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <SectionHeader title="نوع العرض" icon={Briefcase} />
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">نوع التنقلات الداخلية</label>
-                <input type="text" name="transportType" value={form.transportType} onChange={handleChange} className="input-field" placeholder="حافلة, سيارة خاصة" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">درجة النقل</label>
-                <input type="text" name="transportClass" value={form.transportClass} onChange={handleChange} className="input-field" />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => updateField('quotationKind', 'services')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${form.quotationKind === 'services' ? 'bg-emerald-900 text-white border-emerald-900' : 'bg-white text-gray-600 border-gray-200'}`}>خدمات منفصلة</button>
+              <button onClick={() => updateField('quotationKind', 'program')} className={`rounded-xl border px-4 py-3 text-sm font-bold ${form.quotationKind === 'program' ? 'bg-emerald-900 text-white border-emerald-900' : 'bg-white text-gray-600 border-gray-200'}`}>برنامج رحلة كامل</button>
             </div>
-            <div className="h-px bg-gray-100 my-4"></div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Utensils size={14} className="text-gray-400"/> نوع الوجبات</label>
-              <select name="mealsType" value={form.mealsType} onChange={handleChange} className="input-field mb-2">
-                <option value="بدون وجبات">بدون وجبات</option>
-                <option value="إفطار فقط">إفطار فقط</option>
-                <option value="نصف إقامة (إفطار وعشاء)">نصف إقامة (إفطار وعشاء)</option>
-                <option value="إقامة كاملة (3 وجبات)">إقامة كاملة (3 وجبات)</option>
-                <option value="أخرى">أخرى</option>
-              </select>
-              <input type="text" name="mealsDescription" value={form.mealsDescription} onChange={handleChange} className="input-field" placeholder="وصف إضافي للوجبات (اختياري)" />
+              <label className="form-label">عنوان العرض</label>
+              <input value={form.title} onChange={(e) => updateField('title', e.target.value)} className="input-field" placeholder="مثال: تأشيرات وطيران دبي والصين" />
             </div>
+            {form.quotationKind === 'program' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">القسم</label>
+                  <select value={form.programSection} onChange={(e) => updateField('programSection', e.target.value)} className="input-field">
+                    <option value="حج">حج</option>
+                    <option value="عمرة">عمرة</option>
+                    <option value="سياحة داخلية">سياحة داخلية</option>
+                    <option value="سياحة خارجية">سياحة خارجية</option>
+                    <option value="أخرى">أخرى</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">درجة البرنامج</label>
+                  <select value={form.programGrade} onChange={(e) => updateField('programGrade', e.target.value)} className="input-field">
+                    {programGrades.map((grade) => <option key={grade.id} value={grade.name}>{grade.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 6. Costs */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-1">
-          <SectionHeader title="تكلفة البرنامج" icon={DollarSign} />
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">سعر الفرد البالغ</label>
-                <input type="number" name="pricePerPerson" value={form.pricePerPerson || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">العدد</label>
-                <input type="number" name="personsCount" value={form.personsCount || ''} onChange={handleChange} className="input-field" min="1" />
-              </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <SectionHeader title="الإجمالي" icon={FileText} />
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm"><span className="text-gray-500">قبل الخصم والضريبة</span><span className="font-bold">{money(subtotal)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-500">الخصومات</span><span className="font-bold text-red-600">-{money(totalDiscount)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-gray-500">الضرائب</span><span className="font-bold text-emerald-700">{money(totalTax)}</span></div>
+            <div className="rounded-xl bg-emerald-900 text-white p-4 flex justify-between items-center">
+              <span className="font-bold">الإجمالي النهائي</span>
+              <span className="text-xl font-black text-gold-300">{money(total)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">سعر الطفل</label>
-                <input type="number" name="pricePerChild" value={form.pricePerChild || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">عدد الأطفال</label>
-                <input type="number" name="childrenCount" value={form.childrenCount || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">رسوم إضافية</label>
-                <input type="number" name="additionalFees" value={form.additionalFees || ''} onChange={handleChange} className="input-field" min="0" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">خصومات</label>
-                <input type="number" name="discounts" value={form.discounts || ''} onChange={handleChange} className="input-field text-red-500" min="0" />
-              </div>
-            </div>
-            <div className="mt-2 p-3 bg-navy-50 rounded-xl border border-navy-100 flex justify-between items-center">
-              <span className="font-bold text-navy-900">الإجمالي النهائي:</span>
-              <span className="text-xl font-bold text-emerald-600">{totalCost.toLocaleString('ar-EG')} ج.م</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 7. Text Areas */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 xl:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <SectionHeader title="الإشراف والزيارات" icon={Users} />
-            <textarea name="supervisionProgram" value={form.supervisionProgram} onChange={handleChange} className="input-field min-h-[150px] resize-y leading-relaxed" placeholder="تفاصيل الإشراف والزيارات والمزارات..." />
-          </div>
-          <div>
-            <SectionHeader title="سياسات السداد" icon={Wallet} />
-            <textarea name="paymentPolicy" value={form.paymentPolicy} onChange={handleChange} className="input-field min-h-[150px] resize-y leading-relaxed" placeholder="شروط الدفع المسبق، الإلغاء، وغيرها..." />
-          </div>
-          <div>
-            <SectionHeader title="الشروط والأحكام" icon={FileCheck} />
-            <textarea name="termsAndConditions" value={form.termsAndConditions} onChange={handleChange} className="input-field min-h-[150px] resize-y leading-relaxed" placeholder="الشروط العامة، الأوراق المطلوبة، وغيرها..." />
+            <button onClick={convertToBooking} disabled={converting || !savedQuotationId || total <= 0} className="w-full btn-secondary justify-center disabled:opacity-50">
+              <CheckCircle2 size={16} /> تحويل إلى حجز
+            </button>
           </div>
         </div>
       </div>
 
+      {form.quotationKind === 'program' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <SectionHeader title="تفاصيل البرنامج" icon={Calendar} />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div><label className="form-label">تاريخ الذهاب</label><input type="date" value={form.departureDate} onChange={(e) => updateField('departureDate', e.target.value)} className="input-field" /></div>
+            <div><label className="form-label">تاريخ العودة</label><input type="date" value={form.returnDate} onChange={(e) => updateField('returnDate', e.target.value)} className="input-field" /></div>
+            <div><label className="form-label">عدد الأيام</label><input type="number" min="0" value={form.daysCount || ''} onChange={(e) => updateField('daysCount', Number(e.target.value) || 0)} className="input-field" /></div>
+            <div><label className="form-label">عدد الليالي</label><input type="number" min="0" value={form.nightsCount || ''} onChange={(e) => updateField('nightsCount', Number(e.target.value) || 0)} className="input-field" /></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div><label className="form-label">تفاصيل البرنامج</label><textarea value={form.programDetails} onChange={(e) => updateField('programDetails', e.target.value)} className="input-field min-h-[110px] resize-y" placeholder="تفاصيل البرنامج، الزيارات، المزارات، أو خط السير..." /></div>
+            <div><label className="form-label flex items-center gap-1"><Hotel size={14} /> تفاصيل الفندق إن وجدت</label><textarea value={form.hotelDetails} onChange={(e) => updateField('hotelDetails', e.target.value)} className="input-field min-h-[110px] resize-y" placeholder="لا تكتب شيئًا إذا لم يتضمن العرض فندقًا." /></div>
+          </div>
+        </div>
+      )}
 
-      {/* 
-        ================================================================================
-        PRINT TEMPLATE (Hidden from normal view, used for string extraction)
-        ================================================================================
-      */}
+      {canManageGrades && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-lg font-bold text-navy-900">إدارة درجات البرامج</h3>
+              <p className="text-xs text-gray-500 mt-1">تظهر هذه الدرجات في عروض البرامج فقط ولا تقيّد عروض الخدمات المنفصلة.</p>
+            </div>
+            <div className="flex gap-2">
+              <input value={newGradeName} onChange={(e) => setNewGradeName(e.target.value)} className="input-field w-48" placeholder="درجة جديدة" />
+              <button type="button" onClick={addProgramGrade} className="btn-secondary"><Plus size={15} /> إضافة</button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {programGrades.map((grade) => (
+              <span key={grade.id} className="badge bg-emerald-50 text-emerald-800 border border-emerald-100 px-3 py-1.5 flex items-center gap-2">
+                {grade.name}
+                <button type="button" onClick={() => archiveProgramGrade(grade)} className="text-red-500 hover:text-red-700" title="إخفاء">
+                  <Trash2 size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
+          <div>
+            <h3 className="text-lg font-bold text-navy-900">بنود الخدمات</h3>
+            <p className="text-xs text-gray-500 mt-1">يمكن إضافة خدمة واحدة أو عدد غير محدود من الخدمات بدون إلزام ببرنامج أو فندق.</p>
+          </div>
+          <button onClick={() => setItems((current) => [...current, newItem()])} disabled={!canEditQuotation} className="btn-gold flex items-center gap-2 disabled:opacity-50"><Plus size={16} /> إضافة خدمة</button>
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {serviceSuggestions.map((service) => (
+            <button key={service} onClick={() => setItems((current) => [...current, newItem(service)])} disabled={!canEditQuotation} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-100 hover:border-emerald-300 disabled:opacity-50">+ {service}</button>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <div key={item.id} className="grid grid-cols-1 lg:grid-cols-12 gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
+              <div className="lg:col-span-2"><label className="form-label">اسم الخدمة</label><input value={item.serviceName} onChange={(e) => updateItem(item.id, 'serviceName', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100" placeholder={`خدمة ${index + 1}`} /></div>
+              <div className="lg:col-span-3"><label className="form-label">الوصف</label><input value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100" placeholder="وصف مختصر للخدمة" /></div>
+              <div><label className="form-label">العدد</label><input type="number" min="0" value={item.quantity || ''} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100" /></div>
+              <div className="lg:col-span-2"><label className="form-label">سعر الوحدة</label><input type="number" min="0" value={item.unitPrice || ''} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100" /></div>
+              <div><label className="form-label">الخصم</label><input type="number" min="0" value={item.discount || ''} onChange={(e) => updateItem(item.id, 'discount', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100 text-red-600" /></div>
+              <div><label className="form-label">الضريبة</label><input type="number" min="0" value={item.tax || ''} onChange={(e) => updateItem(item.id, 'tax', e.target.value)} disabled={!canEditQuotation} className="input-field bg-white disabled:bg-gray-100 text-emerald-700" /></div>
+              <div className="lg:col-span-2">
+                <label className="form-label">الإجمالي</label>
+                <div className="input-field bg-white font-black text-emerald-800 flex items-center justify-between">
+                  <span>{money(lineTotal(item))}</span>
+                  {items.length > 1 && canEditQuotation && <button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} className="text-red-500 hover:text-red-700"><Trash2 size={15} /></button>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div><SectionHeader title="الطيران" icon={Briefcase} /><textarea value={form.flightDetails} onChange={(e) => updateField('flightDetails', e.target.value)} className="input-field min-h-[120px] resize-y" placeholder="تفاصيل الطيران إن وجدت، واتركه فارغًا إذا لم يكن ضمن العرض." /></div>
+        <div><SectionHeader title="المواصلات" icon={Briefcase} /><textarea value={form.transportDetails} onChange={(e) => updateField('transportDetails', e.target.value)} className="input-field min-h-[120px] resize-y" placeholder="تفاصيل النقل، القطار، الاستقبال والتوديع إن وجدت." /></div>
+        <div><SectionHeader title="الشروط والسداد" icon={FileCheck} /><textarea value={form.paymentPolicy} onChange={(e) => updateField('paymentPolicy', e.target.value)} className="input-field min-h-[58px] resize-y mb-3" placeholder="سياسة السداد" /><textarea value={form.termsAndConditions} onChange={(e) => updateField('termsAndConditions', e.target.value)} className="input-field min-h-[58px] resize-y" placeholder="الشروط والأحكام" /></div>
+      </div>
+
       <div id="quotation-print" className="hidden">
-        {/* Header */}
-        <div className="print-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <img
-              src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg"
-              alt="Promise Travel"
-              style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }}
-            />
-            <div>
-              <h1 className="print-title">عرض سعر برنامج سياحي</h1>
-              <p className="print-subtitle" style={{ fontSize: '13px', fontWeight: 'bold', color: '#0c224f' }}>بروميس للسياحة والسفر — PROMISE TRAVEL</p>
+        <main className="quote-sheet">
+          <header className="quote-header">
+            <div className="brand">
+              <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise Travel" />
+              <div>
+                <h1>{form.quotationKind === 'program' ? 'عرض سعر برنامج سياحي' : 'عرض سعر خدمات سياحية'}</h1>
+                <div className="muted">PROMISE TRAVEL - بروميس للسياحة والسفر</div>
+              </div>
             </div>
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-bold text-gray-800">التاريخ: {new Date(form.quotationDate).toLocaleDateString('ar-EG')}</p>
-            <p className="text-sm text-gray-500 mt-1">السادة / <span className="font-bold text-navy-900 text-base">{form.clientName || '..............................'}</span></p>
-            <p className="text-xs text-gray-400 mt-1">تحية طيبة وبعد،،،</p>
-          </div>
-        </div>
-
-        {/* 1. Trip Summary */}
-        <div className="print-section">
-          <div className="print-section-title">ملخص البرنامج ({form.programSection} - {form.programGrade})</div>
-          <table className="print-table">
-            <tbody>
-              <tr>
-                <th>تاريخ الذهاب</th>
-                <td>{form.departureDate ? new Date(form.departureDate).toLocaleDateString('ar-EG') : '—'}</td>
-                <th>تاريخ العودة</th>
-                <td>{form.returnDate ? new Date(form.returnDate).toLocaleDateString('ar-EG') : '—'}</td>
-              </tr>
-              <tr>
-                <th>المدة الزمنية</th>
-                <td>{form.daysCount} أيام / {form.nightsCount} ليالي</td>
-                <th>خط السير</th>
-                <td>
-                  {form.departureRoute && <div><strong>الذهاب:</strong> {form.departureRoute}</div>}
-                  {form.returnRoute && <div><strong>العودة:</strong> {form.returnRoute}</div>}
-                  {!form.departureRoute && !form.returnRoute && '—'}
-                </td>
-              </tr>
-              <tr>
-                <th>الطيران</th>
-                <td>{form.airline || '—'} ({form.flightClass})</td>
-                <th>التنقلات الداخلية</th>
-                <td>{form.transportType} ({form.transportClass})</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* 2. Accommodation */}
-        <div className="print-section">
-          <div className="print-section-title">الإقامة الفندقية والوجبات</div>
-          <table className="print-table">
-            <thead>
-              <tr>
-                <th style={{width: '20%'}}>المدينة</th>
-                <th style={{width: '40%'}}>اسم الفندق</th>
-                <th style={{width: '20%'}}>المستوى (النجوم)</th>
-                <th style={{width: '20%'}}>عدد الليالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.meccaHotelName && (
-                <tr>
-                  <td className="font-bold text-center">مكة المكرمة</td>
-                  <td>{form.meccaHotelName}</td>
-                  <td className="text-center">{form.meccaHotelStars ? `${form.meccaHotelStars} نجوم` : '—'}</td>
-                  <td className="text-center">{form.meccaHotelNights} ليالي</td>
-                </tr>
-              )}
-              {form.medinaHotelName && (
-                <tr>
-                  <td className="font-bold text-center">المدينة المنورة</td>
-                  <td>{form.medinaHotelName}</td>
-                  <td className="text-center">{form.medinaHotelStars ? `${form.medinaHotelStars} نجوم` : '—'}</td>
-                  <td className="text-center">{form.medinaHotelNights} ليالي</td>
-                </tr>
-              )}
-              {!form.meccaHotelName && !form.medinaHotelName && (
-                <tr><td colSpan={4} className="text-center text-gray-500 py-4">لم يتم تحديد فنادق</td></tr>
-              )}
-            </tbody>
-          </table>
-          <div className="mt-2 text-sm">
-            <span className="font-bold text-gray-800 ml-2">نظام الوجبات:</span>
-            <span className="text-gray-600">{form.mealsType} {form.mealsDescription && `- ${form.mealsDescription}`}</span>
-          </div>
-        </div>
-
-        {/* 3. Text Areas (Supervision, Policies, Terms) */}
-        <div className="print-section">
-          <div className="print-grid">
-            <div className="print-box">
-              <div className="print-box-title">برنامج الإشراف والزيارات</div>
-              <div className="print-text">{form.supervisionProgram || 'لا يوجد'}</div>
+            <div className="meta">
+              <div>التاريخ: {new Date(form.quotationDate).toLocaleDateString('ar-EG')}</div>
+              {form.validUntil && <div>صالح حتى: {new Date(form.validUntil).toLocaleDateString('ar-EG')}</div>}
+              {selectedCustomer?.client_code && <div>كود العميل: {selectedCustomer.client_code}</div>}
             </div>
-            <div className="print-box">
-              <div className="print-box-title">سياسات التعاقد والسداد</div>
-              <div className="print-text">{form.paymentPolicy || 'لا يوجد'}</div>
+          </header>
+
+          <section className="section">
+            <div className="section-title">{form.title || 'عرض سعر'}</div>
+            <div className="info-grid">
+              <div className="info-box"><strong>العميل</strong>{form.clientName || selectedCustomer?.name || '—'}</div>
+              <div className="info-box"><strong>نوع العرض</strong>{form.quotationKind === 'program' ? 'برنامج رحلة كامل' : 'خدمات منفصلة'}</div>
+              {form.quotationKind === 'program' && <div className="info-box"><strong>القسم</strong>{form.programSection}</div>}
+              {form.quotationKind === 'program' && <div className="info-box"><strong>درجة البرنامج</strong>{form.programGrade}</div>}
+              {form.quotationKind === 'program' && form.departureDate && <div className="info-box"><strong>تاريخ الذهاب</strong>{new Date(form.departureDate).toLocaleDateString('ar-EG')}</div>}
+              {form.quotationKind === 'program' && form.returnDate && <div className="info-box"><strong>تاريخ العودة</strong>{new Date(form.returnDate).toLocaleDateString('ar-EG')}</div>}
+              {form.quotationKind === 'program' && (form.daysCount > 0 || form.nightsCount > 0) && <div className="info-box"><strong>المدة</strong>{form.daysCount || 0} أيام / {form.nightsCount || 0} ليالي</div>}
             </div>
-          </div>
-        </div>
-        
-        <div className="print-section">
-          <div className="print-box">
-            <div className="print-box-title">الشروط والأحكام العامة</div>
-            <div className="print-text">{form.termsAndConditions || 'لا يوجد'}</div>
-          </div>
-        </div>
+          </section>
 
-        {/* 4. Financials */}
-        <div className="print-section" style={{ pageBreakInside: 'avoid' }}>
-          <div className="print-section-title">التكلفة المالية</div>
-          <table className="print-table">
-            <thead>
-              <tr>
-                <th>البيان</th>
-                <th>العدد</th>
-                <th>سعر الفرد</th>
-                <th>الإجمالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.personsCount > 0 && (
-                <tr>
-                  <td>سعر البالغين</td>
-                  <td className="text-center">{form.personsCount}</td>
-                  <td className="text-center">{form.pricePerPerson.toLocaleString('ar-EG')} ج.م</td>
-                  <td className="text-center font-bold">{(form.pricePerPerson * form.personsCount).toLocaleString('ar-EG')} ج.م</td>
-                </tr>
-              )}
-              {form.childrenCount > 0 && (
-                <tr>
-                  <td>سعر الأطفال</td>
-                  <td className="text-center">{form.childrenCount}</td>
-                  <td className="text-center">{form.pricePerChild.toLocaleString('ar-EG')} ج.م</td>
-                  <td className="text-center font-bold">{(form.pricePerChild * form.childrenCount).toLocaleString('ar-EG')} ج.م</td>
-                </tr>
-              )}
-              {form.additionalFees > 0 && (
-                <tr>
-                  <td colSpan={3}>رسوم إضافية</td>
-                  <td className="text-center font-bold">{form.additionalFees.toLocaleString('ar-EG')} ج.م</td>
-                </tr>
-              )}
-              {form.discounts > 0 && (
-                <tr>
-                  <td colSpan={3}>خصومات</td>
-                  <td className="text-center font-bold text-red-600">-{form.discounts.toLocaleString('ar-EG')} ج.م</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          
-          <div className="print-total-box">
-            <span className="print-total-label">إجمالي تكلفة البرنامج المقترحة:</span>
-            <span className="print-total-value">{totalCost.toLocaleString('ar-EG')} ج.م</span>
-          </div>
-        </div>
+          {form.quotationKind === 'program' && form.programDetails.trim() && <section className="section"><div className="section-title">تفاصيل البرنامج</div><div className="text-block">{form.programDetails}</div></section>}
+          {form.quotationKind === 'program' && form.hotelDetails.trim() && <section className="section"><div className="section-title">الإقامة الفندقية</div><div className="text-block">{form.hotelDetails}</div></section>}
+          {(form.flightDetails.trim() || form.transportDetails.trim()) && (
+            <section className="section">
+              <div className="info-grid">
+                {form.flightDetails.trim() && <div className="text-block"><strong>الطيران</strong><br />{form.flightDetails}</div>}
+                {form.transportDetails.trim() && <div className="text-block"><strong>المواصلات</strong><br />{form.transportDetails}</div>}
+              </div>
+            </section>
+          )}
 
-        {/* Signatures */}
-        <div className="signature-area">
-          <div className="signature-box">
-            <div className="signature-line">توقيع العميل بالموافقة</div>
-          </div>
-          <div className="signature-box">
-            <div className="signature-line">توقيع مدير المبيعات</div>
-          </div>
-          <div className="signature-box">
-            <div className="signature-line">ختم الشركة المعتمد</div>
-          </div>
-        </div>
+          <section className="section">
+            <div className="section-title">بنود الخدمات والتكلفة</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>الخدمة</th>
+                  <th>الوصف</th>
+                  <th className="text-center">العدد</th>
+                  <th className="text-center">سعر الوحدة</th>
+                  <th className="text-center">الخصم</th>
+                  <th className="text-center">الضريبة</th>
+                  <th className="text-center">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeItems.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.serviceName}</td>
+                    <td>{item.description || '—'}</td>
+                    <td className="text-center">{item.quantity}</td>
+                    <td className="text-center">{money(item.unitPrice)}</td>
+                    <td className="text-center">{item.discount > 0 ? money(item.discount) : '—'}</td>
+                    <td className="text-center">{item.tax > 0 ? money(item.tax) : '—'}</td>
+                    <td className="text-center"><strong>{money(lineTotal(item))}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="total-panel"><span>الإجمالي النهائي لعرض السعر</span><span>{money(total)}</span></div>
+          </section>
 
-        {/* Footer */}
-        <div className="print-footer">
-          <p>PROMISE TRAVEL & TOURS - نظام إدارة الحج والعمرة | جميع الأسعار قابلة للتغيير بناءً على سياسات الطيران والضرائب</p>
-        </div>
+          {(form.paymentPolicy.trim() || form.termsAndConditions.trim()) && (
+            <section className="section">
+              <div className="info-grid">
+                {form.paymentPolicy.trim() && <div className="text-block"><strong>سياسة السداد</strong><br />{form.paymentPolicy}</div>}
+                {form.termsAndConditions.trim() && <div className="text-block"><strong>الشروط والأحكام</strong><br />{form.termsAndConditions}</div>}
+              </div>
+            </section>
+          )}
+
+          <div className="signatures">
+            <div className="signature">توقيع العميل بالموافقة</div>
+            <div className="signature">توقيع مسؤول المبيعات</div>
+            <div className="signature">ختم الشركة</div>
+          </div>
+          <footer className="footer">هذا العرض مبني فقط على البيانات والبنود المدخلة، ولا يتضمن أي خدمة غير مذكورة صراحة في العرض.</footer>
+        </main>
       </div>
-      
     </div>
   );
 }
