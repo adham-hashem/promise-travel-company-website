@@ -190,10 +190,12 @@ export default function BookingPage({ preset, onDone }: Props) {
         const uploadFile = file.type.startsWith('image/') ? await compressImage(file) : file;
         const { error: upErr } = await supabase.storage.from('documents').upload(filePath, uploadFile);
         if (upErr) continue;
+        const { data: publicFile } = supabase.storage.from('documents').getPublicUrl(filePath);
         await supabase.from('documents').insert({
           inquiry_id: inquiry.id,
           doc_type: docType.id,
           file_path: filePath,
+          file_url: publicFile.publicUrl,
           file_name: file.name,
           file_size: uploadFile.size,
           status: 'مرفوع',

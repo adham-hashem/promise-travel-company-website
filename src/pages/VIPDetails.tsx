@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, Star, Users, DollarSign, Briefcase, Clock, 
-  Plane, Calendar, Plus, Upload, CheckCircle2, AlertCircle, FileText, Save
+  Plane, Calendar, Plus, Upload, CheckCircle2, AlertCircle, FileText, Save, Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,7 +31,7 @@ interface VipPaymentRow {
 }
 
 export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const [trip, setTrip] = useState<VIPTrip | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [logs, setLogs] = useState<VIPTripLog[]>([]);
@@ -42,6 +42,7 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
   const [savingPricing, setSavingPricing] = useState(false);
   const [savingExecutionItem, setSavingExecutionItem] = useState<string | null>(null);
   const [operating, setOperating] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info'|'customers'|'financial'|'execution'|'logs'>('info');
 
@@ -182,9 +183,9 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
       
       // Handle File Uploads in Background
       const docTypes = [
-        { id: 'passport_image', label: 'جواز السفر' },
-        { id: 'personal_photo', label: 'الصورة الشخصية' },
-        { id: 'national_id_image', label: 'بطاقة الهوية' }
+        { id: 'passport_image', label: 'جواز سفر' },
+        { id: 'personal_photo', label: 'صورة شخصية' },
+        { id: 'national_id_image', label: 'بطاقة رقم قومي' }
       ];
 
       const uploadPromises = docTypes.map(async (d) => {
@@ -205,11 +206,17 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
           .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
           
         if (uploadError) throw uploadError;
+
+        const { data: publicFile } = supabase.storage.from('documents').getPublicUrl(fileName);
         
         await supabase.from('documents').insert({
           customer_id: data.id,
-          document_type: d.label,
+          client_code: data.client_code || null,
+          doc_type: d.label,
           file_path: fileName,
+          file_url: publicFile.publicUrl,
+          file_name: compressedFile.name,
+          file_size: compressedFile.size,
           uploaded_by: profile?.id
         });
       });
@@ -407,6 +414,70 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
     }
   };
 
+  const handleDeleteVipCustomer = async (customer: Customer) => {
+    if (!can('customers_delete')) return;
+    if (!confirm('هل أنت متأكد من حذف عميل VIP؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+
+    setDeletingCustomerId(customer.id);
+    try {
+      const [{ data: hasFlight }, { data: hasPayment }] = await Promise.all([
+        supabase.from('flight_tickets').select('id').eq('customer_id', customer.id).limit(1),
+        supabase.from('payments').select('id').eq('customer_id', customer.id).limit(1),
+      ]);
+
+      if (hasFlight && hasFlight.length > 0) {
+        alert('لا يمكن حذف عميل VIP لأنه مرتبط بتذاكر طيران. احذف أو عالج التذاكر المرتبطة أولاً لضمان سلامة البيانات.');
+        return;
+      }
+
+      if (hasPayment && hasPayment.length > 0) {
+        alert('لا يمكن حذف عميل VIP لأنه مرتبط بحركات مالية. احذف أو عالج القيود المالية المرتبطة أولاً لضمان سلامة الحسابات.');
+        return;
+      }
+
+      const { data: opFiles } = await supabase.from('operation_files').select('id').eq('customer_id', customer.id);
+      const opFileIds = (opFiles || []).map((file) => file.id);
+
+      if (opFileIds.length > 0) {
+        await supabase.from('operation_logs').delete().in('file_id', opFileIds);
+        await supabase.from('operation_file_documents').delete().in('operation_file_id', opFileIds);
+      }
+
+      await Promise.all([
+        supabase.from('workflow_timeline').delete().eq('customer_id', customer.id),
+        supabase.from('operation_files').delete().eq('customer_id', customer.id),
+        supabase.from('bookings').delete().eq('customer_id', customer.id),
+        supabase.from('documents').delete().eq('customer_id', customer.id),
+        supabase.from('visa_management').delete().eq('customer_id', customer.id),
+        supabase.from('travel_group_members').delete().eq('customer_id', customer.id),
+      ]);
+
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customer.id)
+        .eq('is_vip', true)
+        .eq('vip_trip_id', tripId);
+      if (error) throw error;
+
+      await supabase.from('vip_trip_logs').insert({
+        trip_id: tripId,
+        user_id: profile?.id,
+        action: 'حذف عميل',
+        details: `تم حذف عميل VIP: ${customer.name}`,
+      });
+
+      setCustomers((current) => current.filter((item) => item.id !== customer.id));
+      setVipBookings((current) => current.filter((item) => item.customer_id !== customer.id));
+      setVipPayments((current) => current.filter((item) => item.customer_id !== customer.id));
+      loadTripDetails();
+    } catch (err: any) {
+      alert('خطأ في حذف عميل VIP: ' + (err?.message || 'حدث خطأ غير متوقع'));
+    } finally {
+      setDeletingCustomerId(null);
+    }
+  };
+
   const getCustomerBooking = (customerId: string) => vipBookings.find((booking) => booking.customer_id === customerId);
   const getCustomerPaid = (customerId: string) => vipPayments
     .filter((payment) => payment.customer_id === customerId && payment.status !== 'غير مدفوع')
@@ -535,12 +606,24 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">{c.phone}</p>
                     </div>
-                    <button 
-                      onClick={() => onNavigate('customer-details', c.id)}
-                      className="text-gold-600 hover:text-gold-700 text-sm font-bold bg-gold-50 px-3 py-1.5 rounded-lg"
-                    >
-                      فتح الملف
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => onNavigate('customer-details', c.id)}
+                        className="text-gold-600 hover:text-gold-700 text-sm font-bold bg-gold-50 px-3 py-1.5 rounded-lg"
+                      >
+                        فتح الملف
+                      </button>
+                      {can('customers_delete') && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVipCustomer(c)}
+                          disabled={deletingCustomerId === c.id}
+                          className="text-red-600 hover:text-red-700 text-sm font-bold bg-red-50 px-3 py-1.5 rounded-lg disabled:opacity-60 flex items-center gap-1"
+                        >
+                          <Trash2 size={14} /> {deletingCustomerId === c.id ? 'جارٍ الحذف...' : 'حذف'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

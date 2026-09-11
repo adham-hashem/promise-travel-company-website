@@ -11,6 +11,7 @@ import type { DocumentRecord, DocType, DocStatus } from '../types';
 interface Props {
   customerId?: string;
   bookingId?: string;
+  customerCode?: string;
   customerName?: string;
   onDocsChange?: (docs: DocumentRecord[]) => void;
 }
@@ -30,7 +31,7 @@ const statusConfig: Record<DocStatus, { label: string; class: string; icon: type
   'مرفوض': { label: 'مرفوض', class: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-export default function DocumentsSection({ customerId, bookingId, customerName, onDocsChange }: Props) {
+export default function DocumentsSection({ customerId, bookingId, customerCode, customerName, onDocsChange }: Props) {
   const { profile, can } = useAuth();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,16 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
   useEffect(() => {
     (async () => {
       let query = supabase.from('documents').select('*, customers(*), bookings(*), uploader:user_profiles!documents_uploaded_by_fkey(id, name), reviewer:user_profiles!documents_reviewed_by_fkey(id, name)');
-      if (customerId) query = query.eq('customer_id', customerId);
+      if (customerId) {
+        let resolvedCode = customerCode || '';
+        if (!resolvedCode) {
+          const { data: customer } = await supabase.from('customers').select('client_code').eq('id', customerId).maybeSingle();
+          resolvedCode = customer?.client_code || '';
+        }
+        query = resolvedCode
+          ? query.or(`customer_id.eq.${customerId},client_code.eq.${resolvedCode}`)
+          : query.eq('customer_id', customerId);
+      }
       else if (bookingId) query = query.eq('booking_id', bookingId);
       const { data } = await query.order('created_at', { ascending: false });
       const loadedDocs = (data as DocumentRecord[]) || [];
@@ -56,7 +66,7 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
       if (onDocsChange) onDocsChange(loadedDocs);
       setLoading(false);
     })();
-  }, [customerId, bookingId]);
+  }, [customerId, bookingId, customerCode]);
 
   const handleUpload = async () => {
     if (!file) return;
@@ -75,11 +85,14 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
     const filePath = `${customerId || bookingId}/${Date.now()}_${safeDocType}.${ext}`;
     const { error: upErr } = await supabase.storage.from('documents').upload(filePath, compressedFile);
     if (upErr) { alert('فشل رفع الملف: ' + upErr.message); setUploading(false); return; }
+    const { data: publicFile } = supabase.storage.from('documents').getPublicUrl(filePath);
 
     // Generate doc sub-code if customer has a client_code
     let docNumber: string | null = null;
+    let resolvedCustomerCode = customerCode || null;
     if (customerId) {
       const { data: cust } = await supabase.from('customers').select('client_code').eq('id', customerId).maybeSingle();
+      resolvedCustomerCode = resolvedCustomerCode || cust?.client_code || null;
       if (cust?.client_code) {
         const { data: code } = await supabase.rpc('generate_sub_code', { p_client_code: cust.client_code, p_prefix: 'DOC' });
         docNumber = code as string;
@@ -89,9 +102,11 @@ export default function DocumentsSection({ customerId, bookingId, customerName, 
     const { data, error: insertErr } = await supabase.from('documents').insert({
       customer_id: customerId || null,
       booking_id: bookingId || null,
+      client_code: resolvedCustomerCode,
       uploaded_by: profile?.id || null,
       doc_type: uploadType,
       file_path: filePath,
+      file_url: publicFile.publicUrl,
       file_name: compressedFile.name,
       file_size: compressedFile.size,
       status: 'مرفوع',

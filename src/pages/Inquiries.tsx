@@ -182,7 +182,7 @@ function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModal
     if (newCustomer) {
       await supabase
         .from('documents')
-        .update({ customer_id: newCustomer.id })
+        .update({ customer_id: newCustomer.id, client_code: newCustomer.client_code || null })
         .eq('inquiry_id', inquiry.id);
 
       // Link inquiry to the new customer

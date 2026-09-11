@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle, AlertTriangle, Printer } from 'lucide-react';
 import type { TravelGroupMember, GroupFamily, GroupRoom } from '../types';
 
 interface Props {
@@ -13,6 +13,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const [families, setFamilies] = useState<GroupFamily[]>([]);
   const [rooms, setRooms] = useState<GroupRoom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
 
   // Global default family capacity state
   const [maxFamilyCapacity, setMaxFamilyCapacity] = useState<number>(() => {
@@ -211,6 +212,24 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
     onUpdate(); // bubble up to refresh member list
   };
 
+  const escapeHtml = (value?: string | null) =>
+    String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;',
+    }[char] || char));
+
+  const openPrintWindow = (html: string) => {
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
+  };
+
   const printRoomingList = () => {
     const colorsPalette = [
       { bg: '#eff6ff', text: '#1e40af' }, // Light Blue
@@ -268,12 +287,12 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       roomMembers.forEach(m => {
         rowsHtml.push(`
           <tr ${styleAttr}>
-            <td>${m.customers.name}</td>
-            <td dir="ltr" style="text-align: right;">${m.customers.phone || '—'}</td>
-            <td>${m.customers.client_code}</td>
-            <td>${familyName}</td>
-            <td>${roomLabel}</td>
-            <td>${m.rooming_type || '—'}</td>
+            <td>${escapeHtml(m.customers.name)}</td>
+            <td dir="ltr" style="text-align: right;">${escapeHtml(m.customers.phone) || '—'}</td>
+            <td>${escapeHtml(m.customers.client_code)}</td>
+            <td>${escapeHtml(familyName)}</td>
+            <td>${escapeHtml(roomLabel)}</td>
+            <td>${escapeHtml(m.rooming_type) || '—'}</td>
           </tr>
         `);
       });
@@ -301,12 +320,12 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         const fam = families.find(f => f.id === m.family_id);
         rowsHtml.push(`
           <tr class="unassigned">
-            <td style="color: #9ca3af; font-style: italic;">${m.customers.name}</td>
-            <td dir="ltr" style="text-align: right;">${m.customers.phone || '—'}</td>
-            <td>${m.customers.client_code}</td>
-            <td>${fam ? fam.family_name : '—'}</td>
+            <td style="color: #9ca3af; font-style: italic;">${escapeHtml(m.customers.name)}</td>
+            <td dir="ltr" style="text-align: right;">${escapeHtml(m.customers.phone) || '—'}</td>
+            <td>${escapeHtml(m.customers.client_code)}</td>
+            <td>${escapeHtml(fam ? fam.family_name : '—')}</td>
             <td>— (غير مسكن)</td>
-            <td>${m.rooming_type || '—'}</td>
+            <td>${escapeHtml(m.rooming_type) || '—'}</td>
           </tr>
         `);
       });
@@ -356,12 +375,143 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
 </table>
 </body>
 </html>`;
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+    openPrintWindow(html);
+  };
+
+  const printRoomCardsSheet = () => {
+    const occupiedRooms = rooms
+      .map((room) => ({
+        room,
+        members: members.filter((member) => member.room_id === room.id),
+      }))
+      .filter((item) => item.members.length > 0)
+      .sort((a, b) => (a.room.room_number || '').localeCompare(b.room.room_number || '', 'ar', { numeric: true }));
+
+    const roomsHtml = occupiedRooms.map(({ room, members: roomMembers }) => `
+      <section class="room-card">
+        <header class="room-header">
+          <div>
+            <span class="room-kicker">نوع الغرفة</span>
+            <strong>${escapeHtml(room.room_type)}</strong>
+          </div>
+          <div class="room-number">
+            <span>رقم الغرفة الحقيقي</span>
+            <strong>${escapeHtml(room.room_number) || 'غير محدد'}</strong>
+          </div>
+        </header>
+        <div class="guest-list">
+          ${roomMembers.map((member, index) => `
+            <div class="guest-row">
+              <span class="guest-index">${index + 1}</span>
+              <span>${escapeHtml(member.customers.name)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>شيت التسكين حسب الغرف</title>
+<style>
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  @page { size: A4; margin: 12mm; }
+  body {
+    margin: 0;
+    background: #f7fbfa;
+    color: #113f3b;
+    font-family: "Cairo", "Tahoma", "Arial", sans-serif;
+    line-height: 1.5;
+  }
+  .sheet { width: 100%; max-width: 190mm; margin: 0 auto; padding: 12px 0; }
+  .brand-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    border-bottom: 3px solid #0f5f56;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 58px; height: 58px; object-fit: cover; border-radius: 12px; border: 2px solid #d8ebe7; }
+  h1 { margin: 0; color: #0b4f48; font-size: 24px; font-weight: 900; }
+  .subtitle { color: #4d756f; font-size: 12px; margin-top: 3px; }
+  .summary { color: #0f5f56; border: 1px solid #b8d8d2; background: #eef8f6; border-radius: 8px; padding: 8px 12px; font-weight: 800; font-size: 12px; white-space: nowrap; }
+  .rooms-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .room-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    min-height: 132px;
+    border: 2px solid #0f5f56;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+  .room-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    background: #0f5f56;
+    color: #ffffff;
+    padding: 9px 11px;
+  }
+  .room-header span { display: block; color: #d8ebe7; font-size: 10px; font-weight: 700; }
+  .room-header strong { display: block; font-size: 15px; font-weight: 900; }
+  .room-number { min-width: 86px; border-right: 1px solid rgba(255,255,255,.28); padding-right: 10px; }
+  .guest-list { padding: 8px 10px 10px; }
+  .guest-row {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #d8ebe7;
+    color: #173f3a;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .guest-row:last-child { border-bottom: 0; }
+  .guest-index {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #eef8f6;
+    color: #0f5f56;
+    border: 1px solid #b8d8d2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .empty-state { text-align: center; padding: 50px 16px; color: #5f7f79; border: 2px dashed #b8d8d2; border-radius: 8px; background: #fff; }
+  @media print {
+    body { background: white; }
+    .sheet { padding: 0; }
+  }
+</style>
+</head>
+<body>
+  <main class="sheet">
+    <header class="brand-header">
+      <div class="brand">
+        <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise Travel" />
+        <div>
+          <h1>شيت التسكين حسب الغرف</h1>
+          <div class="subtitle">شركة بروميس للسياحة والسفر</div>
+        </div>
+      </div>
+      <div class="summary">${occupiedRooms.length} غرفة مسكنة · ${members.filter((member) => member.room_id).length} شخص</div>
+    </header>
+    ${occupiedRooms.length > 0 ? `<div class="rooms-grid">${roomsHtml}</div>` : '<div class="empty-state">لا توجد غرف تحتوي على أشخاص مسكنين.</div>'}
+  </main>
+</body>
+</html>`;
+    openPrintWindow(html);
   };
 
   if (loading) return <div className="p-10 text-center text-gray-500">جاري تحميل بيانات التسكين...</div>;
@@ -449,7 +599,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <div className="bg-gray-50 p-4 rounded-xl space-y-3 mb-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="form-label text-[10px]">رقم الغرفة (اختياري)</label>
+                  <label className="form-label text-[10px]">رقم الغرفة الحقيقي</label>
                   <input value={roomForm.room_number} onChange={e => setRoomForm({...roomForm, room_number: e.target.value})} className="form-input text-sm" placeholder="مثال: 101" />
                 </div>
                 <div>
@@ -560,8 +710,8 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <User size={16} className="text-gold-500" /> قائمة تسكين الأعضاء
           </h4>
           <div className="flex items-center gap-3">
-            <button onClick={printRoomingList} className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1">
-              طباعة شيت التسكين الملون
+            <button onClick={() => setShowPrintOptions(true)} className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1">
+              <Printer size={14} /> طباعة شيت التسكين
             </button>
             <span className="badge bg-white text-navy-700 border border-gray-200">الإجمالي: {members.length}</span>
           </div>
@@ -698,6 +848,37 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2 bg-white">
               <button onClick={() => setAssigningMember(null)} className="btn-outline text-xs px-4 py-2">إلغاء</button>
               <button onClick={saveAssign} className="btn-gold text-xs px-4 py-2 flex items-center gap-1"><CheckCircle2 size={14} /> حفظ</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrintOptions && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-navy-900 text-white">
+              <h4 className="font-bold">اختيار نموذج شيت التسكين</h4>
+            </div>
+            <div className="p-5 space-y-3 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => { setShowPrintOptions(false); printRoomingList(); }}
+                className="w-full bg-white border border-gray-200 rounded-xl p-4 text-right hover:border-gold-300 hover:bg-gold-50/30 transition-colors"
+              >
+                <span className="block font-bold text-navy-900">شيت التسكين الحالي</span>
+                <span className="block text-xs text-gray-500 mt-1">النموذج الملون الحالي كما هو بدون تغيير.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowPrintOptions(false); printRoomCardsSheet(); }}
+                className="w-full bg-white border border-teal-200 rounded-xl p-4 text-right hover:border-teal-500 hover:bg-teal-50 transition-colors"
+              >
+                <span className="block font-bold text-teal-900">شيت التسكين حسب الغرف</span>
+                <span className="block text-xs text-teal-700 mt-1">خانات غرف فعلية مع نوع الغرفة ورقمها الحقيقي وأسماء المسكنين فقط.</span>
+              </button>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end bg-white">
+              <button onClick={() => setShowPrintOptions(false)} className="btn-outline text-xs px-4 py-2">إلغاء</button>
             </div>
           </div>
         </div>

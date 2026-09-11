@@ -550,9 +550,11 @@ export interface DocumentRecord {
   customer_id?: string;
   booking_id?: string;
   inquiry_id?: string;
+  client_code?: string;
   uploaded_by?: string;
   doc_type: DocType;
   file_path: string;
+  file_url?: string;
   file_name?: string;
   file_size?: number;
   status: DocStatus;

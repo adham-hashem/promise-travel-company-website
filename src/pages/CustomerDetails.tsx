@@ -1238,6 +1238,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
           {/* Documents */}
           <DocumentsSection 
             customerId={customer.id} 
+            customerCode={customer.client_code}
             customerName={customer.name} 
             onDocsChange={setDocs} 
           />
