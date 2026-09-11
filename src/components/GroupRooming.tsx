@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle, AlertTriangle, Printer } from 'lucide-react';
+import { Users, Building2, User, Plus, Trash2, Edit2, CheckCircle2, AlertCircle, AlertTriangle, Printer, Wand2 } from 'lucide-react';
 import type { TravelGroupMember, GroupFamily, GroupRoom } from '../types';
 
 interface Props {
@@ -14,6 +14,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const [rooms, setRooms] = useState<GroupRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [autoAssigning, setAutoAssigning] = useState(false);
 
   // Global default family capacity state
   const [maxFamilyCapacity, setMaxFamilyCapacity] = useState<number>(() => {
@@ -29,13 +30,15 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const [newFamilyName, setNewFamilyName] = useState('');
   
   const [showRoomForm, setShowRoomForm] = useState(false);
-  const [roomForm, setRoomForm] = useState({
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const initialRoomForm = {
     room_number: '',
     room_type: 'ثنائي',
     is_family: false,
     family_id: '',
-    gender: 'عائلة',
-  });
+    gender: 'رجال' as 'رجال' | 'نساء' | 'عائلة',
+  };
+  const [roomForm, setRoomForm] = useState(initialRoomForm);
 
   // Assign member states
   const [assigningMember, setAssigningMember] = useState<TravelGroupMember | null>(null);
@@ -54,6 +57,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
   const isFamilyRooming = (value?: string) => (value || '').includes('عائلة');
   const isFemaleValue = (value?: string) => (value || '').includes('أنث') || (value || '').includes('نساء');
   const isMaleValue = (value?: string) => (value || '').includes('ذكر') || (value || '').includes('رجال');
+
   const getAssignableRooms = () => {
     if (isFamilyRooming(assignForm.rooming_type)) {
       return rooms.filter(r => r.is_family && (!assignForm.family_id || r.family_id === assignForm.family_id));
@@ -61,23 +65,24 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
 
     const wantsFemaleRoom = isFemaleValue(assignForm.gender);
     const wantsMaleRoom = isMaleValue(assignForm.gender);
+
     const matchedRooms = rooms.filter(r => {
       if (r.is_family) return false;
-      if (wantsFemaleRoom) return isFemaleValue(r.gender);
-      if (wantsMaleRoom) return isMaleValue(r.gender);
+      if (wantsFemaleRoom) return isFemaleValue(r.gender) || r.gender === 'عائلة' || !r.gender;
+      if (wantsMaleRoom) return isMaleValue(r.gender) || r.gender === 'عائلة' || !r.gender;
       return true;
     });
 
     return matchedRooms.length > 0 ? matchedRooms : rooms.filter(r => !r.is_family);
   };
 
-  // Auto-allocate member to the first available room when family_id, gender, or rooming_type changes
+  // Suggest first available room when family_id, gender, or rooming_type changes (only if no room is selected yet)
   useEffect(() => {
     if (!assigningMember) return;
+    if (assignForm.room_id) return; // do not override user or member's existing room
     
     if (isFamilyRooming(assignForm.rooming_type)) {
       if (!assignForm.family_id) {
-        setAssignForm(prev => ({ ...prev, room_id: '' }));
         return;
       }
       
@@ -95,7 +100,9 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         return occupants.length < capacity;
       });
       
-      setAssignForm(prev => ({ ...prev, room_id: recommendedRoom?.id || '' }));
+      if (recommendedRoom) {
+        setAssignForm(prev => ({ ...prev, room_id: recommendedRoom.id }));
+      }
     } else {
       // Find first available room for this gender
       const genderRooms = getAssignableRooms();
@@ -108,9 +115,52 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
         return occupants.length < capacity;
       });
       
-      setAssignForm(prev => ({ ...prev, room_id: recommendedRoom?.id || '' }));
+      if (recommendedRoom) {
+        setAssignForm(prev => ({ ...prev, room_id: recommendedRoom.id }));
+      }
     }
   }, [assignForm.rooming_type, assignForm.family_id, assignForm.gender, assigningMember?.id, rooms, members]);
+
+  const suggestRoomForAssign = () => {
+    if (isFamilyRooming(assignForm.rooming_type)) {
+      if (!assignForm.family_id) {
+        alert('يرجى اختيار العائلة أولاً لاقتراح غرفة عائلية مناسبة لها.');
+        return;
+      }
+      const familyRooms = rooms.filter(r => r.is_family && r.family_id === assignForm.family_id);
+      const recommendedRoom = familyRooms.find(r => {
+        const occupants = members.filter(m => m.room_id === r.id && m.id !== assigningMember?.id);
+        let capacity = maxFamilyCapacity;
+        const typeStr = r.room_type || '';
+        if (typeStr.includes('مفتوح') || typeStr === 'عائلة') capacity = Infinity;
+        else {
+          const match = typeStr.match(/\d+/);
+          capacity = match ? parseInt(match[0]) : maxFamilyCapacity;
+        }
+        return occupants.length < capacity;
+      });
+      if (recommendedRoom) {
+        setAssignForm(prev => ({ ...prev, room_id: recommendedRoom.id }));
+      } else {
+        alert('لا توجد غرف عائلية بها أماكن شاغرة لهذه العائلة.');
+      }
+    } else {
+      const genderRooms = getAssignableRooms();
+      const recommendedRoom = genderRooms.find(r => {
+        const occupants = members.filter(m => m.room_id === r.id && m.id !== assigningMember?.id);
+        let capacity = 2;
+        if (r.room_type === 'ثنائي') capacity = 2;
+        else if (r.room_type === 'ثلاثي') capacity = 3;
+        else if (r.room_type === 'رباعي') capacity = 4;
+        return occupants.length < capacity;
+      });
+      if (recommendedRoom) {
+        setAssignForm(prev => ({ ...prev, room_id: recommendedRoom.id }));
+      } else {
+        alert('لا توجد غرف عادية شاغرة مناسبة لهذا الجنس حالياً.');
+      }
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -129,50 +179,101 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       group_id: groupId,
       family_name: familyName
     }).select().single();
+    if (error) {
+      alert('حدث خطأ أثناء إضافة العائلة: ' + error.message);
+      return;
+    }
     if (data) {
       setFamilies([...families, data as GroupFamily]);
       setNewFamilyName('');
     }
   };
 
-  const createRoom = async () => {
-    const { data, error } = await supabase.from('group_rooms').insert({
+  const cancelRoomForm = () => {
+    setEditingRoomId(null);
+    setShowRoomForm(false);
+    setRoomForm(initialRoomForm);
+  };
+
+  const startEditRoom = (room: GroupRoom) => {
+    setEditingRoomId(room.id);
+    const isFamily = !!room.is_family;
+    setRoomForm({
+      room_number: room.room_number || '',
+      room_type: room.room_type || (isFamily ? `عائلة - ${maxFamilyCapacity}` : 'ثنائي'),
+      is_family: isFamily,
+      family_id: room.family_id || '',
+      gender: isFamily ? 'عائلة' : (room.gender === 'نساء' ? 'نساء' : 'رجال'),
+    });
+    setShowRoomForm(true);
+  };
+
+  const saveRoom = async () => {
+    const isFamily = !!roomForm.is_family;
+    const finalGender: 'عائلة' | 'رجال' | 'نساء' = isFamily ? 'عائلة' : (roomForm.gender === 'نساء' ? 'نساء' : 'رجال');
+    const roomPayload = {
       group_id: groupId,
-      room_number: roomForm.room_number || null,
-      room_type: roomForm.room_type,
-      is_family: roomForm.is_family,
-      family_id: roomForm.is_family && roomForm.family_id ? roomForm.family_id : null,
-      gender: roomForm.gender,
-    }).select().single();
-    if (data) {
-      setRooms([...rooms, data as GroupRoom]);
-      setShowRoomForm(false);
-      setRoomForm({ room_number: '', room_type: 'ثنائي', is_family: false, family_id: '', gender: 'عائلة' });
+      room_number: roomForm.room_number.trim() || null,
+      room_type: isFamily ? roomForm.room_type : (roomForm.room_type || 'ثنائي'),
+      is_family: isFamily,
+      family_id: isFamily && roomForm.family_id ? roomForm.family_id : null,
+      gender: finalGender,
+    };
+
+    if (editingRoomId) {
+      const { error } = await supabase.from('group_rooms').update(roomPayload).eq('id', editingRoomId);
+      if (error) {
+        alert('حدث خطأ أثناء تعديل الغرفة: ' + error.message);
+        return;
+      }
+      setRooms(rooms.map(r => r.id === editingRoomId ? { ...r, ...roomPayload } as GroupRoom : r));
+    } else {
+      const { data, error } = await supabase.from('group_rooms').insert(roomPayload).select().single();
+      if (error) {
+        alert('حدث خطأ أثناء حفظ الغرفة: ' + error.message);
+        return;
+      }
+      if (data) {
+        setRooms([...rooms, data as GroupRoom]);
+      }
     }
+
+    cancelRoomForm();
+    onUpdate();
   };
 
   const deleteRoom = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف الغرفة؟ سيتم تفريغ الأعضاء المرتبطين بها.')) return;
-    await supabase.from('group_rooms').delete().eq('id', id);
+    const { error } = await supabase.from('group_rooms').delete().eq('id', id);
+    if (error) {
+      alert('حدث خطأ أثناء حذف الغرفة: ' + error.message);
+      return;
+    }
     setRooms(rooms.filter(r => r.id !== id));
+    if (editingRoomId === id) cancelRoomForm();
     onUpdate(); // refresh members
   };
 
   const deleteFamily = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف العائلة؟ سيتم تفريغ الأعضاء المرتبطين بها.')) return;
-    await supabase.from('group_families').delete().eq('id', id);
+    const { error } = await supabase.from('group_families').delete().eq('id', id);
+    if (error) {
+      alert('حدث خطأ أثناء حذف العائلة: ' + error.message);
+      return;
+    }
     setFamilies(families.filter(f => f.id !== id));
     onUpdate(); // refresh members
   };
 
   const openAssignModal = (member: TravelGroupMember) => {
     setAssigningMember(member);
+    const determinedGender = member.gender || (member.customers?.gender ? (isFemaleValue(member.customers.gender) ? 'أنثى' : 'ذكر') : 'ذكر');
     setAssignForm({
       rooming_type: member.rooming_type?.startsWith('عائلة') ? 'عائلة' : (member.rooming_type || 'منفرد'),
       is_head: member.rooming_type === 'عائلة - رئيس',
       family_id: member.family_id || '',
       room_id: member.room_id || '',
-      gender: member.gender || 'ذكر'
+      gender: determinedGender
     });
   };
 
@@ -221,15 +322,137 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       }
     }
 
-    await supabase.from('travel_group_members').update({
+    const { error } = await supabase.from('travel_group_members').update({
       rooming_type: finalRoomingType,
       family_id: assignForm.rooming_type === 'عائلة' ? (assignForm.family_id || null) : null,
       room_id: assignForm.room_id || null,
       gender: assignForm.gender
     }).eq('id', assigningMember.id);
     
+    if (error) {
+      alert('حدث خطأ أثناء حفظ التسكين: ' + error.message);
+      return;
+    }
+
     setAssigningMember(null);
     onUpdate(); // bubble up to refresh member list
+  };
+
+  // Smart Auto Assign All Unassigned Members
+  const autoAssignAll = async () => {
+    const unassigned = members.filter(m => !m.room_id);
+    if (unassigned.length === 0) {
+      alert('جميع الأعضاء مسكنون بالفعل في غرف!');
+      return;
+    }
+    if (rooms.length === 0) {
+      alert('يرجى إنشاء غرف أولاً ليتم تسكين الأعضاء فيها.');
+      return;
+    }
+
+    if (!confirm(`هل تريد تسكين ${unassigned.length} عضواً غير مسكن تلقائياً وفقاً للعائلات والنوع وسعة الغرف؟`)) {
+      return;
+    }
+
+    setAutoAssigning(true);
+    try {
+      const currentOccupantsMap = new Map<string, string[]>();
+      rooms.forEach(r => currentOccupantsMap.set(r.id, []));
+      members.forEach(m => {
+        if (m.room_id && currentOccupantsMap.has(m.room_id)) {
+          currentOccupantsMap.get(m.room_id)!.push(m.id);
+        }
+      });
+
+      const getRoomCapacity = (r: GroupRoom) => {
+        if (r.is_family) {
+          const typeStr = r.room_type || '';
+          if (typeStr.includes('مفتوح') || typeStr === 'عائلة') return Infinity;
+          const match = typeStr.match(/\d+/);
+          return match ? parseInt(match[0]) : maxFamilyCapacity;
+        }
+        if (r.room_type === 'ثنائي') return 2;
+        if (r.room_type === 'ثلاثي') return 3;
+        if (r.room_type === 'رباعي') return 4;
+        return 2;
+      };
+
+      const updates: { id: string; room_id: string; gender: string; rooming_type: string; family_id: string | null }[] = [];
+
+      // 1. First assign family members who have a family_id
+      const familyUnassigned = unassigned.filter(m => isFamilyRooming(m.rooming_type) && m.family_id);
+      for (const m of familyUnassigned) {
+        const famRooms = rooms.filter(r => r.is_family && r.family_id === m.family_id);
+        const availableRoom = famRooms.find(r => {
+          const count = (currentOccupantsMap.get(r.id) || []).length;
+          return count < getRoomCapacity(r);
+        });
+        if (availableRoom) {
+          currentOccupantsMap.get(availableRoom.id)!.push(m.id);
+          updates.push({
+            id: m.id,
+            room_id: availableRoom.id,
+            family_id: m.family_id || null,
+            rooming_type: m.rooming_type || 'عائلة',
+            gender: m.gender || (m.customers?.gender ? (isFemaleValue(m.customers.gender) ? 'أنثى' : 'ذكر') : 'ذكر')
+          });
+        }
+      }
+
+      // 2. Assign regular individual members
+      const regularUnassigned = unassigned.filter(m => !isFamilyRooming(m.rooming_type) || !m.family_id);
+      for (const m of regularUnassigned) {
+        const determinedGender = m.gender || (m.customers?.gender ? (isFemaleValue(m.customers.gender) ? 'أنثى' : 'ذكر') : 'ذكر');
+        const wantsFemale = isFemaleValue(determinedGender);
+        const wantsMale = isMaleValue(determinedGender);
+
+        const regularRooms = rooms.filter(r => !r.is_family);
+        const matchedRooms = regularRooms.filter(r => {
+          if (wantsFemale) return isFemaleValue(r.gender) || r.gender === 'عائلة' || !r.gender;
+          if (wantsMale) return isMaleValue(r.gender) || r.gender === 'عائلة' || !r.gender;
+          return true;
+        });
+
+        const availableRoom = matchedRooms.find(r => {
+          const count = (currentOccupantsMap.get(r.id) || []).length;
+          return count < getRoomCapacity(r);
+        });
+
+        if (availableRoom) {
+          currentOccupantsMap.get(availableRoom.id)!.push(m.id);
+          updates.push({
+            id: m.id,
+            room_id: availableRoom.id,
+            family_id: null,
+            rooming_type: 'منفرد',
+            gender: determinedGender
+          });
+        }
+      }
+
+      if (updates.length === 0) {
+        alert('لم يتم العثور على شواغر كافية في الغرف تناسب الأعضاء غير المسكنين.');
+        setAutoAssigning(false);
+        return;
+      }
+
+      for (const upd of updates) {
+        await supabase.from('travel_group_members').update({
+          room_id: upd.room_id,
+          family_id: upd.family_id,
+          rooming_type: upd.rooming_type,
+          gender: upd.gender
+        }).eq('id', upd.id);
+      }
+
+      alert(`✅ تم تسكين ${updates.length} عضواً بنجاح في الغرف المناسبة!`);
+      onUpdate();
+      loadData();
+    } catch (err: any) {
+      alert('حدث خطأ أثناء التسكين التلقائي: ' + (err.message || ''));
+    } finally {
+      setAutoAssigning(false);
+    }
   };
 
   const escapeHtml = (value?: string | null) =>
@@ -610,13 +833,30 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 className="w-12 text-center border border-gray-200 rounded px-1.5 py-0.5 text-xs font-bold text-gold-600 focus:outline-none focus:border-gold-500"
               />
             </div>
-            <button onClick={() => setShowRoomForm(!showRoomForm)} className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1">
+            <button 
+              onClick={() => {
+                if (showRoomForm) cancelRoomForm();
+                else {
+                  setEditingRoomId(null);
+                  setRoomForm(initialRoomForm);
+                  setShowRoomForm(true);
+                }
+              }} 
+              className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1"
+            >
               <Plus size={14} /> إضافة غرفة
             </button>
           </div>
           
           {showRoomForm && (
-            <div className="bg-gray-50 p-4 rounded-xl space-y-3 mb-4">
+            <div className="bg-gray-50 p-4 rounded-xl space-y-3 mb-4 border border-gray-200">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                <span className="text-xs font-bold text-navy-900">
+                  {editingRoomId ? '✏️ تعديل بيانات الغرفة' : '➕ إضافة غرفة جديدة'}
+                </span>
+                <button onClick={cancelRoomForm} className="text-xs text-gray-400 hover:text-gray-600">✕ إغلاق</button>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="form-label text-[10px]">رقم الغرفة الحقيقي</label>
@@ -625,13 +865,13 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 <div>
                   <label className="form-label text-[10px]">{roomForm.is_family ? 'سعة الغرفة العائلية' : 'نوع الغرفة'}</label>
                   {!roomForm.is_family ? (
-                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
+                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value as any})} className="form-input text-sm">
                       <option value="ثنائي">ثنائي</option>
                       <option value="ثلاثي">ثلاثي</option>
                       <option value="رباعي">رباعي</option>
                     </select>
                   ) : (
-                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value})} className="form-input text-sm">
+                    <select value={roomForm.room_type} onChange={e => setRoomForm({...roomForm, room_type: e.target.value as any})} className="form-input text-sm">
                       <option value="عائلة - مفتوح">قبول أي عدد عادي</option>
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, maxFamilyCapacity].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b).map(num => (
                         <option key={num} value={`عائلة - ${num}`}>
@@ -644,7 +884,17 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={roomForm.is_family} onChange={e => setRoomForm({...roomForm, is_family: e.target.checked, gender: e.target.checked ? 'عائلة' : 'رجال', room_type: e.target.checked ? `عائلة - ${maxFamilyCapacity}` : 'ثنائي'})} className="rounded text-gold-500 focus:ring-gold-500" />
+                  <input 
+                    type="checkbox" 
+                    checked={roomForm.is_family} 
+                    onChange={e => setRoomForm({
+                      ...roomForm, 
+                      is_family: e.target.checked, 
+                      gender: e.target.checked ? 'عائلة' : 'رجال', 
+                      room_type: e.target.checked ? `عائلة - ${maxFamilyCapacity}` : 'ثنائي'
+                    })} 
+                    className="rounded text-gold-500 focus:ring-gold-500" 
+                  />
                   غرفة عائلية؟
                 </label>
               </div>
@@ -658,27 +908,51 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 </div>
               ) : (
                 <div>
-                  <label className="form-label text-[10px]">الجنس</label>
-                  <select value={roomForm.gender} onChange={e => setRoomForm({...roomForm, gender: e.target.value})} className="form-input text-sm">
+                  <label className="form-label text-[10px]">الجنس المخصص للغرفة</label>
+                  <select 
+                    value={roomForm.gender === 'نساء' ? 'نساء' : 'رجال'} 
+                    onChange={e => setRoomForm({...roomForm, gender: e.target.value as any})} 
+                    className="form-input text-sm"
+                  >
                     <option value="رجال">رجال</option>
                     <option value="نساء">نساء</option>
                   </select>
                 </div>
               )}
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowRoomForm(false)} className="text-xs text-gray-500 hover:text-gray-700">إلغاء</button>
-                <button onClick={createRoom} className="btn-gold text-xs px-3 py-1.5">حفظ الغرفة</button>
+                <button onClick={cancelRoomForm} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5">إلغاء</button>
+                <button onClick={saveRoom} className="btn-gold text-xs px-3 py-1.5">
+                  {editingRoomId ? 'تحديث الغرفة' : 'حفظ الغرفة'}
+                </button>
               </div>
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
-            {rooms.map(r => (
-              <span key={r.id} className={`badge border px-3 py-1.5 flex items-center gap-2 ${r.is_family ? 'bg-purple-50 text-purple-700 border-purple-200' : (r.gender === 'رجال' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-pink-50 text-pink-700 border-pink-200')}`}>
-                <Building2 size={12} /> {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({r.is_family ? 'عائلية' : r.gender})
-                <button onClick={() => deleteRoom(r.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
-              </span>
-            ))}
+            {rooms.map(r => {
+              const isLegacyFamilyBug = !r.is_family && r.gender === 'عائلة';
+              const badgeClass = r.is_family 
+                ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                : isLegacyFamilyBug
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : r.gender === 'رجال' 
+                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    : 'bg-pink-50 text-pink-700 border-pink-200';
+
+              const genderLabel = r.is_family 
+                ? 'عائلية' 
+                : isLegacyFamilyBug
+                  ? 'تحتاج ضبط (رجال/نساء)'
+                  : r.gender;
+
+              return (
+                <span key={r.id} className={`badge border px-3 py-1.5 flex items-center gap-2 ${badgeClass}`}>
+                  <Building2 size={12} /> {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({genderLabel})
+                  <button onClick={() => startEditRoom(r)} title="تعديل الغرفة" className="text-blue-500 hover:text-blue-700 mr-1"><Edit2 size={12} /></button>
+                  <button onClick={() => deleteRoom(r.id)} title="حذف الغرفة" className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
+                </span>
+              );
+            })}
             {rooms.length === 0 && !showRoomForm && <span className="text-xs text-gray-400">لا توجد غرف مسجلة.</span>}
           </div>
         </div>
@@ -730,6 +1004,15 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
             <User size={16} className="text-gold-500" /> قائمة تسكين الأعضاء
           </h4>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={autoAssignAll} 
+              disabled={autoAssigning || members.length === 0}
+              className="btn-gold text-xs px-3 py-1.5 flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              title="تسكين جميع الأعضاء غير المسكنين في الغرف الشاغرة تلقائياً"
+            >
+              <Wand2 size={14} className={autoAssigning ? 'animate-spin' : ''} />
+              {autoAssigning ? 'جاري التسكين...' : 'تسكين تلقائي ذكي للكل'}
+            </button>
             <button onClick={() => setShowPrintOptions(true)} className="btn-outline text-xs px-3 py-1.5 flex items-center gap-1">
               <Printer size={14} /> طباعة شيت التسكين
             </button>
@@ -842,9 +1125,18 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
               )}
 
               <div>
-                <label className="form-label text-xs">الغرفة (اختياري)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label text-xs mb-0">الغرفة (اختياري)</label>
+                  <button 
+                    type="button" 
+                    onClick={suggestRoomForAssign} 
+                    className="text-[11px] text-gold-600 hover:text-gold-700 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 size={11} /> اقتراح تلقائي
+                  </button>
+                </div>
                 <select value={assignForm.room_id} onChange={e => setAssignForm({...assignForm, room_id: e.target.value})} className="form-input text-sm">
-                  <option value="">-- غير مسكن (تسكين تلقائي) --</option>
+                  <option value="">-- غير مسكن --</option>
                   {getAssignableRooms().map(r => (
                     <option key={r.id} value={r.id}>
                       {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({r.is_family ? 'عائلية' : r.gender})

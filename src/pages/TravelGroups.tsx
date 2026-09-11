@@ -105,7 +105,7 @@ export default function TravelGroups({}: Props) {
     setLoadingMembers(true);
     const { data } = await supabase
       .from('travel_group_members')
-      .select('*, customers(id, name, phone, client_code, national_id, passport_number, service_type, email)')
+      .select('*, customers(id, name, phone, client_code, national_id, passport_number, service_type, email, gender)')
       .eq('group_id', groupId)
       .order('added_at', { ascending: true });
     setMembers((data || []) as TravelGroupMember[]);
