@@ -51,11 +51,31 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
     loadData();
   }, [groupId]);
 
+  const isFamilyRooming = (value?: string) => (value || '').includes('عائلة');
+  const isFemaleValue = (value?: string) => (value || '').includes('أنث') || (value || '').includes('نساء');
+  const isMaleValue = (value?: string) => (value || '').includes('ذكر') || (value || '').includes('رجال');
+  const getAssignableRooms = () => {
+    if (isFamilyRooming(assignForm.rooming_type)) {
+      return rooms.filter(r => r.is_family && (!assignForm.family_id || r.family_id === assignForm.family_id));
+    }
+
+    const wantsFemaleRoom = isFemaleValue(assignForm.gender);
+    const wantsMaleRoom = isMaleValue(assignForm.gender);
+    const matchedRooms = rooms.filter(r => {
+      if (r.is_family) return false;
+      if (wantsFemaleRoom) return isFemaleValue(r.gender);
+      if (wantsMaleRoom) return isMaleValue(r.gender);
+      return true;
+    });
+
+    return matchedRooms.length > 0 ? matchedRooms : rooms.filter(r => !r.is_family);
+  };
+
   // Auto-allocate member to the first available room when family_id, gender, or rooming_type changes
   useEffect(() => {
     if (!assigningMember) return;
     
-    if (assignForm.rooming_type === 'عائلة') {
+    if (isFamilyRooming(assignForm.rooming_type)) {
       if (!assignForm.family_id) {
         setAssignForm(prev => ({ ...prev, room_id: '' }));
         return;
@@ -78,7 +98,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       setAssignForm(prev => ({ ...prev, room_id: recommendedRoom?.id || '' }));
     } else {
       // Find first available room for this gender
-      const genderRooms = rooms.filter(r => !r.is_family && r.gender === (assignForm.gender === 'ذكر' ? 'رجال' : 'نساء'));
+      const genderRooms = getAssignableRooms();
       const recommendedRoom = genderRooms.find(r => {
         const occupants = members.filter(m => m.room_id === r.id && m.id !== assigningMember.id);
         let capacity = 2; // default
@@ -825,21 +845,16 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 <label className="form-label text-xs">الغرفة (اختياري)</label>
                 <select value={assignForm.room_id} onChange={e => setAssignForm({...assignForm, room_id: e.target.value})} className="form-input text-sm">
                   <option value="">-- غير مسكن (تسكين تلقائي) --</option>
-                  {rooms.filter(r => {
-                    if (assignForm.rooming_type === 'عائلة') {
-                      return r.is_family && r.family_id === assignForm.family_id;
-                    }
-                    return !r.is_family && (r.gender === (assignForm.gender === 'ذكر' ? 'رجال' : 'نساء'));
-                  }).map(r => (
+                  {getAssignableRooms().map(r => (
                     <option key={r.id} value={r.id}>
                       {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({r.is_family ? 'عائلية' : r.gender})
                     </option>
                   ))}
                 </select>
-                {assignForm.rooming_type === 'عائلة' && !assignForm.family_id && (
+                {isFamilyRooming(assignForm.rooming_type) && !assignForm.family_id && (
                   <p className="text-[10px] text-gray-400 mt-1">💡 يرجى اختيار العائلة أولاً لرؤية غرفها.</p>
                 )}
-                {assignForm.rooming_type === 'عائلة' && assignForm.family_id && rooms.filter(r => r.is_family && r.family_id === assignForm.family_id).length === 0 && (
+                {isFamilyRooming(assignForm.rooming_type) && assignForm.family_id && rooms.filter(r => r.is_family && r.family_id === assignForm.family_id).length === 0 && (
                   <p className="text-[10px] text-red-500 mt-1">⚠️ لا توجد غرف لهذه العائلة. يرجى إنشاء غرفة عائلية وربطها بهذه العائلة.</p>
                 )}
               </div>
