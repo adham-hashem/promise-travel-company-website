@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Plane, Users, Calendar, ArrowLeft, Star, Clock } from 'lucide-react';
+import { Plus, Search, Plane, Users, Calendar, ArrowLeft, Star, Clock, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { VIPTrip, Employee } from '../types';
@@ -12,11 +12,12 @@ interface VIPTripsProps {
 }
 
 export default function VIPTrips({ onNavigate }: VIPTripsProps) {
-  const { profile } = useAuth();
+  const { profile, can } = useAuth();
   const [trips, setTrips] = useState<VIPTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [employees, setEmployees] = useState<AssignableVipEmployee[]>([]);
+  const [deletingTripId, setDeletingTripId] = useState<string | null>(null);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTrip, setNewTrip] = useState({
@@ -119,6 +120,26 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
     }
   };
 
+  const handleDeleteTrip = async (trip: VIPTrip) => {
+    if (!can('customers_delete')) return;
+    const customersCount = (trip as any).customers?.[0]?.count || 0;
+    const message = customersCount > 0
+      ? `هل أنت متأكد من حذف رحلة VIP؟ سيتم فك ارتباط ${customersCount} عميل من هذه الرحلة بدون حذف ملفات العملاء أو الحسابات. لا يمكن التراجع عن هذا الإجراء.`
+      : 'هل أنت متأكد من حذف رحلة VIP؟ لا يمكن التراجع عن هذا الإجراء.';
+    if (!confirm(message)) return;
+
+    setDeletingTripId(trip.id);
+    try {
+      const { error } = await supabase.from('vip_trips').delete().eq('id', trip.id);
+      if (error) throw error;
+      setTrips((current) => current.filter((item) => item.id !== trip.id));
+    } catch (err: any) {
+      alert('خطأ في حذف رحلة VIP: ' + (err?.message || 'حدث خطأ غير متوقع'));
+    } finally {
+      setDeletingTripId(null);
+    }
+  };
+
   const filteredTrips = trips.filter(t => 
     t.name.includes(searchTerm) || 
     t.destination?.includes(searchTerm) || 
@@ -211,12 +232,24 @@ export default function VIPTrips({ onNavigate }: VIPTripsProps) {
                 </div>
               </div>
               
-              <button 
-                onClick={() => onNavigate('vip-details', trip.id)}
-                className="w-full py-3 bg-gray-50 hover:bg-gold-50 text-navy-800 font-bold border-t border-gray-100 flex items-center justify-center gap-2 transition-colors"
-              >
-                تفاصيل وملف الرحلة <ArrowLeft size={16} />
-              </button>
+              <div className="grid grid-cols-1 border-t border-gray-100">
+                <button 
+                  onClick={() => onNavigate('vip-details', trip.id)}
+                  className="w-full py-3 bg-gray-50 hover:bg-gold-50 text-navy-800 font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  تفاصيل وملف الرحلة <ArrowLeft size={16} />
+                </button>
+                {can('customers_delete') && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTrip(trip)}
+                    disabled={deletingTripId === trip.id}
+                    className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-700 font-bold border-t border-red-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                  >
+                    <Trash2 size={16} /> {deletingTripId === trip.id ? 'جارٍ الحذف...' : 'حذف رحلة VIP'}
+                  </button>
+                )}
+              </div>
             </div>
           ))
         )}
