@@ -340,6 +340,18 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModal
   const SourceIcon = SOURCE_ICONS[inquiry.source];
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
+  const formattedNotes = (inquiry.notes || '')
+    .split(/\s*[—|]\s*/g)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const separatorIndex = part.indexOf(':');
+      if (separatorIndex === -1) return { label: '', value: part };
+      return {
+        label: part.slice(0, separatorIndex).trim(),
+        value: part.slice(separatorIndex + 1).trim(),
+      };
+    });
 
   useEffect(() => {
     let active = true;
@@ -416,7 +428,24 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModal
           {inquiry.notes && (
             <div className="bg-gray-50 rounded-xl p-3">
               <p className="text-xs text-gray-500 mb-1">الملاحظات</p>
-              <p className="text-sm text-gray-700">{inquiry.notes}</p>
+              {formattedNotes.length > 1 ? (
+                <div className="space-y-2">
+                  {formattedNotes.map((note, index) => (
+                    <div key={`${note.label}-${index}`} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
+                      {note.label ? (
+                        <>
+                          <p className="text-[11px] font-bold text-gold-700 mb-0.5">{note.label}</p>
+                          <p className="text-sm text-navy-900 leading-relaxed whitespace-pre-wrap">{note.value || '—'}</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-navy-900 leading-relaxed whitespace-pre-wrap">{note.value}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{inquiry.notes}</p>
+              )}
             </div>
           )}
 
