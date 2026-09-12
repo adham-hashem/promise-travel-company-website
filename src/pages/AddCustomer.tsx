@@ -757,18 +757,32 @@ export default function AddCustomer({ onNavigate }: Props) {
                   <label className="form-label">فندق مكة المفضل</label>
                   <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: سويس أوتيل المقام" />
                 </div>
-                <div>
-                  <label className="form-label">نوع غرفة مكة</label>
-                  <input value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
-                </div>
+                {form.age_group === 'بالغ' && (
+                  <div>
+                    <label className="form-label">نوع غرفة مكة (التسكين)</label>
+                    <select value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input">
+                      <option value="">اختر التسكين</option>
+                      <option value="ثنائي">ثنائي</option>
+                      <option value="ثلاثي">ثلاثي</option>
+                      <option value="رباعي">رباعي</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="form-label">فندق المدينة المفضل</label>
                   <input value={form.hotel_madinah} onChange={(e) => update('hotel_madinah', e.target.value)} className="form-input" placeholder="مثال: بولمان زمزم" />
                 </div>
-                <div>
-                  <label className="form-label">نوع غرفة المدينة</label>
-                  <input value={form.room_type_madinah} onChange={(e) => update('room_type_madinah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
-                </div>
+                {form.age_group === 'بالغ' && (
+                  <div>
+                    <label className="form-label">نوع غرفة المدينة (التسكين)</label>
+                    <select value={form.room_type_madinah} onChange={(e) => update('room_type_madinah', e.target.value)} className="form-input">
+                      <option value="">اختر التسكين</option>
+                      <option value="ثنائي">ثنائي</option>
+                      <option value="ثلاثي">ثلاثي</option>
+                      <option value="رباعي">رباعي</option>
+                    </select>
+                  </div>
+                )}
               </>
             )}
             {form.service_type === 'سياحة داخلية' && (
@@ -777,10 +791,17 @@ export default function AddCustomer({ onNavigate }: Props) {
                   <label className="form-label">الفندق المفضل (اختياري)</label>
                   <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: فندق هيلتون دهب" />
                 </div>
-                <div>
-                  <label className="form-label">نوع الغرفة (اختياري)</label>
-                  <input value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input" placeholder="ثنائية، ثلاثية، إلخ" />
-                </div>
+                {form.age_group === 'بالغ' && (
+                  <div>
+                    <label className="form-label">نوع الغرفة (التسكين)</label>
+                    <select value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input">
+                      <option value="">اختر التسكين</option>
+                      <option value="ثنائي">ثنائي</option>
+                      <option value="ثلاثي">ثلاثي</option>
+                      <option value="رباعي">رباعي</option>
+                    </select>
+                  </div>
+                )}
               </>
             )}
           </div>

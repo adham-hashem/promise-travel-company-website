@@ -840,16 +840,56 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
                         placeholder="أدخل التفاصيل (مثال: رقم الحجز، اسم الفندق، رقم التأكيد...)"
                         className="input-field text-sm min-h-[82px] resize-none bg-white"
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleExecutionFileUpdate(item.id)}
-                        disabled={savingExecutionItem === item.id}
-                        className={`self-end px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
-                          isCompleted ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-navy-900 text-white hover:bg-navy-800'
-                        } disabled:opacity-60`}
-                      >
-                        <Save size={14} /> {savingExecutionItem === item.id ? 'جارٍ الحفظ...' : isCompleted ? 'تحديث البند' : 'حفظ وتأكيد'}
-                      </button>
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="file" 
+                            id={`exec_file_${item.id}`}
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                handleUploadExecutionFile(item.id, e.target.files[0]);
+                              }
+                            }}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => document.getElementById(`exec_file_${item.id}`)?.click()}
+                            className="text-xs font-bold bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-colors"
+                            disabled={uploadingItemFile === item.id}
+                          >
+                            {uploadingItemFile === item.id ? (
+                              <><Clock size={14} className="animate-spin"/> جاري الرفع...</>
+                            ) : (
+                              <><Upload size={14}/> رفع ملف</>
+                            )}
+                          </button>
+                          
+                          {itemData?.file_url && (
+                            <a 
+                              href={itemData.file_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1.5 rounded-lg flex items-center gap-1 hover:bg-emerald-200 transition-colors max-w-[120px] truncate block"
+                              title={itemData.file_name}
+                            >
+                              <CheckCircle2 size={14} className="inline mr-1" />
+                              {itemData.file_name || 'مرفق'}
+                            </a>
+                          )}
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleExecutionFileUpdate(item.id)}
+                          disabled={savingExecutionItem === item.id}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors ${
+                            isCompleted ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-navy-900 text-white hover:bg-navy-800'
+                          } disabled:opacity-60`}
+                        >
+                          <Save size={14} /> {savingExecutionItem === item.id ? 'جارٍ الحفظ...' : isCompleted ? 'تحديث البند' : 'حفظ وتأكيد'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
