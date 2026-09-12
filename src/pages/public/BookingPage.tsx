@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Loader2, CheckCircle2, Moon, Plane, MapPin, Hotel as HotelIcon,
-  User, Phone, Mail, FileText, Send, Users, Upload,
-  Eye, Trash2, Globe, Hash, BedDouble, Baby,
+  User, Phone, Mail, FileText, Send, Upload,
+  Eye, Trash2, Globe, Hash, BedDouble,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
+import { adultRoomOptions, getPackagePriceForCustomer, type AgeGroup, type AdultRoomType } from '../../lib/packagePricing';
 import type { Package, Hotel, InternalTrip } from '../../types';
 
 interface Props {
@@ -32,6 +33,12 @@ const websiteDocFileKeys: Record<string, string> = {
   'صورة شخصية': 'personal_photo',
 };
 
+interface TravelerLine {
+  id: string;
+  age_group: AgeGroup;
+  room_type: AdultRoomType | '';
+}
+
 export default function BookingPage({ preset, onDone }: Props) {
   const [packages, setPackages] = useState<Package[] | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -42,13 +49,12 @@ export default function BookingPage({ preset, onDone }: Props) {
     package_id: preset?.packageId || '',
     hotel_id: '',
     travelers: '1',
-    room_type: '',
-    adult_count: '1',
-    child_count: '0',
-    infant_count: '0',
     travel_date: '',
     notes: '',
   });
+  const [travelerLines, setTravelerLines] = useState<TravelerLine[]>([
+    { id: 'traveler-1', age_group: 'بالغ', room_type: '' },
+  ]);
   const [docFiles, setDocFiles] = useState<Record<string, File | null>>({
     'جواز سفر': null, 'بطاقة رقم قومي': null, 'صورة شخصية': null,
   });
@@ -69,7 +75,8 @@ export default function BookingPage({ preset, onDone }: Props) {
 
   const loadOptions = async (type: string, packageId = '') => {
     setPackages(null);
-    setForm((f) => ({ ...f, package_id: packageId, hotel_id: '', room_type: '', adult_count: '1', child_count: '0', infant_count: '0' }));
+    setForm((f) => ({ ...f, package_id: packageId, hotel_id: '', travelers: '1' }));
+    setTravelerLines([{ id: `traveler-${Date.now()}`, age_group: 'بالغ', room_type: '' }]);
     if (!type) { setPackages([]); return; }
     if (type === 'داخلي') {
       setPackages([]);
@@ -88,6 +95,11 @@ export default function BookingPage({ preset, onDone }: Props) {
     loadOptions(type);
   };
 
+  const setPackage = (packageId: string) => {
+    setForm({ ...form, package_id: packageId, travelers: '1' });
+    setTravelerLines([{ id: `traveler-${Date.now()}`, age_group: 'بالغ', room_type: '' }]);
+  };
+
   useEffect(() => {
     if (preset?.type) loadOptions(preset.type, preset.packageId || '');
   }, [preset?.type, preset?.packageId]);
@@ -104,23 +116,46 @@ export default function BookingPage({ preset, onDone }: Props) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   };
   const hasPrice = (value: unknown) => Number.isFinite(Number(value)) && Number(value) > 0;
-  const roomOptions = selectedPackage ? [
-    { value: 'ثنائية', label: 'غرفة ثنائية', price: selectedPackage.price_double },
-    { value: 'ثلاثية', label: 'غرفة ثلاثية', price: selectedPackage.price_triple },
-    { value: 'رباعية', label: 'غرفة رباعية', price: selectedPackage.price_quad },
-  ].filter((option) => hasPrice(option.price)) : [];
-  const adultPrice = selectedPackage
-    ? Number(roomOptions.find((option) => option.value === form.room_type)?.price || selectedPackage.price || 0)
-    : 0;
-  const adultCount = toCount(form.adult_count);
-  const childCount = toCount(form.child_count);
-  const infantCount = toCount(form.infant_count);
-  const packageTravelerCount = adultCount + childCount + infantCount;
+  const roomOptions = selectedPackage
+    ? adultRoomOptions
+      .map((option) => ({ ...option, price: selectedPackage[option.field] }))
+      .filter((option) => hasPrice(option.price))
+    : [];
+  const packageTravelerCount = travelerLines.length;
+  const adultCount = travelerLines.filter((traveler) => traveler.age_group === 'بالغ').length;
+  const childCount = travelerLines.filter((traveler) => traveler.age_group === 'طفل').length;
+  const infantCount = travelerLines.filter((traveler) => traveler.age_group === 'رضيع').length;
   const packageTotal = selectedPackage
-    ? (adultCount * adultPrice)
-      + (childCount * (hasPrice(selectedPackage.price_child) ? Number(selectedPackage.price_child) : 0))
-      + (infantCount * (hasPrice(selectedPackage.price_infant) ? Number(selectedPackage.price_infant) : 0))
+    ? travelerLines.reduce((sum, traveler) => (
+      sum + getPackagePriceForCustomer(selectedPackage, traveler.age_group, traveler.room_type)
+    ), 0)
     : 0;
+
+  const setTravelerCount = (value: string) => {
+    const nextCount = Math.max(1, toCount(value) || 1);
+    setForm((prev) => ({ ...prev, travelers: String(nextCount) }));
+    setTravelerLines((prev) => {
+      if (nextCount === prev.length) return prev;
+      if (nextCount < prev.length) return prev.slice(0, nextCount);
+      return [
+        ...prev,
+        ...Array.from({ length: nextCount - prev.length }, (_, index) => ({
+          id: `traveler-${Date.now()}-${index}`,
+          age_group: 'بالغ' as AgeGroup,
+          room_type: '' as AdultRoomType | '',
+        })),
+      ];
+    });
+  };
+
+  const updateTraveler = (id: string, patch: Partial<TravelerLine>) => {
+    setTravelerLines((prev) => prev.map((traveler) => {
+      if (traveler.id !== id) return traveler;
+      const next = { ...traveler, ...patch };
+      if (patch.age_group && patch.age_group !== 'بالغ') next.room_type = '';
+      return next;
+    }));
+  };
 
   const previewFile = (docType: string) => {
     const file = docFiles[docType];
@@ -138,8 +173,8 @@ export default function BookingPage({ preset, onDone }: Props) {
     if (isPackageBooking && form.package_id) {
       if (!selectedPackage) { setError('يرجى اختيار باقة صحيحة'); return; }
       if (packageTravelerCount < 1) { setError('حدد عدد المسافرين في الباقة'); return; }
-      if (roomOptions.length > 0 && !form.room_type) { setError('اختر نوع الغرفة المطلوبة'); return; }
-      if (adultCount > 0 && adultPrice <= 0) { setError('لا يوجد سعر بالغ متاح لهذه الباقة'); return; }
+      if (adultCount > 0 && travelerLines.some((traveler) => traveler.age_group === 'بالغ' && !traveler.room_type)) { setError('اختر نوع التسكين لكل بالغ'); return; }
+      if (adultCount > 0 && travelerLines.some((traveler) => traveler.age_group === 'بالغ' && getPackagePriceForCustomer(selectedPackage, 'بالغ', traveler.room_type) <= 0)) { setError('لا يوجد سعر بالغ متاح لنوع التسكين المختار'); return; }
       if (childCount > 0 && !hasPrice(selectedPackage.price_child)) { setError('سعر الطفل غير متاح لهذه الباقة'); return; }
       if (infantCount > 0 && !hasPrice(selectedPackage.price_infant)) { setError('سعر الرضيع غير متاح لهذه الباقة'); return; }
     }
@@ -154,7 +189,15 @@ export default function BookingPage({ preset, onDone }: Props) {
       const selectedHotel = form.hotel_id ? hotels.find((h) => h.id === form.hotel_id) : null;
       const selectedTrip = form.service_type === 'داخلي' && form.package_id ? trips.find((t) => t.id === form.package_id) : null;
       const packagePricingNotes = isPackageBooking && form.package_id
-        ? `الغرفة: ${form.room_type || 'غير محددة'} — بالغين: ${adultCount} — أطفال: ${childCount} — رضع: ${infantCount} — الإجمالي التقريبي: ${packageTotal.toLocaleString('ar-EG')} ج.م`
+        ? [
+          `تفاصيل التسعير: بالغين: ${adultCount} | أطفال: ${childCount} | رضع: ${infantCount}`,
+          ...travelerLines.map((traveler, index) => {
+            const price = selectedPackage ? getPackagePriceForCustomer(selectedPackage, traveler.age_group, traveler.room_type) : 0;
+            const roomLabel = traveler.age_group === 'بالغ' ? ` - تسكين ${traveler.room_type}` : ' - بدون تسكين مستقل';
+            return `مسافر ${index + 1}: ${traveler.age_group}${roomLabel} - ${price.toLocaleString('ar-EG')} ج.م`;
+          }),
+          `الإجمالي التقريبي: ${packageTotal.toLocaleString('ar-EG')} ج.م`,
+        ].join('\n')
         : '';
       const bookingNotes = [
         'استعلام حجز من واجهة الزائر - يبدأ من قسم الاستعلامات قبل التشغيل',
@@ -168,7 +211,7 @@ export default function BookingPage({ preset, onDone }: Props) {
         selectedTrip ? `الرحلة الداخلية: ${selectedTrip.name}` : '',
         packagePricingNotes,
         form.notes ? `ملاحظات العميل: ${form.notes}` : '',
-      ].filter(Boolean).join(' — ');
+      ].filter(Boolean).join('\n');
 
       const inquiryNumber = `INQ-${Date.now().toString().slice(-6)}`;
       const { data: inquiry, error: inquiryErr } = await supabase
@@ -306,7 +349,7 @@ export default function BookingPage({ preset, onDone }: Props) {
                   ) : (
                     <select
                       value={form.package_id}
-                      onChange={(e) => setForm({ ...form, package_id: e.target.value, room_type: '', child_count: '0', infant_count: '0' })}
+                      onChange={(e) => setPackage(e.target.value)}
                       className="form-input"
                     >
                       <option value="">— اختر باقة —</option>
@@ -333,61 +376,64 @@ export default function BookingPage({ preset, onDone }: Props) {
                     )}
                   </div>
 
-                  {roomOptions.length > 0 ? (
-                    <div>
-                      <label className="form-label">نوع الغرفة المطلوبة <span className="text-red-500">*</span></label>
-                      <div className="grid sm:grid-cols-3 gap-2">
-                        {roomOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setForm({ ...form, room_type: option.value })}
-                            className={`rounded-xl border-2 p-3 text-right transition-all ${
-                              form.room_type === option.value
-                                ? 'border-gold-500 bg-white text-emerald-950 shadow-sm'
-                                : 'border-emerald-100 bg-white/60 text-gray-600 hover:border-gold-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 text-xs font-bold">
-                              <BedDouble size={14} className="text-gold-600" />
-                              {option.label}
-                            </div>
-                            <p className="mt-1 text-sm font-black">{Number(option.price).toLocaleString('ar-EG')} ج.م</p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : hasPrice(selectedPackage.price) ? (
-                    <div className="rounded-xl border border-emerald-100 bg-white px-4 py-3 flex items-center justify-between">
-                      <span className="text-sm font-bold text-emerald-950">السعر الأساسي للبالغ</span>
-                      <span className="text-sm font-black text-emerald-950">{Number(selectedPackage.price).toLocaleString('ar-EG')} ج.م</span>
-                    </div>
-                  ) : null}
+                  <div>
+                    <label className="form-label">عدد الأشخاص</label>
+                    <input type="number" min="1" value={form.travelers} onChange={(e) => setTravelerCount(e.target.value)} className="form-input bg-white text-left" dir="ltr" />
+                  </div>
 
-                  <div className="grid sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="form-label">عدد البالغين</label>
-                      <div className="relative">
-                        <User size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" value={form.adult_count} onChange={(e) => setForm({ ...form, adult_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left" dir="ltr" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="form-label">عدد الأطفال {hasPrice(selectedPackage.price_child) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_child).toLocaleString('ar-EG')} ج.م)</span>}</label>
-                      <div className="relative">
-                        <Users size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_child)} value={form.child_count} onChange={(e) => setForm({ ...form, child_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
-                      </div>
-                      {!hasPrice(selectedPackage.price_child) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر طفل لهذه الباقة</p>}
-                    </div>
-                    <div>
-                      <label className="form-label">عدد الرضع {hasPrice(selectedPackage.price_infant) && <span className="text-gray-400 font-normal">({Number(selectedPackage.price_infant).toLocaleString('ar-EG')} ج.م)</span>}</label>
-                      <div className="relative">
-                        <Baby size={16} className="absolute top-1/2 -translate-y-1/2 right-9 text-gray-400 pointer-events-none" />
-                        <input type="number" min="0" disabled={!hasPrice(selectedPackage.price_infant)} value={form.infant_count} onChange={(e) => setForm({ ...form, infant_count: e.target.value })} className="form-input pl-4 pr-16 bg-white text-left disabled:bg-gray-100 disabled:text-gray-400" dir="ltr" />
-                      </div>
-                      {!hasPrice(selectedPackage.price_infant) && <p className="text-[11px] text-gray-400 mt-1">لا يوجد سعر رضيع لهذه الباقة</p>}
-                    </div>
+                  <div className="space-y-3">
+                    {travelerLines.map((traveler, index) => {
+                      const travelerPrice = getPackagePriceForCustomer(selectedPackage, traveler.age_group, traveler.room_type);
+                      return (
+                        <div key={traveler.id} className="rounded-2xl border border-emerald-100 bg-white p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-black text-emerald-950">مسافر {index + 1}</p>
+                            <p className="text-sm font-black text-emerald-800">{travelerPrice.toLocaleString('ar-EG')} ج.م</p>
+                          </div>
+                          <div className="grid sm:grid-cols-3 gap-2">
+                            {(['بالغ', 'طفل', 'رضيع'] as AgeGroup[]).map((ageGroup) => (
+                              <button
+                                key={ageGroup}
+                                type="button"
+                                onClick={() => updateTraveler(traveler.id, { age_group: ageGroup })}
+                                className={`rounded-xl border-2 px-3 py-2 text-xs font-bold transition-all ${
+                                  traveler.age_group === ageGroup
+                                    ? 'border-gold-500 bg-gold-50 text-emerald-950'
+                                    : 'border-gray-100 text-gray-500 hover:border-emerald-200'
+                                }`}
+                              >
+                                {ageGroup}
+                              </button>
+                            ))}
+                          </div>
+                          {traveler.age_group === 'بالغ' && (
+                            <div className="grid sm:grid-cols-3 gap-2">
+                              {roomOptions.map((option) => (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() => updateTraveler(traveler.id, { room_type: option.value })}
+                                  className={`rounded-xl border-2 p-3 text-right transition-all ${
+                                    traveler.room_type === option.value
+                                      ? 'border-gold-500 bg-emerald-50 text-emerald-950 shadow-sm'
+                                      : 'border-emerald-100 bg-white text-gray-600 hover:border-gold-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 text-xs font-bold">
+                                    <BedDouble size={14} className="text-gold-600" />
+                                    {option.label}
+                                  </div>
+                                  <p className="mt-1 text-sm font-black">{Number(option.price).toLocaleString('ar-EG')} ج.م</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {traveler.age_group !== 'بالغ' && (
+                            <p className="text-[11px] text-gray-500">لا يوجد نوع تسكين مستقل للطفل أو الرضيع، ويُحسب بسعره المستقل داخل الباقة.</p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

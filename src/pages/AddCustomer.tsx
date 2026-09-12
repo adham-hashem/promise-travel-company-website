@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { compressImage } from '../lib/imageCompressor';
 import { ensureVipAccountingArtifacts } from '../lib/vipAccounting';
 import { grantVipAccess } from '../lib/vipAccess';
+import { getPackagePriceForCustomer, normalizeAdultRoomType, type AgeGroup } from '../lib/packagePricing';
 import type { Package, Employee, Page, ServiceType, CustomerStatus } from '../types';
 
 type AssignableVipManager = Employee & { status?: string };
@@ -134,7 +135,24 @@ export default function AddCustomer({ onNavigate }: Props) {
       });
   }, []);
 
-  const update = (field: string, value: string) => setForm({ ...form, [field]: value });
+  const update = (field: string, value: string) => {
+    if (field === 'age_group') {
+      setForm({
+        ...form,
+        age_group: value as AgeGroup,
+        room_type_makkah: value === 'بالغ' ? form.room_type_makkah : '',
+        room_type_madinah: value === 'بالغ' ? form.room_type_madinah : '',
+      });
+      return;
+    }
+    setForm({ ...form, [field]: value });
+  };
+
+  const selectedPackage = packages.find((p) => p.id === form.requested_package_id) || null;
+  const selectedRoomType = normalizeAdultRoomType(form.room_type_makkah || form.room_type_madinah);
+  const finalPackagePrice = selectedPackage
+    ? getPackagePriceForCustomer(selectedPackage, form.age_group, selectedRoomType)
+    : 0;
 
   const calculateAgeGroup = (birthDateStr: string): 'بالغ' | 'طفل' | 'رضيع' => {
     if (!birthDateStr) return 'بالغ';
@@ -223,8 +241,8 @@ export default function AddCustomer({ onNavigate }: Props) {
           country: form.country || null,
           hotel_makkah: form.hotel_makkah || null,
           hotel_madinah: form.hotel_madinah || null,
-          room_type_makkah: form.room_type_makkah || null,
-          room_type_madinah: form.room_type_madinah || null,
+          room_type_makkah: form.age_group === 'بالغ' ? (form.room_type_makkah || null) : null,
+          room_type_madinah: form.age_group === 'بالغ' ? (form.room_type_madinah || null) : null,
           is_vip: isVip,
           client_type: form.client_type,
           age_group: form.age_group,
@@ -551,16 +569,7 @@ export default function AddCustomer({ onNavigate }: Props) {
                     {packages
                       .filter((p) => !form.service_type || p.type === form.service_type)
                       .map((p) => {
-                        let finalPrice = p.price;
-                          if (form.age_group === 'طفل' && p.price_child > 0) {
-                            finalPrice = p.price_child;
-                          } else if (form.age_group === 'رضيع' && p.price_infant > 0) {
-                            finalPrice = p.price_infant;
-                          } else if (form.age_group === 'بالغ') {
-                            if (form.room_type_makkah === 'ثنائي' && p.price_double > 0) finalPrice = p.price_double;
-                            else if (form.room_type_makkah === 'ثلاثي' && p.price_triple > 0) finalPrice = p.price_triple;
-                            else if (form.room_type_makkah === 'رباعي' && p.price_quad > 0) finalPrice = p.price_quad;
-                          }
+                        const finalPrice = getPackagePriceForCustomer(p, form.age_group, selectedRoomType);
                         return (
                           <option key={p.id} value={p.id}>
                             {p.name} — {finalPrice.toLocaleString('ar-EG')} ج.م
@@ -580,6 +589,21 @@ export default function AddCustomer({ onNavigate }: Props) {
                     {vipManagers.map((emp) => <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>)}
                   </select>
                 </div>
+              </div>
+            )}
+            {!isVip && selectedPackage && (
+              <div className="md:col-span-2 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-emerald-700">السعر النهائي قبل الحفظ</p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    {form.age_group === 'بالغ'
+                      ? `بالغ${selectedRoomType ? ` ${selectedRoomType}` : ' - اختر التسكين لإظهار سعره من الباقة'}`
+                      : `${form.age_group} - بدون نوع تسكين مستقل`}
+                  </p>
+                </div>
+                <p className="text-xl font-black text-emerald-950">
+                  {finalPackagePrice.toLocaleString('ar-EG')} <span className="text-xs font-bold">ج.م</span>
+                </p>
               </div>
             )}
             <div>
@@ -722,7 +746,13 @@ export default function AddCustomer({ onNavigate }: Props) {
                   onChange={(e) => {
                     const dateVal = e.target.value;
                     const calculated = calculateAgeGroup(dateVal);
-                    setForm(prev => ({ ...prev, birth_date: dateVal, age_group: calculated }));
+                    setForm(prev => ({
+                      ...prev,
+                      birth_date: dateVal,
+                      age_group: calculated,
+                      room_type_makkah: calculated === 'بالغ' ? prev.room_type_makkah : '',
+                      room_type_madinah: calculated === 'بالغ' ? prev.room_type_madinah : '',
+                    }));
                   }}
                   className="form-input pr-9"
                   dir="ltr"

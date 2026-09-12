@@ -11,6 +11,7 @@ import type { Payment, PaymentMethod, Booking, PaymentProof } from '../types';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import ApprovalRequestsManager from '../components/ApprovalRequestsManager';
 import FinancialNotifications from '../components/FinancialNotifications';
+import { getPackagePriceForCustomerRecord } from '../lib/packagePricing';
 
 const emptyForm = {
   booking_id: '',
@@ -33,34 +34,6 @@ const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
 interface PayRow extends Payment {
   payment_proofs?: PaymentProof[];
 }
-
-const calculateCustomerPackagePrice = (cust: any, pkg: any) => {
-  if (!pkg) return 0;
-  let price = Number(pkg.price || 0);
-  const roomType = (cust?.room_type_makkah || cust?.room_type_madinah || 'ثنائي').toLowerCase();
-  
-  let selectedRoomPrice = 0;
-  if (roomType.includes('ثنائ') || roomType.includes('double')) {
-    selectedRoomPrice = Number(pkg.price_double || 0);
-  } else if (roomType.includes('ثلاث') || roomType.includes('triple')) {
-    selectedRoomPrice = Number(pkg.price_triple || 0);
-  } else if (roomType.includes('رباع') || roomType.includes('quad')) {
-    selectedRoomPrice = Number(pkg.price_quad || 0);
-  }
-  
-  if (selectedRoomPrice > 0) {
-    price = selectedRoomPrice;
-  }
-  
-  const ageGroup = cust?.age_group || 'بالغ';
-  if (ageGroup === 'طفل' && pkg.price_child > 0) {
-    price = Number(pkg.price_child);
-  } else if (ageGroup === 'رضيع' && pkg.price_infant > 0) {
-    price = Number(pkg.price_infant);
-  }
-  
-  return price;
-};
 
 export default function Payments() {
   const { profile } = useAuth();
@@ -106,7 +79,7 @@ export default function Payments() {
     const pkg = member.id === form.customer_id
       ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
       : (member.packages || packages.find(p => p.id === member.requested_package_id));
-    return sum + calculateCustomerPackagePrice(member, pkg);
+    return sum + getPackagePriceForCustomerRecord(member, pkg);
   }, 0);
 
   const packagePrice = familyPackagePrice;
@@ -177,7 +150,7 @@ export default function Payments() {
       const pkg = member.id === form.customer_id
         ? (selectedPkg || member.packages || packages.find(p => p.id === member.requested_package_id))
         : (member.packages || packages.find(p => p.id === member.requested_package_id));
-      return sum + calculateCustomerPackagePrice(member, pkg);
+      return sum + getPackagePriceForCustomerRecord(member, pkg);
     }, 0);
     
     const currentAmt = parseFloat(form.amount) || 0;
@@ -282,7 +255,7 @@ export default function Payments() {
 
     family.forEach(member => {
       const pkg = member.packages || packages.find(p => p.id === member.requested_package_id);
-      const price = pkg ? calculateCustomerPackagePrice(member, pkg) : 0;
+      const price = pkg ? getPackagePriceForCustomerRecord(member, pkg) : 0;
       const memberBookings = bookings.filter(b => b.customer_id === member.id);
       
       if (memberBookings.length > 0) {
@@ -869,13 +842,13 @@ export default function Payments() {
                 const filePayments: any[] = file.payments || [];
                 const totalPaid = filePayments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
                 
-                const mainPkgPrice = file.customer?.packages ? calculateCustomerPackagePrice(file.customer, file.customer.packages) : 0;
+                const mainPkgPrice = file.customer?.packages ? getPackagePriceForCustomerRecord(file.customer, file.customer.packages) : 0;
                 const mainBookingTotal = Number(file.booking?.total_amount || 0) || mainPkgPrice;
                 
                 const bookingTotal = mainBookingTotal + subCustomers.reduce((sum, sc) => {
                   const subBooking = bookings.find(b => b.customer_id === sc.id);
                   const subPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
-                  const subPkgPrice = subPkg ? calculateCustomerPackagePrice(sc, subPkg) : 0;
+                  const subPkgPrice = subPkg ? getPackagePriceForCustomerRecord(sc, subPkg) : 0;
                   return sum + (Number(subBooking?.total_amount || 0) || subPkgPrice);
                 }, 0);
 
@@ -1369,7 +1342,7 @@ export default function Payments() {
                           <div className="space-y-1.5">
                             {subCusts.map(sc => {
                               const scPkg = sc.packages || packages.find(p => p.id === sc.requested_package_id);
-                              const scPrice = scPkg ? calculateCustomerPackagePrice(sc, scPkg) : 0;
+                              const scPrice = scPkg ? getPackagePriceForCustomerRecord(sc, scPkg) : 0;
                               return (
                                 <div key={sc.id} className="flex justify-between text-xs text-gray-700 border-b border-gray-100 pb-1">
                                   <span>{sc.name} ({sc.client_code || 'بدون كود'}) - {sc.age_group || 'بالغ'}</span>
@@ -1668,6 +1641,5 @@ function TransferFileToOpsModal({ file, onClose, onTransferred }: TransferFileOp
     </div>
   );
 }
-
 
 

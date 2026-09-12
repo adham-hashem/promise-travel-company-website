@@ -9,6 +9,7 @@ import {
 import { supabase } from '../lib/supabase';
 import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent } from '../types';
 import DocumentsSection from '../components/DocumentsSection';
+import { getPackagePriceForCustomerRecord } from '../lib/packagePricing';
 
 const statusColors: Record<CustomerStatus, string> = {
   جديد: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -43,34 +44,6 @@ interface FinSummary {
   totalRemaining: number;
   invoiceCount: number;
 }
-
-const calculateCustomerPackagePrice = (cust: any, pkg: any) => {
-  if (!pkg) return 0;
-  let price = Number(pkg.price || 0);
-  const roomType = (cust?.room_type_makkah || cust?.room_type_madinah || 'ثنائي').toLowerCase();
-  
-  let selectedRoomPrice = 0;
-  if (roomType.includes('ثنائ') || roomType.includes('double')) {
-    selectedRoomPrice = Number(pkg.price_double || 0);
-  } else if (roomType.includes('ثلاث') || roomType.includes('triple')) {
-    selectedRoomPrice = Number(pkg.price_triple || 0);
-  } else if (roomType.includes('رباع') || roomType.includes('quad')) {
-    selectedRoomPrice = Number(pkg.price_quad || 0);
-  }
-  
-  if (selectedRoomPrice > 0) {
-    price = selectedRoomPrice;
-  }
-  
-  const ageGroup = cust?.age_group || 'بالغ';
-  if (ageGroup === 'طفل' && pkg.price_child > 0) {
-    price = Number(pkg.price_child);
-  } else if (ageGroup === 'رضيع' && pkg.price_infant > 0) {
-    price = Number(pkg.price_infant);
-  }
-  
-  return price;
-};
 
 export default function CustomerDetails({ customerId, onNavigate }: Props) {
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -323,7 +296,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
       // Deduplicate unique family members
       const uniqueFamily = Array.from(new Map(familyMembers.map(m => [m?.id, m])).values()).filter(Boolean);
       const groupPackagePrice = uniqueFamily.reduce((sum, member) => {
-        return sum + calculateCustomerPackagePrice(member, member.packages);
+        return sum + getPackagePriceForCustomerRecord(member, member.packages);
       }, 0);
 
       const packagePrice = groupPackagePrice;
