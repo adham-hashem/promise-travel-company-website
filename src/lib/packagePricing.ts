@@ -32,7 +32,7 @@ export const getPackagePriceForCustomer = (
   if (normalizedRoomType === 'ثلاثي') return Number(pkg.price_triple || 0);
   if (normalizedRoomType === 'رباعي') return Number(pkg.price_quad || 0);
 
-  return Number(pkg.price || 0);
+  return 0;
 };
 
 export const getPackagePriceForCustomerRecord = (customer: any, pkg: any) => {
