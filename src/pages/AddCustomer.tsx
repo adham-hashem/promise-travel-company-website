@@ -552,11 +552,15 @@ export default function AddCustomer({ onNavigate }: Props) {
                       .filter((p) => !form.service_type || p.type === form.service_type)
                       .map((p) => {
                         let finalPrice = p.price;
-                        if (form.age_group === 'طفل' && p.price_child > 0) {
-                          finalPrice = p.price_child;
-                        } else if (form.age_group === 'رضيع' && p.price_infant > 0) {
-                          finalPrice = p.price_infant;
-                        }
+                          if (form.age_group === 'طفل' && p.price_child > 0) {
+                            finalPrice = p.price_child;
+                          } else if (form.age_group === 'رضيع' && p.price_infant > 0) {
+                            finalPrice = p.price_infant;
+                          } else if (form.age_group === 'بالغ') {
+                            if (form.room_type_makkah === 'ثنائي' && p.price_double > 0) finalPrice = p.price_double;
+                            else if (form.room_type_makkah === 'ثلاثي' && p.price_triple > 0) finalPrice = p.price_triple;
+                            else if (form.room_type_makkah === 'رباعي' && p.price_quad > 0) finalPrice = p.price_quad;
+                          }
                         return (
                           <option key={p.id} value={p.id}>
                             {p.name} — {finalPrice.toLocaleString('ar-EG')} ج.م
