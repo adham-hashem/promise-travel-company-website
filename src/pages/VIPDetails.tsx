@@ -45,6 +45,7 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info'|'customers'|'financial'|'execution'|'logs'>('info');
+  const [uploadingItemFile, setUploadingItemFile] = useState<string | null>(null);
 
   // Customer Add Form State
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -311,6 +312,48 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
       }
       const preview = URL.createObjectURL(file);
       setDocUploads(prev => ({ ...prev, [type]: { file, preview } }));
+    }
+  };
+
+  const handleUploadExecutionFile = async (itemId: string, file: File) => {
+    if (!trip) return;
+    setUploadingItemFile(itemId);
+    try {
+      const ext = file.name.split('.').pop();
+      const fileName = `vip_${trip.id}_${itemId}_${Date.now()}.${ext}`;
+      const filePath = `vip-executions/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file);
+        
+      if (uploadError) throw uploadError;
+      
+      const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+      
+      const currentDetails = trip.execution_details || {};
+      const itemData = currentDetails[itemId] || { details: executionDrafts[itemId] || '' };
+      
+      const newDetails = {
+        ...currentDetails,
+        [itemId]: {
+          ...itemData,
+          file_url: publicUrlData.publicUrl,
+          file_name: file.name
+        }
+      };
+      
+      const { error: updateError } = await supabase.from('vip_trips').update({
+        execution_details: newDetails
+      }).eq('id', trip.id);
+      
+      if (updateError) throw updateError;
+      
+      await loadTripDetails();
+    } catch (err: any) {
+      alert('فشل رفع الملف: ' + err.message);
+    } finally {
+      setUploadingItemFile(null);
     }
   };
 
