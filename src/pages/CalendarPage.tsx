@@ -14,7 +14,7 @@ interface CalEvent {
 }
 
 const typeConfig = {
-  travel: { label: 'موعد سفر', color: 'bg-blue-500', text: 'text-blue-700', bg: 'bg-blue-50', icon: Plane },
+  travel: { label: 'موعد سفر', color: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50', icon: Plane },
   return: { label: 'موعد عودة', color: 'bg-cyan-500', text: 'text-cyan-700', bg: 'bg-cyan-50', icon: Plane },
   follow_up: { label: 'متابعة', color: 'bg-amber-500', text: 'text-amber-700', bg: 'bg-amber-50', icon: Clock },
   installment: { label: 'قسط', color: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50', icon: CreditCard },

@@ -17,7 +17,7 @@ import StatDrillDownModal, { type StatType } from '../components/StatDrillDownMo
 
 
 
-const RADIAL_COLORS = ['#0c224f', '#c9941a', '#10b981', '#ef4444', '#a855f7'];
+const RADIAL_COLORS = ['#0f3f39', '#c9941a', '#10b981', '#ef4444', '#a855f7'];
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
@@ -233,7 +233,7 @@ export default function Employees({ onNavigate }: Props) {
                       <YAxis tick={{ fontSize: 12, fontFamily: 'Cairo', fill: '#6b7280' }} />
                       <Tooltip contentStyle={{ fontFamily: 'Cairo', borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
                       <Legend wrapperStyle={{ fontFamily: 'Cairo', fontSize: 12 }} />
-                      <Bar dataKey="عملاء" fill="#0c224f" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="عملاء" fill="#0f3f39" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="حجوزات" fill="#c9941a" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

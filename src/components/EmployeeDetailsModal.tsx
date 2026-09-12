@@ -13,7 +13,7 @@ type Tab = 'info' | 'clients' | 'bookings';
 type PeriodFilter = 'week' | 'month' | 'year' | 'custom';
 
 const statusColors: Record<string, string> = {
-  جديد: 'bg-blue-100 text-blue-700',
+  جديد: 'bg-emerald-100 text-emerald-700',
   مهتم: 'bg-amber-100 text-amber-700',
   متابعة: 'bg-purple-100 text-purple-700',
   'تم الحجز': 'bg-green-100 text-green-700',
@@ -27,7 +27,7 @@ const bookingStatusColors: Record<string, string> = {
   ملغي: 'bg-red-100 text-red-700',
 };
 
-const PIE_COLORS = ['#0c224f', '#c9941a', '#10b981', '#ef4444', '#a855f7'];
+const PIE_COLORS = ['#0f3f39', '#c9941a', '#10b981', '#ef4444', '#a855f7'];
 
 interface Props {
   employee: Employee | null;
@@ -298,7 +298,7 @@ export default function EmployeeDetailsModal({ employee, onClose, onNavigate }: 
                         </thead>
                         <tbody>
                           {filteredClients.map((c) => (
-                            <tr key={c.id} className="cursor-pointer hover:bg-blue-50/30" onClick={() => onNavigate('customer-details', c.id)}>
+                            <tr key={c.id} className="cursor-pointer hover:bg-emerald-50/30" onClick={() => onNavigate('customer-details', c.id)}>
                               <td><p className="font-semibold text-gray-800 text-sm">{c.name}</p></td>
                               <td className="text-gray-600 text-xs" dir="ltr">{c.phone || '—'}</td>
                               <td className="text-gray-600 text-xs">{c.governorate || '—'}</td>

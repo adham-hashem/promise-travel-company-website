@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 import { exportToExcel, exportToPDF } from '../lib/export';
 
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const COLORS = ['#0c224f', '#c9941a', '#1e4a9e', '#e4b030', '#6b7280', '#10b981', '#ef4444'];
+const COLORS = ['#0f3f39', '#c9941a', '#1f6f65', '#e4b030', '#6b7280', '#10b981', '#ef4444'];
 
 interface MonthlyDataRow {
   month: string;
@@ -230,8 +230,8 @@ export default function Reports() {
           <AreaChart data={monthlySales}>
             <defs>
               <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0c224f" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#0c224f" stopOpacity={0} />
+                <stop offset="5%" stopColor="#0f3f39" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#0f3f39" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -241,7 +241,7 @@ export default function Reports() {
               formatter={(v) => [`${Number(v).toLocaleString('ar-EG')} ج.م`, 'الإيرادات']}
               contentStyle={{ fontFamily: 'Cairo', borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
             />
-            <Area type="monotone" dataKey="إيرادات" stroke="#0c224f" strokeWidth={2.5} fill="url(#revGrad)" />
+            <Area type="monotone" dataKey="إيرادات" stroke="#0f3f39" strokeWidth={2.5} fill="url(#revGrad)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -257,7 +257,7 @@ export default function Reports() {
               <YAxis tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#6b7280' }} />
               <Tooltip contentStyle={{ fontFamily: 'Cairo', borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
               <Legend wrapperStyle={{ fontFamily: 'Cairo', fontSize: '12px' }} />
-              <Bar dataKey="عملاء" fill="#0c224f" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="عملاء" fill="#0f3f39" radius={[4, 4, 0, 0]} />
               <Bar dataKey="حجوزات" fill="#c9941a" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

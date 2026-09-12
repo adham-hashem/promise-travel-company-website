@@ -257,11 +257,11 @@ export default function Installments() {
         )}
 
         {dueSoon.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-            <Clock size={24} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+            <Clock size={24} className="text-emerald-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-blue-800">🔔 أقساط قريبة الاستحقاق ({dueSoon.length})</p>
-              <p className="text-blue-700 text-sm mt-1">{dueSoon.map(d => d.customers?.name).join('، ')}</p>
+              <p className="font-bold text-emerald-800">🔔 أقساط قريبة الاستحقاق ({dueSoon.length})</p>
+              <p className="text-emerald-700 text-sm mt-1">{dueSoon.map(d => d.customers?.name).join('، ')}</p>
             </div>
           </div>
         )}
@@ -320,7 +320,7 @@ export default function Installments() {
                   <td className="font-bold text-navy-900">{fmt(i.amount)} ج.م</td>
                   <td className="text-gray-800">{i.due_date ? new Date(i.due_date).toLocaleDateString('ar-EG') : '—'}</td>
                   <td>
-                    <span className={`badge ${i.status === 'مدفوع' ? 'bg-emerald-100 text-emerald-700' : i.status === 'متأخر' ? 'bg-red-100 text-red-700' : i.status === 'ملغي' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`badge ${i.status === 'مدفوع' ? 'bg-emerald-100 text-emerald-700' : i.status === 'متأخر' ? 'bg-red-100 text-red-700' : i.status === 'ملغي' ? 'bg-gray-100 text-gray-700' : 'bg-emerald-100 text-emerald-700'}`}>
                       {i.status === 'مدفوع' ? <CheckCircle2 size={11} className="inline ml-1" /> : null}{i.status}
                     </span>
                   </td>

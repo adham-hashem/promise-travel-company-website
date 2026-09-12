@@ -25,7 +25,7 @@ const docTypes: { id: DocType; label: string; icon: typeof FileText }[] = [
 ];
 
 const statusConfig: Record<DocStatus, { label: string; class: string; icon: typeof Clock }> = {
-  'مرفوع': { label: 'مرفوع', class: 'bg-blue-100 text-blue-700', icon: Upload },
+  'مرفوع': { label: 'مرفوع', class: 'bg-emerald-100 text-emerald-700', icon: Upload },
   'قيد المراجعة': { label: 'قيد المراجعة', class: 'bg-amber-100 text-amber-700', icon: Clock },
   'مقبول': { label: 'مقبول', class: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
   'مرفوض': { label: 'مرفوض', class: 'bg-red-100 text-red-700', icon: XCircle },
@@ -274,7 +274,7 @@ export default function DocumentsSection({ customerId, bookingId, customerCode, 
                 )}
                 <div className="flex items-center gap-1 pt-2 border-t border-gray-200">
                   <button onClick={() => viewFile(doc)} title="عرض" className="p-1.5 rounded-lg hover:bg-navy-100 text-navy-600"><Eye size={14} /></button>
-                  <button onClick={() => downloadFile(doc)} title="تحميل" className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"><Download size={14} /></button>
+                  <button onClick={() => downloadFile(doc)} title="تحميل" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"><Download size={14} /></button>
                   {canReview && doc.status !== 'مقبول' && (
                     <>
                       <button onClick={() => updateStatus(doc, 'مقبول')} title="قبول" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"><CheckCircle2 size={14} /></button>

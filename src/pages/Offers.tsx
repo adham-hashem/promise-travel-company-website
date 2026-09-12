@@ -164,7 +164,7 @@ export default function Offers() {
     const start = new Date(o.start_date);
     if (!o.is_active) return { label: 'مخفي', class: 'bg-gray-100 text-gray-500' };
     if (now > end) return { label: 'منتهي', class: 'bg-red-100 text-red-700' };
-    if (now < start) return { label: 'قادم', class: 'bg-blue-100 text-blue-700' };
+    if (now < start) return { label: 'قادم', class: 'bg-emerald-100 text-emerald-700' };
     return { label: 'نشط', class: 'bg-emerald-100 text-emerald-700' };
   };
 

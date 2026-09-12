@@ -26,7 +26,7 @@ const emptyForm = {
 const stageLabels: Record<string, { label: string; color: string }> = {
   new: { label: 'جديد', color: 'bg-gray-100 text-gray-600' },
   accounts: { label: 'الحسابات', color: 'bg-amber-100 text-amber-700' },
-  operations: { label: 'التشغيل', color: 'bg-blue-100 text-blue-700' },
+  operations: { label: 'التشغيل', color: 'bg-emerald-100 text-emerald-700' },
   visa: { label: 'التأشيرات', color: 'bg-purple-100 text-purple-700' },
   flight: { label: 'الطيران', color: 'bg-cyan-100 text-cyan-700' },
   ready: { label: 'جاهز للسفر', color: 'bg-emerald-100 text-emerald-700' },
@@ -394,7 +394,7 @@ export default function FlightTickets({ onNavigate }: Props) {
                     <div className="flex justify-between"><span className="text-gray-400 font-semibold">الهاتف</span><span className="font-semibold text-navy-800" dir="ltr">{r.customer?.phone || '—'}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400 font-semibold">رقم الهوية</span><span className="font-mono font-semibold text-navy-800">{r.customer?.national_id || '—'}</span></div>
                     <div className="flex justify-between"><span className="text-gray-400 font-semibold">رقم الجواز</span><span className="font-mono font-semibold text-navy-800">{r.customer?.passport_number || '—'}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{r.customer?.service_type || '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400 font-semibold">نوع الخدمة</span><span className="badge bg-emerald-50 text-emerald-700 font-semibold">{r.customer?.service_type || '—'}</span></div>
                   </div>
                   {r.notes && (
                     <div className="mt-2.5 bg-cyan-50/80 p-2.5 rounded-xl border border-cyan-100 text-[11px] text-navy-800">
@@ -643,7 +643,7 @@ export default function FlightTickets({ onNavigate }: Props) {
                     </div>
                     <button onClick={async () => { const { data } = await supabase.storage.from('documents').createSignedUrl(selectedTicket.ticket_file_path!, 3600); if (data) window.open(data.signedUrl); }} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Eye size={14} /></button>
                     <button onClick={async () => { const { data } = await supabase.storage.from('documents').download(selectedTicket.ticket_file_path!); if (data) { const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = selectedTicket.ticket_file_name!; a.click(); } }} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><Download size={14} /></button>
-                    <button onClick={() => fileRef.current?.click()} className="p-1.5 hover:bg-gray-200 rounded-lg text-blue-500"><Upload size={14} /></button>
+                    <button onClick={() => fileRef.current?.click()} className="p-1.5 hover:bg-gray-200 rounded-lg text-emerald-500"><Upload size={14} /></button>
                   </div>
                 ) : (
                   <button onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full border-2 border-dashed border-gray-300 hover:border-navy-400 rounded-xl py-6 flex flex-col items-center gap-2">
@@ -716,7 +716,7 @@ export default function FlightTickets({ onNavigate }: Props) {
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div><span className="text-gray-400 block mb-0.5">الباقة المطلوبة</span><span className="font-semibold text-navy-800 text-xs bg-gold-50/70 border border-gold-200 px-2 py-0.5 rounded">{detailCustomer.packages?.name || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-emerald-50 text-emerald-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">فندق مكة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_makkah || '—'}</span></div>

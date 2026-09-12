@@ -346,8 +346,8 @@ export default function LeadsDistributionModal({ employees, onClose, onDistribut
                       <span className="text-[11px] text-navy-900 font-bold">الاسم</span>
                     </div>
                     <div className="p-1.5 bg-navy-100/50 rounded border border-navy-200">
-                      <span className="block font-bold text-[10px] text-blue-600">العمود 2 *</span>
-                      <span className="text-[11px] text-blue-900 font-bold">الهاتف</span>
+                      <span className="block font-bold text-[10px] text-emerald-600">العمود 2 *</span>
+                      <span className="text-[11px] text-emerald-900 font-bold">الهاتف</span>
                     </div>
                     <div className="p-1.5 bg-gray-50 rounded">
                       <span className="block font-bold text-[10px] text-gray-400">العمود 3</span>

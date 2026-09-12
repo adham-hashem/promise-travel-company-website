@@ -22,13 +22,13 @@ const departments = ['المبيعات', 'الحسابات', 'التشغيل', '
 
 const priorityColors: Record<TaskPriority, string> = {
   منخفضة: 'bg-gray-100 text-gray-600',
-  متوسطة: 'bg-blue-100 text-blue-700',
+  متوسطة: 'bg-emerald-100 text-emerald-700',
   عالية: 'bg-amber-100 text-amber-700',
   عاجل: 'bg-red-100 text-red-700',
 };
 
 const statusColors: Record<string, string> = {
-  'جديدة': 'bg-blue-100 text-blue-700',
+  'جديدة': 'bg-emerald-100 text-emerald-700',
   'قيد التنفيذ': 'bg-amber-100 text-amber-700',
   'مكتملة': 'bg-emerald-100 text-emerald-700',
   'متأخرة': 'bg-red-100 text-red-700',
@@ -275,7 +275,7 @@ export default function Tasks({}: Props) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
           { label: 'الكل', value: stats.total, color: 'text-navy-700', bg: 'bg-navy-50' },
-          { label: 'جديدة', value: stats.pending, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'جديدة', value: stats.pending, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'قيد التنفيذ', value: stats.inProgress, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'مكتملة', value: stats.completed, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'متأخرة', value: stats.overdue, color: 'text-red-600', bg: 'bg-red-50' },
@@ -404,7 +404,7 @@ export default function Tasks({}: Props) {
                             <div><strong>رمز العميل:</strong> {t.client_code}</div>
                             <div>
                               <strong>الهاتف:</strong>{' '}
-                              <a href={`tel:${associatedCust.phone}`} className="text-blue-600 hover:underline font-semibold font-mono">
+                              <a href={`tel:${associatedCust.phone}`} className="text-emerald-600 hover:underline font-semibold font-mono">
                                 {associatedCust.phone}
                               </a>
                             </div>
@@ -425,7 +425,7 @@ export default function Tasks({}: Props) {
                         <div className="mt-2 mb-2">
                           <button
                             onClick={() => toggleUpdates(t.id)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-blue-700 hover:text-blue-900 transition-colors mb-1.5"
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 transition-colors mb-1.5"
                           >
                             <MessageSquare size={12} />
                             المستجدات ({taskUpdates[t.id].length})
@@ -448,12 +448,12 @@ export default function Tasks({}: Props) {
                           {expandedUpdates[t.id] && (
                             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                               {taskUpdates[t.id].map((u, idx) => (
-                                <div key={u.id} className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs relative">
+                                <div key={u.id} className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-xs relative">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                    <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
                                       {idx + 1}
                                     </span>
-                                    <span className="text-[10px] text-blue-600 font-semibold">
+                                    <span className="text-[10px] text-emerald-600 font-semibold">
                                       {u.employees?.name || 'الموظف'}
                                     </span>
                                     <span className="text-[9px] text-gray-400 mr-auto">

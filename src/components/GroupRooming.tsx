@@ -483,7 +483,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
       { bg: '#e0e7ff', text: '#3730a3' }, // Light Indigo
       { bg: '#f0fdfa', text: '#0f766e' }, // Light Teal
       { bg: '#fff7ed', text: '#9a3412' }, // Light Orange
-      { bg: '#ecfeff', text: '#0891b2' }, // Light Cyan
+      { bg: '#ecfeff', text: '#0f766e' }, // Light Cyan
       { bg: '#ecfdf5', text: '#065f46' }, // Light Emerald
       { bg: '#fffbeb', text: '#92400e' }  // Light Amber
     ];
@@ -585,10 +585,10 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
     print-color-adjust: exact !important; 
   }
   body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
-  h1 { font-size: 22px; text-align: center; margin-bottom: 5px; color: #0c224f; font-weight: 900; }
+  h1 { font-size: 22px; text-align: center; margin-bottom: 5px; color: #0f3f39; font-weight: 900; }
   .subtitle { text-align: center; color: #666; margin-bottom: 25px; font-size: 14px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  th { background: #0c224f; color: white; padding: 12px 10px; text-align: right; font-weight: bold; font-size: 13px; }
+  th { background: #0f3f39; color: white; padding: 12px 10px; text-align: right; font-weight: bold; font-size: 13px; }
   td { padding: 11px 10px; border: 1px solid #e5e7eb; font-size: 13px; }
   .unassigned { background: #fafafa; color: #9ca3af; }
   @media print { 
@@ -808,7 +808,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {families.map(f => (
-              <span key={f.id} className="badge bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 flex items-center gap-2">
+              <span key={f.id} className="badge bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 flex items-center gap-2">
                 <Users size={12} /> {f.family_name}
                 <button onClick={() => deleteFamily(f.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
               </span>
@@ -936,7 +936,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                 : isLegacyFamilyBug
                   ? 'bg-amber-50 text-amber-800 border-amber-300'
                   : r.gender === 'رجال' 
-                    ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                     : 'bg-pink-50 text-pink-700 border-pink-200';
 
               const genderLabel = r.is_family 
@@ -948,7 +948,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
               return (
                 <span key={r.id} className={`badge border px-3 py-1.5 flex items-center gap-2 ${badgeClass}`}>
                   <Building2 size={12} /> {r.room_number ? `${r.room_number} - ` : ''}{r.room_type} ({genderLabel})
-                  <button onClick={() => startEditRoom(r)} title="تعديل الغرفة" className="text-blue-500 hover:text-blue-700 mr-1"><Edit2 size={12} /></button>
+                  <button onClick={() => startEditRoom(r)} title="تعديل الغرفة" className="text-emerald-500 hover:text-emerald-700 mr-1"><Edit2 size={12} /></button>
                   <button onClick={() => deleteRoom(r.id)} title="حذف الغرفة" className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
                 </span>
               );
@@ -975,7 +975,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                       <Building2 size={12} className="text-gold-500" />
                       {room.room_number ? `غرفة ${room.room_number}` : 'غرفة بدون رقم'}
                     </span>
-                    <span className={`badge ${room.is_family ? 'bg-purple-100 text-purple-700' : (room.gender === 'رجال' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700')}`}>
+                    <span className={`badge ${room.is_family ? 'bg-purple-100 text-purple-700' : (room.gender === 'رجال' ? 'bg-emerald-100 text-emerald-700' : 'bg-pink-100 text-pink-700')}`}>
                       {room.is_family ? 'عائلية' : room.gender}
                     </span>
                   </div>
@@ -1043,7 +1043,7 @@ export default function GroupRooming({ groupId, members, onUpdate }: Props) {
                           👑 رئيس العائلة
                         </span>
                       ) : (
-                        <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        <span className={`badge ${m.rooming_type === 'عائلة' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {m.rooming_type || 'غير محدد'}
                         </span>
                       )}

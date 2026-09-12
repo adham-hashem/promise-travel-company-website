@@ -16,7 +16,7 @@ const supplierTypes: { value: SupplierType; label: string; icon: React.ElementTy
 ];
 
 const typeColors: Record<SupplierType, string> = {
-  فنادق: 'bg-blue-100 text-blue-700',
+  فنادق: 'bg-emerald-100 text-emerald-700',
   طيران: 'bg-cyan-100 text-cyan-700',
   نقل: 'bg-amber-100 text-amber-700',
   مرشدين: 'bg-emerald-100 text-emerald-700',

@@ -8,7 +8,7 @@
 
 body {
   direction: rtl;
-  background-color: #f4f6fa;
+  background-color: #f4faf8;
   overflow-x: hidden;
 }
 
@@ -35,7 +35,7 @@ img, video, canvas, svg {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0c224f;
+  background: #0f3f39;
 }
 
 .sidebar-item {
@@ -67,7 +67,7 @@ img, video, canvas, svg {
 }
 
 .data-table tr:hover td {
-  @apply bg-blue-50/30;
+  @apply bg-emerald-50/30;
 }
 
 .badge {
@@ -113,7 +113,7 @@ img, video, canvas, svg {
 
 /* Gradients used across the public site + dashboard */
 .bg-gradient-navy {
-  background: linear-gradient(135deg, #0c224f 0%, #1a3a6e 100%);
+  background: linear-gradient(135deg, #0f3f39 0%, #185951 100%);
 }
 .bg-gradient-gold {
   background: linear-gradient(135deg, #d4a017 0%, #f0c040 100%);
@@ -122,7 +122,7 @@ img, video, canvas, svg {
   background: linear-gradient(135deg, #d4a017 0%, #f0c040 100%);
 }
 .gradient-navy {
-  background: linear-gradient(135deg, #0c224f 0%, #1a3a6e 100%);
+  background: linear-gradient(135deg, #0f3f39 0%, #185951 100%);
 }
 
 @keyframes slideIn {

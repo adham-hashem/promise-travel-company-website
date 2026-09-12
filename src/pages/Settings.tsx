@@ -24,7 +24,7 @@ const roleColors: Record<string, string> = {
   'مدير النظام': 'bg-navy-100 text-navy-700 border-navy-200',
   'إضافة عملاء': 'bg-teal-100 text-teal-700 border-teal-200',
   'مدير المبيعات': 'bg-purple-100 text-purple-700 border-purple-200',
-  'مندوب مبيعات': 'bg-blue-100 text-blue-700 border-blue-200',
+  'مندوب مبيعات': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'محاسب': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'موظف التشغيل': 'bg-orange-100 text-orange-700 border-orange-200',
   'مسؤول طيران': 'bg-cyan-100 text-cyan-700 border-cyan-200',
@@ -48,7 +48,7 @@ interface PermSection {
 
 const PERM_SECTIONS: PermSection[] = [
   {
-    id: 'sales', label: 'إدارة المبيعات', icon: ShoppingBag, color: 'text-blue-600 bg-blue-50',
+    id: 'sales', label: 'إدارة المبيعات', icon: ShoppingBag, color: 'text-emerald-600 bg-emerald-50',
     permissions: {
       view: 'customers_view', add: 'customers_add', edit: 'customers_edit', delete: 'customers_delete',
     },

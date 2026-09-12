@@ -140,7 +140,7 @@ export default function ProfitAnalysis() {
               contentStyle={{ fontFamily: 'Cairo', borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
             />
             <Legend wrapperStyle={{ fontFamily: 'Cairo', fontSize: 12 }} />
-            <Bar dataKey="sales" name="المبيعات" fill="#0c224f" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="sales" name="المبيعات" fill="#0f3f39" radius={[6, 6, 0, 0]} />
             <Bar dataKey="cost" name="التكلفة" fill="#ea580c" radius={[6, 6, 0, 0]} />
             <Bar dataKey="profit" name="الربح" fill="#16a34a" radius={[6, 6, 0, 0]} />
           </BarChart>

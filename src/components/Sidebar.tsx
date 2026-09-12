@@ -271,9 +271,9 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, isOpen, onC
           </button>
         )}
         <img
-          src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg"
+          src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg"
           alt="Promise Logo"
-          className="h-14 w-14 rounded-2xl object-contain bg-white p-1 shadow-lg"
+          className="h-14 w-14 rounded-2xl object-cover bg-white p-1 shadow-lg"
         />
         <div className="mt-2.5 text-center">
           <span className="text-white font-bold text-base tracking-wider">PROMISE</span>

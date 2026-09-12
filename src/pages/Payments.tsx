@@ -697,7 +697,7 @@ export default function Payments() {
     w.document.write(`
       <html dir="rtl"><head><meta charset="utf-8"><title>إيصال دفع</title>
       <style>
-        body{font-family:'Cairo',sans-serif;padding:30px;color:#0c224f;}
+        body{font-family:'Cairo',sans-serif;padding:30px;color:#0f3f39;}
         .logo{font-size:24px;font-weight:900;text-align:center;margin-bottom:5px;}
         .sub{text-align:center;color:#d4a017;font-size:12px;margin-bottom:20px;}
         .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #ddd;font-size:14px;}
@@ -706,7 +706,7 @@ export default function Payments() {
         .foot{margin-top:30px;text-align:center;font-size:11px;color:#999;}
       </style></head><body>
       <div style="text-align: center; margin-bottom: 10px;">
-        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; display: inline-block;" />
+        <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover; display: inline-block;" />
       </div>
       <div class="logo">PROMISE</div><div class="sub">بروميس للسياحة والسفر</div>
       <h3 style="text-align:center;margin-bottom:20px; margin-top:0;">إيصال استلام دفعة</h3>
@@ -905,7 +905,7 @@ export default function Payments() {
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5 justify-center">
-                        <button onClick={() => setDetailCustomer(file.customer)} title="عرض التفاصيل" className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
+                        <button onClick={() => setDetailCustomer(file.customer)} title="عرض التفاصيل" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600">
                           <Eye size={15} />
                         </button>
                         <button onClick={() => { setForm({ ...emptyForm, customer_id: file.customer_id, booking_id: file.booking_id || '', package_id: file.booking?.package_id || '' }); setShowModal(true); }} title="إضافة دفعة" className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600">
@@ -1000,7 +1000,7 @@ export default function Payments() {
                         <button
                           onClick={() => setDetailCustomer(p.customers)}
                           title="عرض تفاصيل العميل"
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
+                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
                         >
                           <Eye size={15} />
                         </button>
@@ -1178,8 +1178,8 @@ export default function Payments() {
 
               {/* Installment info */}
               {installmentInfo && selectedPayment.payment_type === 'قسط' && (
-                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                  <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><FileText size={15} className="text-blue-500" /> تفاصيل الأقساط</h4>
+                <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                  <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2"><FileText size={15} className="text-emerald-500" /> تفاصيل الأقساط</h4>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {[
                       { label: 'إجمالي الحجز', value: `${fmt(installmentInfo.total)} ج.م` },
@@ -1334,7 +1334,7 @@ export default function Payments() {
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div><span className="text-gray-400 block mb-0.5">الباقة المطلوبة</span><span className="font-semibold text-navy-800 text-xs bg-gold-50/70 border border-gold-200 px-2 py-0.5 rounded">{detailCustomer.packages?.name || '—'}</span></div>
-                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-blue-50 text-blue-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
+                  <div><span className="text-gray-400 block mb-0.5">نوع الخدمة</span><span className="badge bg-emerald-50 text-emerald-700 font-semibold">{detailCustomer.service_type || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">حالة المستندات</span><span className={`badge ${detailCustomer.documents_status === 'مكتمل' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{detailCustomer.documents_status || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">متطلبات التأشيرة</span><span className="font-semibold text-gray-800">{detailCustomer.visa_requirement || '—'}</span></div>
                   <div><span className="text-gray-400 block mb-0.5">فندق مكة</span><span className="font-semibold text-gray-800">{detailCustomer.hotel_makkah || '—'}</span></div>

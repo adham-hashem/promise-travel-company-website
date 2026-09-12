@@ -78,11 +78,11 @@ export default function FinancialNotifications() {
       )}
 
       {dueSoon.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-          <Clock size={24} className="text-blue-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+          <Clock size={24} className="text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-bold text-blue-800">🔔 أقساط قريبة الاستحقاق (خلال 3 أيام) ({dueSoon.length})</p>
-            <p className="text-blue-700 text-sm mt-1">{dueSoon.map(d => d.customers?.name).join('، ')}</p>
+            <p className="font-bold text-emerald-800">🔔 أقساط قريبة الاستحقاق (خلال 3 أيام) ({dueSoon.length})</p>
+            <p className="text-emerald-700 text-sm mt-1">{dueSoon.map(d => d.customers?.name).join('، ')}</p>
           </div>
         </div>
       )}

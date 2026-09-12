@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const COLORS = ['#c9941a', '#0c224f', '#16a34a', '#0891b2', '#7c3aed', '#dc2626'];
+const COLORS = ['#c9941a', '#0f3f39', '#16a34a', '#0f766e', '#7c3aed', '#dc2626'];
 
 const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
 
@@ -166,7 +166,7 @@ export default function Revenue() {
                   </span>
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center"><TrendingUp size={24} /></div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><TrendingUp size={24} /></div>
             </div>
           </div>
 

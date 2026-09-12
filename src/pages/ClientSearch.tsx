@@ -45,7 +45,7 @@ interface FullData {
 }
 
 const statusColors: Record<string, string> = {
-  جديد: 'bg-blue-100 text-blue-700',
+  جديد: 'bg-emerald-100 text-emerald-700',
   مهتم: 'bg-amber-100 text-amber-700',
   متابعة: 'bg-purple-100 text-purple-700',
   'تم الحجز': 'bg-green-100 text-green-700',
@@ -697,7 +697,7 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
                       <p className="text-sm font-semibold text-navy-900">{t.title}</p>
                       {t.department && <p className="text-xs text-gray-500">{t.department}</p>}
                     </div>
-                    <span className={`badge text-xs ${statusColors[t.status] ?? 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
+                    <span className={`badge text-xs ${statusColors[t.status] ?? 'bg-emerald-100 text-emerald-700'}`}>{t.status}</span>
                   </div>
                 ))}
               </div>
@@ -714,7 +714,7 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
                         <p className="text-xs text-gray-500">{new Date(it.created_at).toLocaleDateString('ar-EG')}</p>
                       </div>
                       <div className="text-left">
-                        <span className="badge text-xs bg-blue-100 text-blue-700">{it.booking_status}</span>
+                        <span className="badge text-xs bg-emerald-100 text-emerald-700">{it.booking_status}</span>
                         <p className="text-xs text-navy-700 font-semibold mt-0.5">{fmt(it.total_amount)} ج.م</p>
                       </div>
                     </div>
@@ -725,7 +725,7 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
 
             {/* Inquiries */}
             {(result.inquiries?.length ?? 0) > 0 && (
-              <SectionCard title="الاستعلامات" icon={MessageSquare} count={result.inquiries?.length ?? 0} accent="text-blue-600">
+              <SectionCard title="الاستعلامات" icon={MessageSquare} count={result.inquiries?.length ?? 0} accent="text-emerald-600">
                 <div className="p-4 space-y-2">
                   {result.inquiries?.map(inq => (
                     <div key={inq.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
@@ -733,7 +733,7 @@ export default function ClientSearch({ onNavigate, customerId }: Props) {
                         <p className="text-sm font-mono font-semibold text-navy-700">{inq.inquiry_number}</p>
                         <p className="text-xs text-gray-500">{inq.service_type} · {inq.source}</p>
                       </div>
-                      <span className="badge text-xs bg-blue-100 text-blue-700">{inq.status}</span>
+                      <span className="badge text-xs bg-emerald-100 text-emerald-700">{inq.status}</span>
                     </div>
                   ))}
                 </div>

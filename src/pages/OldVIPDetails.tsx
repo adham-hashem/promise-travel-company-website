@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Customer, Page, VipRequest, VipWorkflowStep } from '../types';
 
 const stagesConfig = [
-  { key: 'accounts', label: 'الحسابات', color: 'border-blue-500 text-blue-600 bg-blue-50/50' },
+  { key: 'accounts', label: 'الحسابات', color: 'border-emerald-500 text-emerald-600 bg-emerald-50/50' },
   { key: 'operations', label: 'التشغيل', color: 'border-purple-500 text-purple-600 bg-purple-50/50' },
   { key: 'bookings', label: 'الحجوزات', color: 'border-pink-500 text-pink-600 bg-pink-50/50' },
   { key: 'flights', label: 'الطيران', color: 'border-cyan-500 text-cyan-600 bg-cyan-50/50' },

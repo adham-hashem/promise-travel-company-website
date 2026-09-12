@@ -11,7 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const COLORS = ['#c9941a', '#0c224f', '#16a34a', '#0891b2', '#dc2626', '#7c3aed'];
+const COLORS = ['#c9941a', '#0f3f39', '#16a34a', '#0f766e', '#dc2626', '#7c3aed'];
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -199,8 +199,8 @@ export default function Dashboard() {
               <span className="text-xs text-gray-600 flex items-center gap-2"><Package size={14} className="text-emerald-600" />أعلى باقة</span>
               <span className="text-sm font-bold text-navy-900">{topPackage?.name || '—'}</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
-              <span className="text-xs text-gray-600 flex items-center gap-2"><BarChart3 size={14} className="text-blue-600" />أفضل مصدر</span>
+            <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
+              <span className="text-xs text-gray-600 flex items-center gap-2"><BarChart3 size={14} className="text-emerald-600" />أفضل مصدر</span>
               <span className="text-sm font-bold text-navy-900">{topSource?.source || '—'}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
@@ -224,7 +224,7 @@ export default function Dashboard() {
                 <YAxis tick={{ fontSize: 11, fontFamily: 'Cairo', fill: '#6b7280' }} />
                 <Tooltip formatter={(v) => `${Number(v).toLocaleString('ar-EG')} ج.م`} contentStyle={{ fontFamily: 'Cairo', borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
                 <Legend wrapperStyle={{ fontFamily: 'Cairo', fontSize: 12 }} />
-                <Bar dataKey="مبيعات" fill="#0c224f" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="مبيعات" fill="#0f3f39" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="مصروفات" fill="#ea580c" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="أرباح" fill="#16a34a" radius={[6, 6, 0, 0]} />
               </BarChart>

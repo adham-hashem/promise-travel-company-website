@@ -15,7 +15,7 @@ import JSZip from 'jszip';
 const STATUSES: TravelGroupStatus[] = ['تجميع', 'مؤكد', 'سافر', 'عاد', 'ملغي'];
 
 const STATUS_CFG: Record<TravelGroupStatus, { color: string; icon: React.ElementType }> = {
-  تجميع:  { color: 'bg-blue-100 text-blue-700 border-blue-200',      icon: Users },
+  تجميع:  { color: 'bg-emerald-100 text-emerald-700 border-emerald-200',      icon: Users },
   مؤكد:   { color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
   سافر:   { color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Plane },
   عاد:    { color: 'bg-gray-100 text-gray-600 border-gray-200',        icon: ArrowLeft },
@@ -561,7 +561,7 @@ export default function TravelGroups({}: Props) {
 </head>
 <body>
 <div style="text-align: center; margin-bottom: 15px;">
-  <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover; display: inline-block;" />
+  <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise Travel" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover; display: inline-block;" />
 </div>
 <h1 style="margin-top: 0;">كشف مسافري الفوج — Passenger Manifest</h1>
 <p class="sub">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')}</p>
@@ -667,7 +667,7 @@ export default function TravelGroups({}: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'إجمالي الأفواج', val: stats.total, icon: Layers, color: 'text-navy-700 bg-navy-50' },
-          { label: 'إجمالي المسافرين', val: stats.travelers, icon: Users, color: 'text-blue-700 bg-blue-50' },
+          { label: 'إجمالي المسافرين', val: stats.travelers, icon: Users, color: 'text-emerald-700 bg-emerald-50' },
           { label: 'أفواج قادمة', val: stats.upcoming, icon: CalendarDays, color: 'text-gold-700 bg-gold-50' },
           { label: 'أفواج في السفر', val: stats.traveling, icon: Plane, color: 'text-purple-700 bg-purple-50' },
         ].map(s => (
@@ -754,7 +754,7 @@ export default function TravelGroups({}: Props) {
                     )}
                     {(g.travel_date || g.return_date) && (
                       <span className="flex items-center gap-1 col-span-2">
-                        <CalendarDays size={11} className="text-blue-500" />
+                        <CalendarDays size={11} className="text-emerald-500" />
                         {fmt(g.travel_date)} ← {fmt(g.return_date)}
                       </span>
                     )}
@@ -1030,7 +1030,7 @@ export default function TravelGroups({}: Props) {
                 </span>
               )}
               {detailGroup.return_date && (
-                <span className="flex items-center gap-1"><CalendarDays size={12} className="text-blue-500" />
+                <span className="flex items-center gap-1"><CalendarDays size={12} className="text-emerald-500" />
                   العودة: {fmt(detailGroup.return_date)}
                 </span>
               )}
@@ -1120,7 +1120,7 @@ export default function TravelGroups({}: Props) {
                           </td>
                           <td className="px-4 py-2.5">
                             {m.customers.service_type && (
-                              <span className="badge bg-blue-50 text-blue-700 text-[10px]">{m.customers.service_type}</span>
+                              <span className="badge bg-emerald-50 text-emerald-700 text-[10px]">{m.customers.service_type}</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5">
@@ -1224,7 +1224,7 @@ export default function TravelGroups({}: Props) {
                   <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between">
                     <div>
                       <h5 className="font-bold text-navy-800 text-sm flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
                         جوازات السفر
                       </h5>
                       <p className="text-xs text-gray-400 mt-1 leading-normal font-medium">
@@ -1346,7 +1346,7 @@ export default function TravelGroups({}: Props) {
                       <p className="text-xs text-gray-400 font-mono">{c.client_code} · {c.phone || 'بدون هاتف'}</p>
                     </div>
                     {c.service_type && (
-                      <span className="badge bg-blue-50 text-blue-600 text-[10px] flex-shrink-0">{c.service_type}</span>
+                      <span className="badge bg-emerald-50 text-emerald-600 text-[10px] flex-shrink-0">{c.service_type}</span>
                     )}
                   </button>
                 );

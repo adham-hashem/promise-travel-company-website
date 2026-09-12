@@ -43,7 +43,7 @@ export default function Login() {
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
           <div className="flex flex-col items-center mb-8">
             <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-xl mb-4">
-              <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise" className="w-20 h-20 object-contain" />
+              <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise" className="w-20 h-20 object-cover" />
             </div>
             <h1 className="text-3xl font-black text-white tracking-wide">PROMISE</h1>
             <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gold-400 to-transparent mt-2" />

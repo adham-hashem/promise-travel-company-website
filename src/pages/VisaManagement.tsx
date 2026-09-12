@@ -17,7 +17,7 @@ const docTypes: VisaDocType[] = ['جواز السفر', 'صورة شخصية', '
 
 const statusConfig: Record<VisaStatus, { color: string; bg: string; icon: React.ElementType }> = {
   'لم يبدأ': { color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  'قيد التقديم': { color: 'text-blue-700', bg: 'bg-blue-100', icon: FileText },
+  'قيد التقديم': { color: 'text-emerald-700', bg: 'bg-emerald-100', icon: FileText },
   'قيد المراجعة': { color: 'text-amber-700', bg: 'bg-amber-100', icon: AlertCircle },
   'تمت الموافقة': { color: 'text-emerald-700', bg: 'bg-emerald-100', icon: CheckCircle2 },
   'مرفوضة': { color: 'text-red-700', bg: 'bg-red-100', icon: XCircle },
@@ -660,7 +660,7 @@ export default function VisaManagement({ onNavigate }: Props) {
                       <button
                         onClick={async () => { const { data } = await supabase.storage.from('documents').download(selected.visa_file_path!); if (data) { const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href = url; a.download = selected.visa_file_name!; a.click(); } }}
                         className="p-2 hover:bg-gray-100 rounded-lg text-gray-500" title="تحميل"><Download size={16} /></button>
-                      <button onClick={() => visaFileRef.current?.click()} className="p-2 hover:bg-gray-100 rounded-lg text-blue-500" title="استبدال"><Upload size={16} /></button>
+                      <button onClick={() => visaFileRef.current?.click()} className="p-2 hover:bg-gray-100 rounded-lg text-emerald-500" title="استبدال"><Upload size={16} /></button>
                       <button onClick={deleteVisaFile} className="p-2 hover:bg-red-50 rounded-lg text-red-500" title="حذف"><Trash2 size={16} /></button>
                     </div>
                   </div>

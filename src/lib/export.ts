@@ -59,10 +59,10 @@ export function exportToPDF(
         <style>
           * { font-family: 'Cairo', 'Tahoma', sans-serif; box-sizing: border-box; }
           body { padding: 32px; color: #1f2937; }
-          h1 { color: #0c224f; font-size: 20px; margin: 0 0 4px; }
+          h1 { color: #0f3f39; font-size: 20px; margin: 0 0 4px; }
           .meta { color: #6b7280; font-size: 12px; margin-bottom: 24px; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th { background: #0c224f; color: #fff; text-align: right; padding: 8px 12px; font-weight: 600; }
+          th { background: #0f3f39; color: #fff; text-align: right; padding: 8px 12px; font-weight: 600; }
           td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; }
           tr:nth-child(even) td { background: #f9fafb; }
           @media print { body { padding: 0; } }

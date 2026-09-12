@@ -10,7 +10,7 @@ const bookingStatuses: InternalBookingStatus[] = ['جديدة', 'مؤكدة', '�
 const paymentStatuses: PaymentStatus[] = ['غير مدفوع', 'مدفوع جزئياً', 'مدفوع بالكامل'];
 
 const bookingStatusColors: Record<InternalBookingStatus, string> = {
-  جديدة: 'bg-blue-100 text-blue-700',
+  جديدة: 'bg-emerald-100 text-emerald-700',
   مؤكدة: 'bg-emerald-100 text-emerald-700',
   مكتملة: 'bg-emerald-200 text-emerald-800',
   ملغاة: 'bg-red-100 text-red-700',
@@ -222,7 +222,7 @@ export default function InternalTripBookings() {
               </thead>
               <tbody>
                 {filtered.map((b) => (
-                  <tr key={b.id} className="hover:bg-blue-50/30 cursor-pointer" onClick={() => openEdit(b)}>
+                  <tr key={b.id} className="hover:bg-emerald-50/30 cursor-pointer" onClick={() => openEdit(b)}>
                     <td className="text-xs font-mono text-gray-500">#{b.id.slice(0, 8)}</td>
                     <td className="font-semibold text-gray-800 text-sm">{b.customer_name}</td>
                     <td className="text-gray-600 text-xs" dir="ltr">{b.phone || '—'}</td>

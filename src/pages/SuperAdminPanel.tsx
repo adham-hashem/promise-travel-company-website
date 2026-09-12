@@ -49,7 +49,7 @@ const CLEANUP_MODULES: CleanupModule[] = [
     description: 'تنظيف الإشعارات القديمة أو المقروءة بالنظام لتخفيف استعلامات الشريط العلوي.',
     table: 'notifications',
     icon: Bell,
-    color: 'text-blue-600 bg-blue-50',
+    color: 'text-emerald-600 bg-emerald-50',
     conditionDescription: 'الإشعارات المقروءة أو المسجلة قبل التاريخ المحدد',
   },
   {
@@ -1023,7 +1023,7 @@ export default function SuperAdminPanel() {
                       <td className="text-gray-600 text-xs" dir="ltr">{c.phone || '—'}</td>
                       <td className="text-gray-500 text-xs">{c.email || '—'}</td>
                       <td>
-                        <span className={`badge text-xs ${c.status === 'مكتمل' ? 'bg-emerald-100 text-emerald-700' : c.status === 'ملغي' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                        <span className={`badge text-xs ${c.status === 'مكتمل' ? 'bg-emerald-100 text-emerald-700' : c.status === 'ملغي' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {c.status || 'جديد'}
                         </span>
                       </td>

@@ -11,7 +11,7 @@ import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Bookin
 import DocumentsSection from '../components/DocumentsSection';
 
 const statusColors: Record<CustomerStatus, string> = {
-  جديد: 'bg-blue-100 text-blue-700 border-blue-200',
+  جديد: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   مهتم: 'bg-amber-100 text-amber-700 border-amber-200',
   متابعة: 'bg-purple-100 text-purple-700 border-purple-200',
   حجز: 'bg-cyan-100 text-cyan-700 border-cyan-200',
@@ -26,7 +26,7 @@ const commTypeIcons: Record<CommType, React.ElementType> = {
   مكالمة: Phone, واتساب: MessageCircle, زيارة: User, 'بريد إلكتروني': Mail,
 };
 const commTypeColors: Record<CommType, string> = {
-  مكالمة: 'bg-blue-50 text-blue-600',
+  مكالمة: 'bg-emerald-50 text-emerald-600',
   واتساب: 'bg-green-50 text-green-600',
   زيارة: 'bg-purple-50 text-purple-600',
   'بريد إلكتروني': 'bg-orange-50 text-orange-600',
@@ -423,8 +423,8 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
 <title>كشف حساب مالي - ${customer.name}</title>
 <style>
   body { font-family: Arial, sans-serif; font-size: 13px; margin: 20px; color: #333; }
-  .header { border-bottom: 2px solid #0c224f; padding-bottom: 15px; margin-bottom: 20px; }
-  h1 { font-size: 22px; color: #0c224f; margin: 0 0 5px 0; font-weight: 900; }
+  .header { border-bottom: 2px solid #0f3f39; padding-bottom: 15px; margin-bottom: 20px; }
+  h1 { font-size: 22px; color: #0f3f39; margin: 0 0 5px 0; font-weight: 900; }
   .company-info { font-size: 12px; color: #666; }
   .statement-title { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0; color: #854d0e; }
   .client-details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
@@ -432,12 +432,12 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
   .client-details td { border: none; padding: 4px 8px; font-size: 13px; }
   .client-details td.label { font-weight: bold; color: #475569; width: 15%; }
   table.ledger { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-  table.ledger th { background: #0c224f; color: white; padding: 10px; text-align: right; font-size: 12px; font-weight: bold; }
+  table.ledger th { background: #0f3f39; color: white; padding: 10px; text-align: right; font-size: 12px; font-weight: bold; }
   table.ledger td { padding: 10px; border: 1px solid #cbd5e1; font-size: 12px; }
-  .summary { float: left; width: 300px; background: #f8fafc; border: 2px solid #0c224f; border-radius: 8px; padding: 15px; }
+  .summary { float: left; width: 300px; background: #f8fafc; border: 2px solid #0f3f39; border-radius: 8px; padding: 15px; }
   .summary table { width: 100%; border-collapse: collapse; }
   .summary td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
-  .summary tr:last-child td { border-bottom: none; font-weight: bold; font-size: 14px; color: #0c224f; }
+  .summary tr:last-child td { border-bottom: none; font-weight: bold; font-size: 14px; color: #0f3f39; }
   .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 15px; clear: both; }
 </style>
 </head>
@@ -676,7 +676,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
               <h4 className="text-sm font-bold text-navy-800 mb-3 flex items-center gap-2">
                 <Layers size={16} className="text-gold-500" /> الفوج الحالي (Travel Group)
               </h4>
-              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-2.5">
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 space-y-2.5">
                 <div>
                   <span className="text-[10px] text-gray-400 block">اسم الفوج</span>
                   <span className="text-sm font-bold text-navy-900">{travelGroup.name}</span>
@@ -688,7 +688,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                   </div>
                   <div>
                     <span className="text-[10px] text-gray-400 block">الحالة</span>
-                    <span className="badge bg-blue-100 text-blue-700 text-[10px] mt-0.5 inline-block">{travelGroup.status}</span>
+                    <span className="badge bg-emerald-100 text-emerald-700 text-[10px] mt-0.5 inline-block">{travelGroup.status}</span>
                   </div>
                   {travelGroup.travel_date && (
                     <div className="col-span-2">
@@ -756,7 +756,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                         doc.status === 'مقبول' ? 'bg-emerald-100 text-emerald-700' :
                         doc.status === 'مرفوض' ? 'bg-red-100 text-red-600' :
                         doc.status === 'قيد المراجعة' ? 'bg-amber-100 text-amber-700' :
-                        'bg-blue-100 text-blue-700'
+                        'bg-emerald-100 text-emerald-700'
                       }`}>{doc.status}</span>
                       <span className="text-[10px] text-gray-400">{new Date(doc.created_at).toLocaleDateString('ar-EG')}</span>
                     </div>
@@ -976,8 +976,8 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                 ))}
               </div>
               {lastLog.notes && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-3">
-                  <p className="text-xs font-semibold text-blue-600 mb-1">ملخص التواصل</p>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-3">
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">ملخص التواصل</p>
                   <p className="text-sm text-gray-700">{lastLog.notes}</p>
                 </div>
               )}
@@ -1209,7 +1209,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                   {timeline.map((ev, i) => {
                     const sourceColors: Record<string, string> = {
                       customer: 'bg-navy-100 text-navy-700',
-                      inquiry: 'bg-blue-100 text-blue-700',
+                      inquiry: 'bg-emerald-100 text-emerald-700',
                       communication: 'bg-amber-100 text-amber-700',
                       booking: 'bg-emerald-100 text-emerald-700',
                       invoice: 'bg-cyan-100 text-cyan-700',

@@ -12,7 +12,7 @@ import type { InternalTrip, InternalTripBooking, InternalCustomer } from '../typ
 
 type Period = 'weekly' | 'monthly' | 'yearly';
 
-const PIE_COLORS = ['#0c224f', '#c9941a', '#10b981', '#ef4444'];
+const PIE_COLORS = ['#0f3f39', '#c9941a', '#10b981', '#ef4444'];
 
 const periodLabel: Record<Period, string> = {
   weekly: 'أسبوعي',

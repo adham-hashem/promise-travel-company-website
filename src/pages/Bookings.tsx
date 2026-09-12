@@ -18,7 +18,7 @@ const statusIcons: Record<BookingStatus, React.ElementType> = {
 
 const paymentColors: Record<string, string> = {
   'مدفوع بالكامل': 'bg-emerald-100 text-emerald-700',
-  'مدفوع جزئياً': 'bg-blue-100 text-blue-700',
+  'مدفوع جزئياً': 'bg-emerald-100 text-emerald-700',
   'غير مدفوع': 'bg-gray-100 text-gray-600',
 };
 

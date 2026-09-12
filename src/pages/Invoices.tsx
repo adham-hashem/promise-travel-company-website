@@ -346,7 +346,7 @@ export default function Invoices() {
         .status-unpaid { background: #fee2e2; color: #dc2626; }
       </style></head><body>
       <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-        <img src="/WhatsApp_Image_2026-06-20_at_4.57.54_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover;" />
+        <img src="/images/WhatsApp_Image_2026-08-16_at_6.55.03_PM.jpeg" alt="Promise Travel" style="width: 70px; height: 70px; border-radius: 12px; object-fit: cover;" />
         <div style="text-align: right;">
           <div class="title" style="margin-bottom: 5px;">PROMISE - فاتورة</div>
           <div class="inv-num" style="margin: 0;">${inv.invoice_number} | ${new Date(inv.created_at).toLocaleDateString('ar-EG')}</div>
@@ -555,7 +555,7 @@ export default function Invoices() {
                         <div className="flex items-center gap-1">
                           <button onClick={() => setDetailInvoice(inv)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-navy-700"><Eye size={15} /></button>
                           {can('invoices_edit') && (
-                            <button onClick={() => { setEditInvoice(inv); setShowModal(true); }} className="p-1.5 hover:bg-blue-50 rounded-lg text-gray-500 hover:text-blue-600"><Pencil size={15} /></button>
+                            <button onClick={() => { setEditInvoice(inv); setShowModal(true); }} className="p-1.5 hover:bg-emerald-50 rounded-lg text-gray-500 hover:text-emerald-600"><Pencil size={15} /></button>
                           )}
                           {can('invoices_delete') && (
                             <button onClick={() => handleDelete(inv.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600"><Trash2 size={15} /></button>

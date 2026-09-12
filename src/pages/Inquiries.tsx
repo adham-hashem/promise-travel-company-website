@@ -11,7 +11,7 @@ import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Inquiry, InquiryStatus, InquirySource, InquiryServiceType, Employee, DocumentRecord } from '../types';
 
 const STATUS_COLORS: Record<InquiryStatus, string> = {
-  'جديد': 'bg-blue-100 text-blue-700 border-blue-200',
+  'جديد': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'قيد المتابعة': 'bg-amber-100 text-amber-700 border-amber-200',
   'تم التحويل': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'مغلق': 'bg-gray-100 text-gray-600 border-gray-200',
@@ -32,11 +32,11 @@ const SOURCE_ICONS: Record<InquirySource, React.ElementType> = {
   'إنستجرام': Instagram,
 };
 const SOURCE_COLORS: Record<InquirySource, string> = {
-  'الموقع الإلكتروني': 'text-blue-600 bg-blue-50',
+  'الموقع الإلكتروني': 'text-emerald-600 bg-emerald-50',
   'واتساب': 'text-emerald-600 bg-emerald-50',
   'مكالمة': 'text-violet-600 bg-violet-50',
   'زيارة': 'text-orange-600 bg-orange-50',
-  'فيسبوك': 'text-blue-700 bg-blue-100',
+  'فيسبوك': 'text-emerald-700 bg-emerald-100',
   'إنستجرام': 'text-pink-600 bg-pink-50',
 };
 
@@ -627,7 +627,7 @@ export default function Inquiries() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'إجمالي الاستعلامات', value: stats.total, icon: MessageSquare, color: 'text-navy-600', bg: 'bg-navy-50' },
-          { label: 'جديد', value: stats.new, icon: AlertCircle, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'جديد', value: stats.new, icon: AlertCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'قيد المتابعة', value: stats.followUp, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'تم التحويل', value: stats.converted, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map(stat => (
@@ -739,7 +739,7 @@ export default function Inquiries() {
                         <div className="flex items-center gap-1">
                           <button onClick={() => setDetailInquiry(inq)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-navy-700"><Eye size={15} /></button>
                           {can('inquiries_edit') && (
-                            <button onClick={() => { setEditInquiry(inq); setShowModal(true); }} className="p-1.5 hover:bg-blue-50 rounded-lg text-gray-500 hover:text-blue-600"><Pencil size={15} /></button>
+                            <button onClick={() => { setEditInquiry(inq); setShowModal(true); }} className="p-1.5 hover:bg-emerald-50 rounded-lg text-gray-500 hover:text-emerald-600"><Pencil size={15} /></button>
                           )}
                           {inq.status !== 'تم التحويل' && inq.status !== 'مغلق' && can('inquiries_edit') && (
                             <button onClick={() => setConvertInquiry(inq)} className="p-1.5 hover:bg-emerald-50 rounded-lg text-gray-500 hover:text-emerald-600" title="تحويل"><ArrowRightLeft size={15} /></button>

@@ -11,7 +11,7 @@ interface Props {
 }
 
 const taskStatusColors: Record<string, string> = {
-  جديدة: 'bg-blue-100 text-blue-700',
+  جديدة: 'bg-emerald-100 text-emerald-700',
   'قيد التنفيذ': 'bg-amber-100 text-amber-700',
   مكتملة: 'bg-emerald-100 text-emerald-700',
   متأخرة: 'bg-red-100 text-red-700',
@@ -24,7 +24,7 @@ const bookingStatusColors: Record<string, string> = {
 };
 
 const customerStatusColors: Record<string, string> = {
-  جديد: 'bg-blue-100 text-blue-700',
+  جديد: 'bg-emerald-100 text-emerald-700',
   مهتم: 'bg-amber-100 text-amber-700',
   متابعة: 'bg-purple-100 text-purple-700',
   'تم الحجز': 'bg-green-100 text-green-700',

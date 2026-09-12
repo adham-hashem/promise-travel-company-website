@@ -1023,8 +1023,8 @@ export default function SalesAgentPortal() {
                   <div className="grid grid-cols-1 gap-2">
                     {viewCustomerDocs.map((doc) => (
                       <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <FileText size={15} className="text-blue-500" />
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <FileText size={15} className="text-emerald-500" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-navy-900">{doc.doc_type}</p>

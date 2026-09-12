@@ -30,14 +30,14 @@ export const exportToPDF = (title: string, headers: string[], rows: any[][]) => 
       <meta charset="UTF-8">
       <title>${title}</title>
       <style>
-        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0c224f; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; color: #0f3f39; }
         .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #c9941a; padding-bottom: 10px; }
         h1 { font-size: 20px; margin: 0; }
-        .btn-print { padding: 8px 16px; background: #0c224f; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: inherit; }
+        .btn-print { padding: 8px 16px; background: #0f3f39; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: inherit; }
         .btn-print:hover { background: #c9941a; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; text-align: right; }
         th, td { border: 1px solid #cbd5e1; padding: 8px 10px; }
-        th { background-color: #f1f5f9; font-weight: 850; color: #0c224f; }
+        th { background-color: #f1f5f9; font-weight: 850; color: #0f3f39; }
         tr:nth-child(even) { background-color: #f8fafc; }
         @media print {
           body { padding: 0; }

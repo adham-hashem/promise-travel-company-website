@@ -9,7 +9,7 @@ const categories: ExpenseCategory[] = ['رواتب', 'تسويق', 'تشغيل',
 const fmt = (n: number) => Number(n || 0).toLocaleString('ar-EG');
 
 const catColors: Record<ExpenseCategory, string> = {
-  'رواتب': 'bg-blue-100 text-blue-700',
+  'رواتب': 'bg-emerald-100 text-emerald-700',
   'تسويق': 'bg-purple-100 text-purple-700',
   'تشغيل': 'bg-amber-100 text-amber-700',
   'فنادق': 'bg-cyan-100 text-cyan-700',

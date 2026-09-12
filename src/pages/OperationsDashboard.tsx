@@ -44,7 +44,7 @@ interface OpFile {
 }
 
 const statusConfig: Record<string, { color: string; bg: string }> = {
-  'جديد': { color: 'text-blue-700', bg: 'bg-blue-100' },
+  'جديد': { color: 'text-emerald-700', bg: 'bg-emerald-100' },
   'قيد التجهيز': { color: 'text-amber-700', bg: 'bg-amber-100' },
   'مستندات ناقصة': { color: 'text-red-700', bg: 'bg-red-100' },
   'جاهز للسفر': { color: 'text-emerald-700', bg: 'bg-emerald-100' },
@@ -54,7 +54,7 @@ const statusConfig: Record<string, { color: string; bg: string }> = {
 
 const priorityConfig: Record<string, { color: string; bg: string }> = {
   'عاجلة': { color: 'text-red-700', bg: 'bg-red-100' },
-  'عادية': { color: 'text-blue-700', bg: 'bg-blue-100' },
+  'عادية': { color: 'text-emerald-700', bg: 'bg-emerald-100' },
   'منخفضة': { color: 'text-gray-600', bg: 'bg-gray-100' },
 };
 
@@ -662,7 +662,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                             <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><CheckCircle2 size={11} /> جاهز للسفر</span>
                           )}
                           {f.financially_approved && f.workflow_stage !== 'flight' && f.workflow_stage !== 'ready' && (
-                            <span className="flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-lg"><CheckCircle2 size={11} /> معتمد مالياً</span>
+                            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg"><CheckCircle2 size={11} /> معتمد مالياً</span>
                           )}
                           {f.booking?.source === 'Website' && (
                             <span className="flex items-center gap-1 text-xs font-bold text-gold-700 bg-gold-100 px-2 py-0.5 rounded-lg"><Globe size={10} /> Website</span>
@@ -740,7 +740,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                     <div className="flex items-center gap-3 text-xs text-white/60 mt-0.5">
                       {selected.op_number && <span className="font-mono">{selected.op_number}</span>}
                       {selected.customer?.client_code && <span className="font-mono">{selected.customer.client_code}</span>}
-                      <span className={`badge text-xs ${priorityConfig[selected.priority || 'عادية']?.bg || 'bg-blue-100'} ${priorityConfig[selected.priority || 'عادية']?.color || 'text-blue-700'}`}>{selected.priority || 'عادية'}</span>
+                      <span className={`badge text-xs ${priorityConfig[selected.priority || 'عادية']?.bg || 'bg-emerald-100'} ${priorityConfig[selected.priority || 'عادية']?.color || 'text-emerald-700'}`}>{selected.priority || 'عادية'}</span>
                     </div>
                   </div>
                 </div>
@@ -981,7 +981,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
                   <div className="space-y-2">
                     {opDocs.map((doc) => (
                       <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0"><FileText size={16} className="text-blue-500" /></div>
+                        <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0"><FileText size={16} className="text-emerald-500" /></div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-navy-900">{doc.doc_type}</p>
                           <p className="text-xs text-gray-400 truncate">{doc.file_name} · {fmtDate(doc.created_at)}</p>

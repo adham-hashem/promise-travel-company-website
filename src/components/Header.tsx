@@ -56,7 +56,7 @@ const notifIcons: Record<string, React.ElementType> = {
 };
 
 const notifColors: Record<string, string> = {
-  new_lead: 'bg-blue-100 text-blue-700',
+  new_lead: 'bg-emerald-100 text-emerald-700',
   task_assigned: 'bg-purple-100 text-purple-700',
   follow_up: 'bg-amber-100 text-amber-700',
   overdue_task: 'bg-red-100 text-red-700',
@@ -65,7 +65,7 @@ const notifColors: Record<string, string> = {
   new_payment: 'bg-emerald-100 text-emerald-700',
   new_invoice: 'bg-navy-100 text-navy-700',
   missing_document: 'bg-amber-100 text-amber-700',
-  travel_soon: 'bg-blue-100 text-blue-700',
+  travel_soon: 'bg-emerald-100 text-emerald-700',
   website_booking: 'bg-gold-100 text-gold-700',
   approval_request: 'bg-red-100 text-red-700',
   installment_overdue: 'bg-red-100 text-red-700',
@@ -75,7 +75,7 @@ const notifColors: Record<string, string> = {
   urgent_travel_issue: 'bg-red-100 text-red-700',
   visa_incomplete: 'bg-orange-100 text-orange-700',
   booking_pending: 'bg-cyan-100 text-cyan-700',
-  new_visa: 'bg-blue-100 text-blue-700',
+  new_visa: 'bg-emerald-100 text-emerald-700',
   visa_review: 'bg-amber-100 text-amber-700',
   visa_approved: 'bg-emerald-100 text-emerald-700',
   visa_rejected: 'bg-red-100 text-red-700',
@@ -404,7 +404,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
                 notifications.map((n) => {
                   const Icon = notifIcons[n.type] || Bell;
                   return (
-                    <button key={n.id} onClick={() => openNotification(n)} className={`w-full text-right flex items-start gap-3 p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/30' : ''}`}>
+                    <button key={n.id} onClick={() => openNotification(n)} className={`w-full text-right flex items-start gap-3 p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-emerald-50/30' : ''}`}>
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${notifColors[n.type] || 'bg-gray-100 text-gray-600'}`}>
                         <Icon size={14} />
                       </div>
@@ -413,7 +413,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
                         {n.body && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{n.body}</p>}
                         <p className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</p>
                       </div>
-                      {!n.is_read && <div className="w-2 h-2 bg-blue-500 rounded-full mt-1 flex-shrink-0" />}
+                      {!n.is_read && <div className="w-2 h-2 bg-emerald-500 rounded-full mt-1 flex-shrink-0" />}
                     </button>
                   );
                 })

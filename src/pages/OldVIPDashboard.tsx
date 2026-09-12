@@ -32,7 +32,7 @@ interface VIPClient {
 }
 
 const stagesConfig = [
-  { key: 'accounts', label: 'الحسابات', color: 'border-blue-500 text-blue-600 bg-blue-50/50', icon: Wallet },
+  { key: 'accounts', label: 'الحسابات', color: 'border-emerald-500 text-emerald-600 bg-emerald-50/50', icon: Wallet },
   { key: 'operations', label: 'التشغيل', color: 'border-purple-500 text-purple-600 bg-purple-50/50', icon: Briefcase },
   { key: 'bookings', label: 'الحجوزات', color: 'border-pink-500 text-pink-600 bg-pink-50/50', icon: FileCheck },
   { key: 'flights', label: 'الطيران', color: 'border-cyan-500 text-cyan-600 bg-cyan-50/50', icon: Plane },
@@ -185,7 +185,7 @@ export default function VIPDashboard({ onNavigate }: Props) {
         </div>
 
         <div className="bg-white border border-gray-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
             <Clock size={22} />
           </div>
           <div>

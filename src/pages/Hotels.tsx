@@ -26,7 +26,7 @@ const CITIES = ['مكة المكرمة', 'المدينة المنورة', 'جد�
 const categoryColors: Record<HotelCategory, string> = {
   'VIP': 'bg-amber-100 text-amber-700 border-amber-200',
   '5 نجوم': 'bg-purple-100 text-purple-700 border-purple-200',
-  '4 نجوم': 'bg-blue-100 text-blue-700 border-blue-200',
+  '4 نجوم': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   '3 نجوم': 'bg-gray-100 text-gray-700 border-gray-200',
 };
 
@@ -405,7 +405,7 @@ export default function Hotels() {
           { label: 'إجمالي الفنادق', value: stats.total, icon: Building2, color: 'text-navy-600', bg: 'bg-navy-50' },
           { label: 'فنادق نشطة', value: stats.active, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'فنادق VIP', value: stats.vip, icon: Star, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'مكة المكرمة', value: stats.makkah, icon: MapPin, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'مكة المكرمة', value: stats.makkah, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map(stat => (
           <div key={stat.label} className="stat-card">
             <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center mb-3`}>
@@ -509,7 +509,7 @@ export default function Hotels() {
                       <div className="flex items-center gap-1">
                         <button onClick={() => setDetailHotel(hotel)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-navy-700"><Eye size={15} /></button>
                         {can('hotels_edit') && (
-                          <button onClick={() => { setEditHotel(hotel); setShowModal(true); }} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-500 hover:text-blue-600"><Pencil size={15} /></button>
+                          <button onClick={() => { setEditHotel(hotel); setShowModal(true); }} className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors text-gray-500 hover:text-emerald-600"><Pencil size={15} /></button>
                         )}
                         {can('hotels_delete') && (
                           <button onClick={() => handleDelete(hotel.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-500 hover:text-red-600"><Trash2 size={15} /></button>
