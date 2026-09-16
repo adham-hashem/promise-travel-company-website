@@ -149,7 +149,7 @@ export default function AddCustomer({ onNavigate }: Props) {
   };
 
   const selectedPackage = packages.find((p) => p.id === form.requested_package_id) || null;
-  const selectedRoomType = normalizeAdultRoomType(form.room_type_makkah || form.room_type_madinah);
+  const selectedRoomType = normalizeAdultRoomType(form.room_type_makkah);
   const finalPackagePrice = selectedPackage
     ? getPackagePriceForCustomer(selectedPackage, form.age_group, selectedRoomType)
     : 0;
@@ -179,7 +179,11 @@ export default function AddCustomer({ onNavigate }: Props) {
   };
 
   const stepValid = (): boolean => {
-    if (step === 0) return !!form.name.trim() && !!form.phone.trim() && !!form.service_type;
+    if (step === 0) {
+      if (!form.name.trim() || !form.phone.trim() || !form.service_type) return false;
+      if (!isVip && form.age_group === 'بالغ' && !!form.requested_package_id && !selectedRoomType) return false;
+      return true;
+    }
     if (step === 1) return true;
     return true;
   };
@@ -232,15 +236,15 @@ export default function AddCustomer({ onNavigate }: Props) {
           sales_agent_submitted: isSalesAgent ? false : true,
           notes: form.notes || null,
           passport_number: form.passport_number || null,
-          passport_issue_date: form.passport_issue_date || null,
-          passport_expiry_date: form.passport_expiry_date || null,
+          passport_issue_date: null,
+          passport_expiry_date: null,
           nationality: form.nationality || null,
           birth_date: form.birth_date || null,
           gender: form.gender || null,
           city: form.city || null,
           country: form.country || null,
-          hotel_makkah: form.hotel_makkah || null,
-          hotel_madinah: form.hotel_madinah || null,
+          hotel_makkah: null,
+          hotel_madinah: null,
           room_type_makkah: form.age_group === 'بالغ' ? (form.room_type_makkah || null) : null,
           room_type_madinah: form.age_group === 'بالغ' ? (form.room_type_madinah || null) : null,
           is_vip: isVip,
@@ -498,20 +502,73 @@ export default function AddCustomer({ onNavigate }: Props) {
               </div>
             </div>
             <div>
-              <label className="form-label">نوع العميل</label>
+              <label className="form-label">الجنسية</label>
+              <input value={form.nationality} onChange={(e) => update('nationality', e.target.value)} className="form-input" placeholder="مصري" />
+            </div>
+            <div>
+              <label className="form-label">تاريخ الميلاد</label>
+              <div className="relative">
+                <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
+                <input
+                  type="date"
+                  value={form.birth_date}
+                  onChange={(e) => {
+                    const dateVal = e.target.value;
+                    const calculated = calculateAgeGroup(dateVal);
+                    setForm(prev => ({
+                      ...prev,
+                      birth_date: dateVal,
+                      age_group: calculated,
+                      room_type_makkah: calculated === 'بالغ' ? prev.room_type_makkah : '',
+                      room_type_madinah: '',
+                    }));
+                  }}
+                  className="form-input pr-9"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="form-label">الجنس</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['ذكر', 'أنثى'] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => update('gender', g)}
+                    className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${form.gender === g ? 'border-gold-500 bg-gold-50 text-navy-900' : 'border-gray-100 text-gray-500 hover:border-navy-200'}`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="form-label">نوع الحجز</label>
               <select value={form.client_type} onChange={(e) => update('client_type', e.target.value)} className="form-input">
                 <option value="فردي">عميل فردي (Individual)</option>
                 <option value="فوج">عميل فوج (Group)</option>
               </select>
             </div>
             <div>
-              <label className="form-label">الفئة العمرية</label>
+              <label className="form-label">نوع العميل</label>
               <select value={form.age_group} onChange={(e) => update('age_group', e.target.value as any)} className="form-input">
                 <option value="بالغ">بالغ (Adult)</option>
                 <option value="طفل">طفل (Child)</option>
                 <option value="رضيع">رضيع (Infant)</option>
               </select>
             </div>
+            {form.age_group === 'بالغ' && (
+              <div>
+                <label className="form-label">نوع التسكين</label>
+                <select value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input">
+                  <option value="">اختر نوع التسكين</option>
+                  <option value="ثنائي">ثنائي</option>
+                  <option value="ثلاثي">ثلاثي</option>
+                  <option value="رباعي">رباعي</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <h4 className="text-sm font-bold text-navy-800 pt-2">نوع الخدمة <span className="text-red-500">*</span></h4>
@@ -719,62 +776,6 @@ export default function AddCustomer({ onNavigate }: Props) {
               </div>
             </div>
             <div>
-              <label className="form-label">الجنسية</label>
-              <input value={form.nationality} onChange={(e) => update('nationality', e.target.value)} className="form-input" placeholder="مصري" />
-            </div>
-            <div>
-              <label className="form-label">تاريخ إصدار الجواز</label>
-              <div className="relative">
-                <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                <input type="date" value={form.passport_issue_date} onChange={(e) => update('passport_issue_date', e.target.value)} className="form-input pr-9" dir="ltr" />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">تاريخ انتهاء الجواز</label>
-              <div className="relative">
-                <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                <input type="date" value={form.passport_expiry_date} onChange={(e) => update('passport_expiry_date', e.target.value)} className="form-input pr-9" dir="ltr" />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">تاريخ الميلاد</label>
-              <div className="relative">
-                <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400" />
-                <input
-                  type="date"
-                  value={form.birth_date}
-                  onChange={(e) => {
-                    const dateVal = e.target.value;
-                    const calculated = calculateAgeGroup(dateVal);
-                    setForm(prev => ({
-                      ...prev,
-                      birth_date: dateVal,
-                      age_group: calculated,
-                      room_type_makkah: calculated === 'بالغ' ? prev.room_type_makkah : '',
-                      room_type_madinah: calculated === 'بالغ' ? prev.room_type_madinah : '',
-                    }));
-                  }}
-                  className="form-input pr-9"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">الجنس</label>
-              <div className="grid grid-cols-2 gap-3">
-                {(['ذكر', 'أنثى'] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => update('gender', g)}
-                    className={`p-3 rounded-xl border-2 text-sm font-bold transition-all ${form.gender === g ? 'border-gold-500 bg-gold-50 text-navy-900' : 'border-gray-100 text-gray-500 hover:border-navy-200'}`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
               <label className="form-label">المدينة</label>
               <select value={form.city} onChange={(e) => update('city', e.target.value)} className="form-input">
                 <option value="">اختر المدينة</option>
@@ -785,59 +786,6 @@ export default function AddCustomer({ onNavigate }: Props) {
               <label className="form-label">الدولة</label>
               <input value={form.country} onChange={(e) => update('country', e.target.value)} className="form-input" placeholder="مصر" />
             </div>
-            {(form.service_type === 'حج' || form.service_type === 'عمرة') && (
-              <>
-                <div>
-                  <label className="form-label">فندق مكة المفضل</label>
-                  <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: سويس أوتيل المقام" />
-                </div>
-                {form.age_group === 'بالغ' && (
-                  <div>
-                    <label className="form-label">نوع غرفة مكة (التسكين)</label>
-                    <select value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input">
-                      <option value="">اختر التسكين</option>
-                      <option value="ثنائي">ثنائي</option>
-                      <option value="ثلاثي">ثلاثي</option>
-                      <option value="رباعي">رباعي</option>
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className="form-label">فندق المدينة المفضل</label>
-                  <input value={form.hotel_madinah} onChange={(e) => update('hotel_madinah', e.target.value)} className="form-input" placeholder="مثال: بولمان زمزم" />
-                </div>
-                {form.age_group === 'بالغ' && (
-                  <div>
-                    <label className="form-label">نوع غرفة المدينة (التسكين)</label>
-                    <select value={form.room_type_madinah} onChange={(e) => update('room_type_madinah', e.target.value)} className="form-input">
-                      <option value="">اختر التسكين</option>
-                      <option value="ثنائي">ثنائي</option>
-                      <option value="ثلاثي">ثلاثي</option>
-                      <option value="رباعي">رباعي</option>
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-            {form.service_type === 'سياحة داخلية' && (
-              <>
-                <div>
-                  <label className="form-label">الفندق المفضل (اختياري)</label>
-                  <input value={form.hotel_makkah} onChange={(e) => update('hotel_makkah', e.target.value)} className="form-input" placeholder="مثال: فندق هيلتون دهب" />
-                </div>
-                {form.age_group === 'بالغ' && (
-                  <div>
-                    <label className="form-label">نوع الغرفة (التسكين)</label>
-                    <select value={form.room_type_makkah} onChange={(e) => update('room_type_makkah', e.target.value)} className="form-input">
-                      <option value="">اختر التسكين</option>
-                      <option value="ثنائي">ثنائي</option>
-                      <option value="ثلاثي">ثلاثي</option>
-                      <option value="رباعي">رباعي</option>
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
           </div>
 
           {isVip && (

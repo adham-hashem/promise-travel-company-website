@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, Calendar, CheckCircle2, FileCheck, FileText, Hotel, Plus, Printer, RefreshCw, Save, Search, Trash2, User } from 'lucide-react';
+import { Briefcase, Calendar, CheckCircle2, Copy, Edit3, Eye, FileCheck, FileText, History, Hotel, Plus, Printer, RefreshCw, Save, Search, Trash2, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Customer } from '../types';
@@ -21,6 +21,46 @@ interface ProgramGrade {
   id: string;
   name: string;
   is_active: boolean;
+}
+
+interface SavedQuotation {
+  id: string;
+  quotation_number: string;
+  customer_id: string;
+  quotation_type: QuotationKind;
+  title: string;
+  quotation_date: string;
+  valid_until?: string | null;
+  program_section?: string | null;
+  program_grade?: string | null;
+  departure_date?: string | null;
+  return_date?: string | null;
+  days_count?: number | null;
+  nights_count?: number | null;
+  program_details?: string | null;
+  hotel_details?: string | null;
+  flight_details?: string | null;
+  transport_details?: string | null;
+  payment_policy?: string | null;
+  terms_and_conditions?: string | null;
+  subtotal: number;
+  total_discount: number;
+  total_tax: number;
+  total_amount: number;
+  status: QuotationStatus | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  customers?: Pick<Customer, 'name' | 'phone' | 'client_code'>;
+  quotation_items?: Array<{
+    service_name: string;
+    description?: string | null;
+    quantity: number;
+    unit_price: number;
+    discount: number;
+    tax: number;
+    line_total: number;
+    sort_order: number;
+  }>;
 }
 
 const defaultProgramGrades = ['VIP', '4 نجوم', 'اقتصادي مميز', 'اقتصادي عادي'];
@@ -50,6 +90,8 @@ export default function QuotationForm() {
   const [newGradeName, setNewGradeName] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [savedQuotationId, setSavedQuotationId] = useState<string | null>(null);
+  const [quotationHistory, setQuotationHistory] = useState<SavedQuotation[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
   const [form, setForm] = useState({
@@ -80,6 +122,7 @@ export default function QuotationForm() {
     });
 
     loadProgramGrades();
+    loadQuotationHistory();
   }, []);
 
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
@@ -98,6 +141,22 @@ export default function QuotationForm() {
   const totalDiscount = activeItems.reduce((sum, item) => sum + (Number(item.discount) || 0), 0);
   const totalTax = activeItems.reduce((sum, item) => sum + (Number(item.tax) || 0), 0);
   const total = activeItems.reduce((sum, item) => sum + lineTotal(item), 0);
+  const filteredQuotationHistory = useMemo(() => {
+    const query = historySearch.trim().toLowerCase();
+    if (!query) return quotationHistory;
+    return quotationHistory.filter((quote) => {
+      const services = (quote.quotation_items || []).map((item) => item.service_name).join(' ');
+      return [
+        quote.quotation_number,
+        quote.title,
+        quote.program_section || '',
+        quote.program_grade || '',
+        quote.quotation_date,
+        quote.customers?.name || '',
+        services,
+      ].some((value) => value.toLowerCase().includes(query));
+    });
+  }, [quotationHistory, historySearch]);
 
   const updateField = (name: string, value: string | number) => {
     setForm((current) => ({ ...current, [name]: value }));
@@ -127,6 +186,108 @@ export default function QuotationForm() {
       .order('sort_order', { ascending: true });
     const loaded = (data as ProgramGrade[] | null) || [];
     setProgramGrades(loaded.length ? loaded : defaultProgramGrades.map((name) => ({ id: name, name, is_active: true })));
+  };
+
+  const loadQuotationHistory = async () => {
+    const { data } = await supabase
+      .from('quotations')
+      .select('*, customers(name, phone, client_code), quotation_items(*)')
+      .order('updated_at', { ascending: false });
+    setQuotationHistory((data as SavedQuotation[] | null) || []);
+  };
+
+  const applyQuotationToForm = (quote: SavedQuotation, mode: 'edit' | 'clone' | 'view' = 'edit') => {
+    setSavedQuotationId(mode === 'clone' ? null : quote.id);
+    setCustomerSearch(`${quote.customers?.name || ''} ${quote.customers?.client_code ? `(${quote.customers.client_code})` : ''}`.trim());
+    setForm({
+      quotationKind: quote.quotation_type,
+      quotationDate: mode === 'clone' ? new Date().toISOString().split('T')[0] : quote.quotation_date,
+      validUntil: quote.valid_until || '',
+      customerId: quote.customer_id,
+      clientName: quote.customers?.name || '',
+      title: mode === 'clone' ? `${quote.title} - نسخة جديدة` : quote.title,
+      programSection: quote.program_section || 'سياحة خارجية',
+      programGrade: quote.program_grade || 'VIP',
+      departureDate: quote.departure_date || '',
+      returnDate: quote.return_date || '',
+      daysCount: Number(quote.days_count || 0),
+      nightsCount: Number(quote.nights_count || 0),
+      programDetails: quote.program_details || '',
+      hotelDetails: quote.hotel_details || '',
+      flightDetails: quote.flight_details || '',
+      transportDetails: quote.transport_details || '',
+      paymentPolicy: quote.payment_policy || 'يتم تحديد طريقة السداد طبقًا للاتفاق النهائي مع العميل.',
+      termsAndConditions: quote.terms_and_conditions || 'الأسعار قابلة للتغيير حسب توافر الخدمة وتحديثات شركات الطيران والفنادق والجهات الرسمية.',
+    });
+    const loadedItems = (quote.quotation_items || [])
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+      .map((item) => ({
+        id: crypto.randomUUID(),
+        serviceName: item.service_name,
+        description: item.description || '',
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unit_price || 0),
+        discount: Number(item.discount || 0),
+        tax: Number(item.tax || 0),
+      }));
+    setItems(loadedItems.length ? loadedItems : [newItem()]);
+  };
+
+  const saveQuotationVersion = async (quotationId: string) => {
+    const quote = quotationHistory.find((entry) => entry.id === quotationId);
+    if (!quote) return;
+    await supabase.from('quotation_versions').insert({
+      quotation_id: quote.id,
+      version_number: Date.now(),
+      snapshot: quote,
+      created_by: profile?.id || null,
+    });
+  };
+
+  const printSavedQuotation = (quote: SavedQuotation) => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('يرجى السماح بالنوافذ المنبثقة للطباعة');
+      return;
+    }
+    const rows = (quote.quotation_items || []).map((item) => `
+      <tr>
+        <td>${item.service_name}</td>
+        <td>${item.description || '—'}</td>
+        <td>${item.quantity}</td>
+        <td>${money(Number(item.unit_price || 0))}</td>
+        <td>${Number(item.discount || 0) > 0 ? money(Number(item.discount || 0)) : '—'}</td>
+        <td>${Number(item.tax || 0) > 0 ? money(Number(item.tax || 0)) : '—'}</td>
+        <td><strong>${money(Number(item.line_total || 0))}</strong></td>
+      </tr>
+    `).join('');
+    win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${quote.title}</title><style>
+      *{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      @page{size:A4;margin:12mm}body{margin:0;color:#183b38;font-family:Cairo,Tahoma,Arial,sans-serif;line-height:1.6}
+      main{max-width:190mm;margin:0 auto}.header{border-bottom:3px solid #0f5f56;padding-bottom:14px;margin-bottom:18px}
+      h1{margin:0;color:#0b4f48;font-size:25px}.muted{color:#5d7773;font-size:12px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+      .box{border:1px solid #cce2de;background:#f4fbf9;border-radius:8px;padding:8px 10px;font-size:12px}.box strong{display:block;color:#0b4f48}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}th{background:#0f5f56;color:white;padding:9px;text-align:right}td{border:1px solid #cce2de;padding:8px}
+      .total{background:#0f5f56;color:white;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;margin-top:10px;font-weight:900}.total span:last-child{color:#e4c766;font-size:22px}
+      .text{border:1px solid #cce2de;border-radius:8px;padding:10px;white-space:pre-wrap;font-size:12px;margin-top:12px}
+    </style></head><body><main>
+      <div class="header"><h1>${quote.quotation_type === 'program' ? 'عرض سعر برنامج سياحي' : 'عرض سعر خدمات سياحية'}</h1><div class="muted">PROMISE TRAVEL - بروميس للسياحة والسفر</div></div>
+      <div class="grid">
+        <div class="box"><strong>رقم العرض</strong>${quote.quotation_number}</div>
+        <div class="box"><strong>العميل</strong>${quote.customers?.name || '—'}</div>
+        <div class="box"><strong>التاريخ</strong>${new Date(quote.quotation_date).toLocaleDateString('ar-EG')}</div>
+        <div class="box"><strong>نوع العرض</strong>${quote.quotation_type === 'program' ? 'برنامج رحلة كامل' : 'خدمات منفصلة'}</div>
+      </div>
+      <h2>${quote.title}</h2>
+      ${quote.program_details ? `<div class="text"><strong>تفاصيل البرنامج</strong><br>${quote.program_details}</div>` : ''}
+      <table><thead><tr><th>الخدمة</th><th>الوصف</th><th>العدد</th><th>سعر الوحدة</th><th>الخصم</th><th>الضريبة</th><th>الإجمالي</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="total"><span>الإجمالي النهائي لعرض السعر</span><span>${money(Number(quote.total_amount || 0))}</span></div>
+      ${quote.payment_policy ? `<div class="text"><strong>سياسة السداد</strong><br>${quote.payment_policy}</div>` : ''}
+      ${quote.terms_and_conditions ? `<div class="text"><strong>الشروط والأحكام</strong><br>${quote.terms_and_conditions}</div>` : ''}
+    </main></body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   };
 
   const addProgramGrade = async () => {
@@ -182,7 +343,7 @@ export default function QuotationForm() {
     setItems([newItem()]);
   };
 
-  const saveQuotation = async (status: QuotationStatus = 'draft') => {
+  const saveQuotation = async (status: QuotationStatus = 'draft', silent = false) => {
     const validationError = validate();
     if (validationError) {
       alert(validationError);
@@ -216,7 +377,10 @@ export default function QuotationForm() {
         total_amount: total,
         status,
         created_by: profile?.id || null,
+        updated_at: new Date().toISOString(),
       };
+
+      if (savedQuotationId) await saveQuotationVersion(savedQuotationId);
 
       const { data: quotation, error: quotationError } = savedQuotationId
         ? await supabase.from('quotations').update(payload).eq('id', savedQuotationId).select('id').single()
@@ -240,7 +404,8 @@ export default function QuotationForm() {
       if (itemsError) throw itemsError;
 
       setSavedQuotationId(quotationId);
-      alert(status === 'issued' ? 'تم حفظ وإصدار عرض السعر.' : 'تم حفظ عرض السعر.');
+      await loadQuotationHistory();
+      if (!silent) alert(status === 'issued' ? 'تم حفظ وإصدار عرض السعر.' : 'تم حفظ عرض السعر.');
       return quotationId;
     } catch (err: any) {
       alert('تعذر حفظ عرض السعر: ' + (err?.message || 'حدث خطأ غير متوقع'));
@@ -287,7 +452,9 @@ export default function QuotationForm() {
     }
   };
 
-  const printQuotation = () => {
+  const printQuotation = async () => {
+    const quotationId = await saveQuotation('issued', true);
+    if (!quotationId) return;
     const printContent = document.getElementById('quotation-print')?.innerHTML;
     if (!printContent) return;
 
@@ -356,6 +523,78 @@ export default function QuotationForm() {
           <button onClick={() => saveQuotation('draft')} disabled={saving || !canEditQuotation} className="btn-secondary flex items-center gap-2 disabled:opacity-50"><Save size={16} /> حفظ</button>
           <button onClick={() => saveQuotation('issued')} disabled={saving || !canEditQuotation} className="btn-gold flex items-center gap-2 disabled:opacity-50"><FileCheck size={16} /> إصدار العرض</button>
           <button onClick={printQuotation} className="btn-gold flex items-center gap-2"><Printer size={16} /> طباعة / تحميل PDF</button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4 border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg"><History size={18} /></div>
+            <div>
+              <h2 className="text-lg font-bold text-navy-900">سجل عروض الأسعار</h2>
+              <p className="text-xs text-gray-500 mt-1">كل العروض المحفوظة متاحة للفتح أو التعديل أو الاستخدام كعرض جديد.</p>
+            </div>
+          </div>
+          <div className="relative w-full lg:w-96">
+            <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              className="input-field pr-9"
+              placeholder="بحث باسم العميل، رقم العرض، الخدمة، البرنامج، التاريخ"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-right text-xs text-gray-500 border-b border-gray-100">
+                <th className="py-2 px-2">رقم العرض</th>
+                <th className="py-2 px-2">العميل</th>
+                <th className="py-2 px-2">تاريخ الإنشاء</th>
+                <th className="py-2 px-2">الخدمات</th>
+                <th className="py-2 px-2">الإجمالي</th>
+                <th className="py-2 px-2">آخر تعديل</th>
+                <th className="py-2 px-2">الحالة</th>
+                <th className="py-2 px-2">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredQuotationHistory.slice(0, 12).map((quote) => (
+                <tr key={quote.id} className="border-b border-gray-50 align-top">
+                  <td className="py-3 px-2 font-bold text-navy-900">{quote.quotation_number}</td>
+                  <td className="py-3 px-2">
+                    <span className="block font-semibold text-gray-800">{quote.customers?.name || '—'}</span>
+                    <span className="block text-[11px] text-gray-400">{quote.customers?.client_code || ''}</span>
+                  </td>
+                  <td className="py-3 px-2 text-gray-600">{new Date(quote.created_at).toLocaleDateString('ar-EG')}</td>
+                  <td className="py-3 px-2 text-gray-600 max-w-xs">
+                    {(quote.quotation_items || []).slice(0, 3).map((item) => item.service_name).join('، ') || quote.title}
+                  </td>
+                  <td className="py-3 px-2 font-black text-emerald-800">{money(Number(quote.total_amount || 0))}</td>
+                  <td className="py-3 px-2 text-gray-600">{new Date(quote.updated_at || quote.created_at).toLocaleDateString('ar-EG')}</td>
+                  <td className="py-3 px-2">
+                    <span className="badge bg-emerald-50 text-emerald-800 border border-emerald-100">
+                      {quote.status === 'draft' ? 'مسودة' : quote.status === 'issued' ? 'صادر' : quote.status === 'converted' ? 'محول' : 'ملغي'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2">
+                    <div className="flex flex-wrap gap-1">
+                      <button type="button" onClick={() => applyQuotationToForm(quote, 'view')} className="p-1.5 rounded-lg hover:bg-gray-100 text-navy-700" title="عرض"><Eye size={15} /></button>
+                      <button type="button" onClick={() => applyQuotationToForm(quote, 'edit')} className="p-1.5 rounded-lg hover:bg-gray-100 text-emerald-700" title="تعديل"><Edit3 size={15} /></button>
+                      <button type="button" onClick={() => applyQuotationToForm(quote, 'clone')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gold-700" title="استخدام كعرض جديد"><Copy size={15} /></button>
+                      <button type="button" onClick={() => printSavedQuotation(quote)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-700" title="طباعة"><Printer size={15} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredQuotationHistory.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-gray-400">لا توجد عروض أسعار محفوظة بعد</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
