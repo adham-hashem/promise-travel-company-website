@@ -246,7 +246,7 @@ function AppInner() {
       {currentPage === 'invoices' && canAccessPage('invoices') && <Invoices />}
       {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries />}
       {currentPage === 'client-search' && canAccessPage('client-search') && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
-      {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} />}
+      {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} selectedTaskId={selectedCustomerId} />}
       {currentPage === 'calendar' && canAccessPage('calendar') && <CalendarPage />}
       {currentPage === 'profit' && canAccessPage('profit') && <ProfitAnalysis />}
       {currentPage === 'suppliers' && canAccessPage('suppliers') && <Suppliers />}

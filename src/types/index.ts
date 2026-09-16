@@ -98,14 +98,16 @@ export interface Task {
   related_section?: string;
   auto_generated?: boolean;
   employee_response?: string;
+  assigned_by_id?: string;
+  last_activity_at?: string;
   employees?: Employee;
 }
 
 export type TaskPriority = 'منخفضة' | 'متوسطة' | 'عالية' | 'عاجل';
-export type TaskStatus = 'جديدة' | 'قيد التنفيذ' | 'مكتملة' | 'متأخرة' | 'Pending' | 'In Progress' | 'Completed';
+export type TaskStatus = 'جديدة' | 'قيد التنفيذ' | 'مؤجلة' | 'مكتملة' | 'متأخرة' | 'Pending' | 'In Progress' | 'Completed';
 
 export type NotificationType =
-  | 'new_lead' | 'task_assigned' | 'follow_up' | 'overdue_task'
+  | 'new_lead' | 'task_assigned' | 'task_reply' | 'follow_up' | 'overdue_task'
   | 'new_customer' | 'new_booking' | 'new_payment' | 'new_invoice'
   | 'missing_document' | 'document_required' | 'travel_soon' | 'urgent_travel_issue'
   | 'website_booking' | 'installment_overdue' | 'installment_due_soon'

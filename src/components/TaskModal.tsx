@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Employee, Task, TaskPriority, TaskStatus } from '../types';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 }
 
 const priorities: TaskPriority[] = ['منخفضة', 'متوسطة', 'عالية'];
-const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مكتملة', 'متأخرة'];
+const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مؤجلة', 'مكتملة', 'متأخرة'];
 
 const priorityColors: Record<string, string> = {
   منخفضة: 'border-gray-200 text-gray-700',
@@ -34,6 +35,7 @@ const emptyForm = {
 };
 
 export default function TaskModal({ open, onClose, onSaved, employees, defaultEmployeeId, editTask }: Props) {
+  const { profile } = useAuth();
   const [form, setForm] = useState({
     ...emptyForm,
     employee_id: defaultEmployeeId || employees[0]?.id || '',
@@ -76,22 +78,49 @@ export default function TaskModal({ open, onClose, onSaved, employees, defaultEm
       start_date: form.start_date,
       due_date: form.due_date,
       completed_at: form.status === 'مكتملة' ? new Date().toISOString() : null,
+      assigned_by_id: editTask?.assigned_by_id || profile?.id || null,
     };
 
     let error: string | null = null;
     if (editTask) {
       const { error: e } = await supabase.from('tasks').update(payload).eq('id', editTask.id);
       error = e?.message || null;
+      if (!e) {
+        if (editTask.employee_id !== form.employee_id) {
+          await supabase.from('task_activity_logs').insert({
+            task_id: editTask.id,
+            actor_employee_id: profile?.id || null,
+            action: 'reassigned',
+            details: { from: editTask.employee_id || null, to: form.employee_id },
+          });
+        }
+        if (editTask.status !== form.status) {
+          await supabase.from('task_activity_logs').insert({
+            task_id: editTask.id,
+            actor_employee_id: profile?.id || null,
+            action: form.status === 'مكتملة' ? 'completed' : form.status === 'مؤجلة' ? 'deferred' : 'status_changed',
+            details: { from: editTask.status, to: form.status },
+          });
+        }
+      }
     } else {
-      const { error: e } = await supabase.from('tasks').insert(payload);
+      const { data: createdTask, error: e } = await supabase.from('tasks').insert(payload).select('id').single();
       error = e?.message || null;
       // Insert a task_assigned notification for new tasks
       if (!e) {
+        await supabase.from('task_activity_logs').insert({
+          task_id: createdTask?.id,
+          actor_employee_id: profile?.id || null,
+          action: 'created',
+          details: { title: form.title, assigned_to: form.employee_id },
+        });
         await supabase.from('notifications').insert({
           employee_id: form.employee_id,
           type: 'task_assigned',
           title: 'تعيين مهمة جديدة',
           body: form.title,
+          target_page: 'tasks',
+          target_record_id: createdTask?.id,
         });
       }
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Plus, X, Loader2, CheckCircle2, Clock, AlertCircle, ListChecks,
   Filter, Search, Hash, User, Calendar, Trash2, Zap, MessageSquare, Send, ChevronDown, ChevronUp,
+  Paperclip, Download, FileText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,11 +14,30 @@ interface TaskUpdate {
   employee_id?: string;
   content: string;
   created_at: string;
-  employees?: { name: string };
+  employees?: { name: string; avatar_url?: string };
+  attachments?: TaskUpdateAttachment[];
+}
+
+interface TaskUpdateAttachment {
+  id: string;
+  task_update_id: string;
+  task_id: string;
+  uploaded_by?: string;
+  file_path: string;
+  file_name: string;
+  file_size?: number;
+  mime_type?: string;
+  created_at: string;
+}
+
+interface TaskRead {
+  task_id: string;
+  employee_id: string;
+  last_read_at: string;
 }
 
 const priorities: TaskPriority[] = ['منخفضة', 'متوسطة', 'عالية', 'عاجل'];
-const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مكتملة', 'متأخرة'];
+const statuses: TaskStatus[] = ['جديدة', 'قيد التنفيذ', 'مؤجلة', 'مكتملة', 'متأخرة'];
 const departments = ['المبيعات', 'الحسابات', 'التشغيل', 'الفنادق', 'السياحة الداخلية'];
 
 const priorityColors: Record<TaskPriority, string> = {
@@ -30,6 +50,7 @@ const priorityColors: Record<TaskPriority, string> = {
 const statusColors: Record<string, string> = {
   'جديدة': 'bg-emerald-100 text-emerald-700',
   'قيد التنفيذ': 'bg-amber-100 text-amber-700',
+  'مؤجلة': 'bg-sky-100 text-sky-700',
   'مكتملة': 'bg-emerald-100 text-emerald-700',
   'متأخرة': 'bg-red-100 text-red-700',
 };
@@ -37,15 +58,17 @@ const statusColors: Record<string, string> = {
 const statusIcons: Record<string, React.ElementType> = {
   'جديدة': Clock,
   'قيد التنفيذ': Loader2,
+  'مؤجلة': Clock,
   'مكتملة': CheckCircle2,
   'متأخرة': AlertCircle,
 };
 
 interface Props {
   onNavigate: (page: Page, id?: string) => void;
+  selectedTaskId?: string;
 }
 
-export default function Tasks({}: Props) {
+export default function Tasks({ selectedTaskId }: Props) {
   const { profile } = useAuth();
   const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
   
@@ -66,6 +89,8 @@ export default function Tasks({}: Props) {
   // Task updates (timeline per task)
   const [taskUpdates, setTaskUpdates] = useState<Record<string, TaskUpdate[]>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
+  const [newUpdateFiles, setNewUpdateFiles] = useState<Record<string, File[]>>({});
+  const [taskReads, setTaskReads] = useState<Record<string, string>>({});
   const [sendingUpdate, setSendingUpdate] = useState<string | null>(null);
   const [expandedUpdates, setExpandedUpdates] = useState<Record<string, boolean>>({});
   const [lastViewedUpdates, setLastViewedUpdates] = useState<Record<string, string>>(() => {
@@ -99,6 +124,13 @@ export default function Tasks({}: Props) {
     const updated = { ...lastViewedUpdates, [taskId]: now };
     setLastViewedUpdates(updated);
     localStorage.setItem('last_viewed_task_updates', JSON.stringify(updated));
+    if (profile?.id) {
+      setTaskReads(prev => ({ ...prev, [taskId]: now }));
+      supabase
+        .from('task_update_reads')
+        .upsert({ task_id: taskId, employee_id: profile.id, last_read_at: now })
+        .then(() => undefined);
+    }
   };
 
   const toggleUpdates = (taskId: string) => {
@@ -118,12 +150,35 @@ export default function Tasks({}: Props) {
     });
   }, [profile]);
 
+  useEffect(() => {
+    if (!profile) return;
+    const channel = supabase
+      .channel('task-conversations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_updates' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_update_attachments' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => load())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile]);
+
+  useEffect(() => {
+    if (!selectedTaskId || tasks.length === 0) return;
+    setExpandedUpdates(prev => ({ ...prev, [selectedTaskId]: true }));
+    markTaskAsSeen(selectedTaskId);
+    markUpdatesAsRead(selectedTaskId);
+    setTimeout(() => {
+      document.getElementById(`task-${selectedTaskId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }, [selectedTaskId, tasks.length]);
+
   const load = async () => {
     if (!profile) return;
     setLoading(true);
     let query = supabase.from('tasks').select('*, employees(*)');
     if (!isManager) {
-      query = query.eq('employee_id', profile.id);
+      query = query.or(`employee_id.eq.${profile.id},assigned_by_id.eq.${profile.id}`);
     }
     const { data } = await query.order('created_at', { ascending: false });
     const fetchedTasks = (data as Task[]) || [];
@@ -152,15 +207,36 @@ export default function Tasks({}: Props) {
       const taskIds = fetchedTasks.map(t => t.id);
       const { data: updates } = await supabase
         .from('task_updates')
-        .select('*, employees(name)')
+        .select('*, employees(name, avatar_url)')
         .in('task_id', taskIds)
         .order('created_at', { ascending: true });
+      const { data: attachments } = await supabase
+        .from('task_update_attachments')
+        .select('*')
+        .in('task_id', taskIds)
+        .order('created_at', { ascending: true });
+      const attachmentsMap: Record<string, TaskUpdateAttachment[]> = {};
+      ((attachments || []) as TaskUpdateAttachment[]).forEach((file) => {
+        if (!attachmentsMap[file.task_update_id]) attachmentsMap[file.task_update_id] = [];
+        attachmentsMap[file.task_update_id].push(file);
+      });
       const updatesMap: Record<string, TaskUpdate[]> = {};
       ((updates || []) as TaskUpdate[]).forEach((u) => {
         if (!updatesMap[u.task_id]) updatesMap[u.task_id] = [];
-        updatesMap[u.task_id].push(u);
+        updatesMap[u.task_id].push({ ...u, attachments: attachmentsMap[u.id] || [] });
       });
       setTaskUpdates(updatesMap);
+
+      const { data: reads } = await supabase
+        .from('task_update_reads')
+        .select('*')
+        .in('task_id', taskIds)
+        .eq('employee_id', profile.id);
+      const readsMap: Record<string, string> = {};
+      ((reads || []) as TaskRead[]).forEach((read) => {
+        readsMap[read.task_id] = read.last_read_at;
+      });
+      setTaskReads(readsMap);
     }
 
     setLoading(false);
@@ -184,6 +260,19 @@ export default function Tasks({}: Props) {
     overdue: tasks.filter((t) => t.status === 'متأخرة').length,
   };
 
+  const getUnreadCount = (taskId: string) => {
+    const lastReadAt = taskReads[taskId] || lastViewedUpdates[taskId];
+    return (taskUpdates[taskId] || []).filter((update) => {
+      if (update.employee_id === profile?.id) return false;
+      return !lastReadAt || new Date(update.created_at) > new Date(lastReadAt);
+    }).length;
+  };
+
+  const openAttachment = async (filePath: string) => {
+    const { data } = await supabase.storage.from('documents').createSignedUrl(filePath, 60 * 10);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
   const createTask = async () => {
     if (!isManager) return;
     if (!form.title.trim() || !form.due_date) return;
@@ -200,11 +289,22 @@ export default function Tasks({}: Props) {
         client_code: form.client_code || null,
         status: 'جديدة',
         start_date: new Date().toISOString().split('T')[0],
+        assigned_by_id: profile?.id || null,
       })
       .select('*, employees(*)')
       .single();
     if (data) {
       setTasks([data as Task, ...tasks]);
+      await supabase.from('task_activity_logs').insert({
+        task_id: data.id,
+        actor_employee_id: profile?.id || null,
+        action: 'created',
+        details: {
+          title: form.title,
+          assigned_to: form.employee_id || null,
+          department: form.department || null,
+        },
+      });
       if (form.employee_id) {
         await supabase.from('notifications').insert({
           employee_id: form.employee_id,
@@ -212,6 +312,8 @@ export default function Tasks({}: Props) {
           title: `مهمة جديدة: ${form.title}`,
           body: form.department ? `قسم ${form.department}` : undefined,
           is_read: false,
+          target_page: 'tasks',
+          target_record_id: data.id,
         });
       }
     }
@@ -224,25 +326,93 @@ export default function Tasks({}: Props) {
     const updates: Record<string, unknown> = { status };
     if (status === 'مكتملة') updates.completed_at = new Date().toISOString();
     const { data } = await supabase.from('tasks').update(updates).eq('id', task.id).select('*, employees(*)').single();
-    if (data) setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
+    if (data) {
+      setTasks(tasks.map((t) => (t.id === task.id ? (data as Task) : t)));
+      await supabase.from('task_activity_logs').insert({
+        task_id: task.id,
+        actor_employee_id: profile?.id || null,
+        action: status === 'مكتملة' ? 'completed' : 'status_changed',
+        details: { from: task.status, to: status },
+      });
+    }
   };
 
   const sendTaskUpdate = async (taskId: string) => {
     const content = newUpdateText[taskId]?.trim();
-    if (!content || !profile) return;
+    const files = newUpdateFiles[taskId] || [];
+    if ((!content && files.length === 0) || !profile) return;
     setSendingUpdate(taskId);
     try {
+      const currentTask = tasks.find((task) => task.id === taskId);
       const { data } = await supabase
         .from('task_updates')
-        .insert({ task_id: taskId, employee_id: profile.id, content })
-        .select('*, employees(name)')
+        .insert({ task_id: taskId, employee_id: profile.id, content: content || 'تم إرفاق ملف' })
+        .select('*, employees(name, avatar_url)')
         .single();
       if (data) {
+        const uploadedAttachments: TaskUpdateAttachment[] = [];
+        for (const file of files) {
+          const safeName = file.name.replace(/[^\w.\-\u0600-\u06FF ]/g, '_');
+          const filePath = `task-replies/${taskId}/${data.id}/${Date.now()}_${safeName}`;
+          const { error: uploadError } = await supabase.storage.from('documents').upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: attachment, error: attachmentError } = await supabase
+            .from('task_update_attachments')
+            .insert({
+              task_update_id: data.id,
+              task_id: taskId,
+              uploaded_by: profile.id,
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type || null,
+            })
+            .select('*')
+            .single();
+          if (attachmentError) throw attachmentError;
+          if (attachment) uploadedAttachments.push(attachment as TaskUpdateAttachment);
+        }
+        await supabase.from('tasks').update({ last_activity_at: new Date().toISOString() }).eq('id', taskId);
+        await supabase.from('task_activity_logs').insert({
+          task_id: taskId,
+          actor_employee_id: profile.id,
+          action: 'reply_added',
+          details: {
+            content,
+            attachments: uploadedAttachments.map((file) => ({ name: file.file_name, path: file.file_path })),
+          },
+        });
+        const recipientId = currentTask?.employee_id === profile.id ? currentTask?.assigned_by_id : currentTask?.employee_id;
+        if (recipientId && recipientId !== profile.id) {
+          await supabase.from('notifications').insert({
+            employee_id: recipientId,
+            type: 'task_reply',
+            title: 'رد جديد على مهمة',
+            body: `${profile.name || 'موظف'} أضاف ردًا على المهمة ${currentTask?.client_code || currentTask?.title || taskId}`,
+            is_read: false,
+            target_page: 'tasks',
+            target_record_id: taskId,
+          });
+        } else if (currentTask?.employee_id === profile.id) {
+          const managerNotifications = employees
+            .filter((emp) => emp.id !== profile.id && ['super_admin', 'مالك النظام', 'مدير النظام', 'مدير المبيعات'].includes(emp.role))
+            .map((emp) => ({
+              employee_id: emp.id,
+              type: 'task_reply',
+              title: 'رد جديد على مهمة',
+              body: `${profile.name || 'موظف'} أضاف ردًا على المهمة ${currentTask?.client_code || currentTask?.title || taskId}`,
+              is_read: false,
+              target_page: 'tasks',
+              target_record_id: taskId,
+            }));
+          if (managerNotifications.length > 0) await supabase.from('notifications').insert(managerNotifications);
+        }
         setTaskUpdates(prev => ({
           ...prev,
-          [taskId]: [...(prev[taskId] || []), data as TaskUpdate],
+          [taskId]: [...(prev[taskId] || []), { ...(data as TaskUpdate), attachments: uploadedAttachments }],
         }));
         setNewUpdateText(prev => ({ ...prev, [taskId]: '' }));
+        setNewUpdateFiles(prev => ({ ...prev, [taskId]: [] }));
         // Auto-expand updates after sending
         setExpandedUpdates(prev => ({ ...prev, [taskId]: true }));
         markUpdatesAsRead(taskId);
@@ -375,7 +545,7 @@ export default function Tasks({}: Props) {
               const StatusIcon = statusIcons[t.status] || Clock;
               const associatedCust = t.client_code ? taskCustomers[t.client_code] : undefined;
               return (
-                <div key={t.id} onClick={() => markTaskAsSeen(t.id)} className="p-5 hover:bg-gray-50/50 transition-colors">
+                <div id={`task-${t.id}`} key={t.id} onClick={() => markTaskAsSeen(t.id)} className={`p-5 hover:bg-gray-50/50 transition-colors ${selectedTaskId === t.id ? 'bg-gold-50/50 ring-1 ring-gold-200' : ''}`}>
                   <div className="flex items-start gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${statusColors[t.status]} relative`}>
                       <StatusIcon size={18} />
@@ -393,6 +563,11 @@ export default function Tasks({}: Props) {
                           <span className="badge bg-purple-100 text-purple-700 text-[10px]"><Zap size={9} className="inline ml-0.5" />تلقائي</span>
                         )}
                         <span className={`badge text-[10px] ${priorityColors[t.priority]}`}>{t.priority}</span>
+                        {getUnreadCount(t.id) > 0 && (
+                          <span className="badge bg-red-100 text-red-700 text-[10px] flex items-center gap-1">
+                            <MessageSquare size={10} /> {getUnreadCount(t.id)}
+                          </span>
+                        )}
                       </div>
                       {t.description && <p className="text-xs text-gray-500 mb-2 whitespace-pre-wrap">{t.description}</p>}
 
@@ -420,60 +595,71 @@ export default function Tasks({}: Props) {
                         </div>
                       )}
 
-                      {/* Task Updates Timeline */}
-                      {(taskUpdates[t.id] || []).length > 0 && (
-                        <div className="mt-2 mb-2">
-                          <button
-                            onClick={() => toggleUpdates(t.id)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 transition-colors mb-1.5"
-                          >
-                            <MessageSquare size={12} />
-                            المستجدات ({taskUpdates[t.id].length})
-                            {(() => {
-                              const updates = taskUpdates[t.id] || [];
-                              if (updates.length === 0) return false;
-                              const latestUpdate = updates[updates.length - 1];
-                              if (latestUpdate.employee_id === profile?.id) return false;
-                              const lastTime = lastViewedUpdates[t.id];
-                              return !lastTime || new Date(latestUpdate.created_at) > new Date(lastTime);
-                            })() && !expandedUpdates[t.id] && (
-                              <span className="relative flex h-1.5 w-1.5 mr-1">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
-                              </span>
-                            )}
-                            {expandedUpdates[t.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                          </button>
+                      <div className="mt-3 mb-2 rounded-2xl border border-gray-100 bg-white">
+                        <button
+                          onClick={() => toggleUpdates(t.id)}
+                          className="w-full px-3 py-2.5 flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 rounded-t-2xl transition-colors"
+                        >
+                          <MessageSquare size={14} />
+                          الردود ({taskUpdates[t.id]?.length || 0})
+                          {getUnreadCount(t.id) > 0 && (
+                            <span className="mr-1 rounded-full bg-red-500 text-white min-w-5 h-5 px-1 flex items-center justify-center text-[10px]">
+                              {getUnreadCount(t.id)}
+                            </span>
+                          )}
+                          <span className="mr-auto">{expandedUpdates[t.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
+                        </button>
 
-                          {expandedUpdates[t.id] && (
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                              {taskUpdates[t.id].map((u, idx) => (
-                                <div key={u.id} className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-xs relative">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                      {idx + 1}
-                                    </span>
-                                    <span className="text-[10px] text-emerald-600 font-semibold">
-                                      {u.employees?.name || 'الموظف'}
-                                    </span>
-                                    <span className="text-[9px] text-gray-400 mr-auto">
+                        {expandedUpdates[t.id] && (
+                          <div className="border-t border-gray-100">
+                            <div className="space-y-2 max-h-72 overflow-y-auto p-3">
+                              {(taskUpdates[t.id] || []).length === 0 ? (
+                                <div className="py-6 text-center text-xs text-gray-400">لا توجد ردود بعد</div>
+                              ) : taskUpdates[t.id].map((u) => (
+                                <div key={u.id} className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {u.employees?.avatar_url ? (
+                                      <img src={u.employees.avatar_url} alt={u.employees.name} className="w-7 h-7 rounded-full object-cover" />
+                                    ) : (
+                                      <span className="w-7 h-7 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center font-bold flex-shrink-0">
+                                        {(u.employees?.name || 'م').slice(0, 1)}
+                                      </span>
+                                    )}
+                                    <span className="text-emerald-800 font-bold">{u.employees?.name || 'الموظف'}</span>
+                                    <span className="text-[10px] text-gray-400 mr-auto">
                                       {new Date(u.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}
                                     </span>
                                   </div>
-                                  <p className="whitespace-pre-wrap text-gray-700 leading-relaxed mr-7">{u.content}</p>
+                                  {u.content && <p className="whitespace-pre-wrap text-gray-700 leading-relaxed mb-2">{u.content}</p>}
+                                  {(u.attachments || []).length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {(u.attachments || []).map((file) => (
+                                        <button
+                                          key={file.id}
+                                          type="button"
+                                          onClick={() => openAttachment(file.file_path)}
+                                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50"
+                                        >
+                                          <FileText size={12} />
+                                          {file.file_name}
+                                          <Download size={11} />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
 
-                      {/* Add new update — employee only, task not completed */}
-                      {!isManager && profile?.id === t.employee_id && t.status !== 'مكتملة' && (
+                      {/* Add reply without changing task status */}
+                      {profile && (isManager || profile.id === t.employee_id || profile.id === t.assigned_by_id) && t.status !== 'مكتملة' && (
                         <div className="mt-2 mb-3 bg-navy-50/60 rounded-xl border border-navy-100 overflow-hidden">
                           <div className="px-3 pt-2.5 pb-1">
                             <label className="block text-[10px] font-bold text-navy-700 mb-1.5 flex items-center gap-1">
-                              <Send size={10} /> أضف مستجد / آخر ما تم إنجازه:
+                              <Send size={10} /> اكتب ردك داخل المهمة:
                             </label>
                             <textarea
                               value={newUpdateText[t.id] || ''}
@@ -482,17 +668,36 @@ export default function Tasks({}: Props) {
                                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendTaskUpdate(t.id);
                               }}
                               rows={2}
-                              placeholder="اكتب آخر مستجدات المهمة هنا... (Ctrl+Enter للإرسال)"
+                              placeholder="اكتب ردك... (Ctrl+Enter للإرسال)"
                               className="form-input text-xs resize-none bg-white"
                             />
+                            {(newUpdateFiles[t.id] || []).length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {(newUpdateFiles[t.id] || []).map((file, index) => (
+                                  <span key={`${file.name}-${index}`} className="badge bg-white text-navy-700 border border-navy-100 flex items-center gap-1">
+                                    <Paperclip size={10} /> {file.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="px-3 pb-2.5 flex items-center justify-between">
-                            <span className="text-[10px] text-gray-400">
-                              {(newUpdateText[t.id] || '').length} حرف
-                            </span>
+                          <div className="px-3 pb-2.5 flex items-center justify-between gap-2">
+                            <label className="btn-outline text-xs py-1.5 px-3 cursor-pointer">
+                              <Paperclip size={12} /> إرفاق ملف
+                              <input
+                                type="file"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  setNewUpdateFiles(prev => ({ ...prev, [t.id]: [...(prev[t.id] || []), ...files] }));
+                                  e.currentTarget.value = '';
+                                }}
+                              />
+                            </label>
                             <button
                               onClick={() => sendTaskUpdate(t.id)}
-                              disabled={!newUpdateText[t.id]?.trim() || sendingUpdate === t.id}
+                              disabled={(!newUpdateText[t.id]?.trim() && !(newUpdateFiles[t.id] || []).length) || sendingUpdate === t.id}
                               className="btn-gold text-xs py-1.5 px-4 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                             >
                               {sendingUpdate === t.id ? (
