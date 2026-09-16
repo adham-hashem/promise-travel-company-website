@@ -256,7 +256,7 @@ function AppInner() {
       {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
       {currentPage === 'internal-groups' && canAccessPage('internal-groups') && <InternalGroups onNavigate={navigate} />}
       {currentPage === 'vip-trips' && canAccessPage('vip-trips') && <VIPTrips onNavigate={navigate} />}
-      {currentPage === 'vip-details' && canAccessPage('vip-details') && <VIPDetails tripId={selectedCustomerId} onNavigate={navigate} />}
+      {currentPage === 'vip-details' && canAccessPage('vip-details') && selectedCustomerId && <VIPDetails tripId={selectedCustomerId} onNavigate={navigate} />}
       {currentPage === 'quotation-form' && canAccessPage('quotation-form') && <QuotationForm />}
     </Layout></ErrorBoundary>
   );

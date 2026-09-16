@@ -294,6 +294,7 @@ export interface Booking {
   booking_number?: string;
   customers?: Customer;
   packages?: Package;
+  package?: Package;
   employees?: Employee;
 }
 
@@ -417,6 +418,7 @@ export type Page =
   | 'sales-portal'
   | 'travel-groups'
   | 'vip-dashboard'
+  | 'vip-trips'
   | 'vip-details'
   | 'internal-groups'
   | 'website'
@@ -734,7 +736,7 @@ export interface TravelGroupMember {
   customer_id: string;
   added_at: string;
   notes?: string;
-  rooming_type?: 'منفرد' | 'عائلة';
+  rooming_type?: 'منفرد' | 'عائلة' | 'عائلة - رئيس';
   family_id?: string;
   room_id?: string;
   gender?: 'ذكر' | 'أنثى';
@@ -762,7 +764,7 @@ export interface GroupRoom {
   id: string;
   group_id: string;
   room_number?: string;
-  room_type: 'ثنائي' | 'ثلاثي' | 'رباعي';
+  room_type: 'ثنائي' | 'ثلاثي' | 'رباعي' | 'عائلة';
   is_family: boolean;
   family_id?: string;
   gender?: 'رجال' | 'نساء' | 'عائلة';

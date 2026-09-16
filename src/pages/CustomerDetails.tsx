@@ -7,7 +7,7 @@ import {
   Eye, Download, Layers, Edit2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent } from '../types';
+import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent, DocType } from '../types';
 import DocumentsSection from '../components/DocumentsSection';
 import { getPackagePriceForCustomerRecord } from '../lib/packagePricing';
 
@@ -35,7 +35,7 @@ const commTypeColors: Record<CommType, string> = {
 
 interface Props {
   customerId?: string;
-  onNavigate: (page: Page) => void;
+  onNavigate: (page: Page, id?: string) => void;
 }
 
 interface FinSummary {
@@ -739,7 +739,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
             )}
             {/* Missing required docs */}
             {(() => {
-              const required = ['جواز سفر', 'بطاقة رقم قومي', 'صورة شخصية'];
+              const required = ['جواز سفر', 'بطاقة رقم قومي', 'صورة شخصية'] as DocType[];
               const uploaded = docs.map(d => d.doc_type);
               const missing = required.filter(r => !uploaded.includes(r));
               return missing.length > 0 ? (

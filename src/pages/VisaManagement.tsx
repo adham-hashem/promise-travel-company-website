@@ -473,7 +473,7 @@ export default function VisaManagement({ onNavigate }: Props) {
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => openVisa(v)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500" title="عرض التفاصيل"><Eye size={15} /></button>
-                          <button onClick={() => { if (window.confirm('هل أنت متأكد من حذف ملف التأشيرة هذا؟')) deleteVisa(v.id); }} className="p-1.5 hover:bg-red-50 rounded-lg text-red-500" title="حذف"><Trash2 size={15} /></button>
+                          <button onClick={() => { if (window.confirm('هل أنت متأكد من حذف ملف التأشيرة هذا؟')) deleteVisa(v); }} className="p-1.5 hover:bg-red-50 rounded-lg text-red-500" title="حذف"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>

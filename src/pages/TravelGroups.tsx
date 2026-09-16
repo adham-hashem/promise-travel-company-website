@@ -113,6 +113,7 @@ export default function TravelGroups({}: Props) {
   };
 
   const downloadGroupDocuments = async (type: 'visas' | 'tickets' | 'passports' | 'photos' | 'all') => {
+    if (!detailGroup) return;
     if (members.length === 0) {
       alert('لا يوجد أعضاء في هذا الفوج لتنزيل مستنداتهم.');
       return;
@@ -130,7 +131,7 @@ export default function TravelGroups({}: Props) {
       const promises: Promise<any>[] = [];
 
       if (type === 'visas' || type === 'all') {
-        promises.push(
+        promises.push(Promise.resolve(
           supabase
             .from('visa_management')
             .select('customer_id, visa_file_path, visa_file_name')
@@ -139,11 +140,11 @@ export default function TravelGroups({}: Props) {
               if (res.error) throw res.error;
               visas = res.data || [];
             })
-        );
+        ));
       }
 
       if (type === 'tickets' || type === 'all') {
-        promises.push(
+        promises.push(Promise.resolve(
           supabase
             .from('flight_tickets')
             .select('customer_id, ticket_file_path, ticket_file_name, created_at')
@@ -153,11 +154,11 @@ export default function TravelGroups({}: Props) {
               if (res.error) throw res.error;
               tickets = res.data || [];
             })
-        );
+        ));
       }
 
       if (type === 'passports' || type === 'photos' || type === 'all') {
-        promises.push(
+        promises.push(Promise.resolve(
           supabase
             .from('documents')
             .select('customer_id, file_path, file_name, doc_type, status, created_at')
@@ -166,7 +167,7 @@ export default function TravelGroups({}: Props) {
               if (res.error) throw res.error;
               docs = res.data || [];
             })
-        );
+        ));
       }
 
       await Promise.all(promises);

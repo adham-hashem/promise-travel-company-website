@@ -47,7 +47,7 @@ export default function TaskModal({ open, onClose, onSaved, employees, defaultEm
       setForm({
         title: editTask.title,
         description: editTask.description || '',
-        employee_id: editTask.employee_id,
+        employee_id: editTask.employee_id || '',
         priority: editTask.priority,
         status: editTask.status,
         start_date: editTask.start_date,

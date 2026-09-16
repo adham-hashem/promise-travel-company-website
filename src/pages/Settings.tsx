@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserProfile } from '../contexts/AuthContext';
 import type { Permissions, UserRole } from '../lib/permissions';
-import { getDefaultPermissions } from '../lib/permissions';
+import { getDefaultPermissions, getDefaultPagePermissions } from '../lib/permissions';
 
 const tabs = [
   { id: 'users', label: 'المستخدمون', icon: Users },
@@ -258,7 +258,6 @@ export default function Settings() {
   const openPermUser = (u: UserProfile) => {
     setSelectedPermUser(u);
     setPermUserPerms({ ...getDefaultPermissions(u.role), ...u.permissions });
-    setPermSaved(false);
   };
 
   const togglePermUserPerm = async (key: keyof Permissions) => {

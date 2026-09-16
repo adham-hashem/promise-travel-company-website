@@ -376,7 +376,13 @@ export default function SalesAgentPortal() {
     }));
 
     if (type === 'pdf') {
-      exportToPDF(data, isDrafts ? 'العملاء_المسودات' : 'العملاء_المرسلون_CRM', isDrafts ? 'قائمة مسودات العملاء - بوابة المندوب' : 'قائمة العملاء المرسلون لـ CRM - بوابة المندوب');
+      const headers = Object.keys(data[0] || {});
+      const rows = data.map((row) => headers.map((header) => String(row[header as keyof typeof row] || '')));
+      exportToPDF(
+        isDrafts ? 'قائمة مسودات العملاء - بوابة المندوب' : 'قائمة العملاء المرسلون لـ CRM - بوابة المندوب',
+        headers,
+        rows
+      );
     } else {
       exportToExcel(data, isDrafts ? 'العملاء_المسودات' : 'العملاء_المرسلون_CRM');
     }

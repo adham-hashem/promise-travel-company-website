@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Plane, Users, Calendar, ArrowLeft, Star, Clock, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { VIPTrip, Employee } from '../types';
+import type { VIPTrip, Employee, Page } from '../types';
 import { grantVipAccess } from '../lib/vipAccess';
 
 type AssignableVipEmployee = Employee & { status?: string };
 
 interface VIPTripsProps {
-  onNavigate: (page: string, params?: any) => void;
+  onNavigate: (page: Page, params?: any) => void;
 }
 
 export default function VIPTrips({ onNavigate }: VIPTripsProps) {

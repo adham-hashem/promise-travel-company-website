@@ -68,10 +68,11 @@ export async function ensureVipAccountingArtifacts(options: EnsureVipAccountingO
     if (bookingError) throw bookingError;
     bookingId = booking.id;
   } else {
+    const currentBooking = existingBooking!;
     const bookingUpdates: Record<string, unknown> = {};
-    if (assignedEmployeeId && !existingBooking.employee_id) bookingUpdates.employee_id = assignedEmployeeId;
-    if (totalAmount > 0 && Number(existingBooking.total_amount || 0) === 0) bookingUpdates.total_amount = totalAmount;
-    if (options.departureDate && !existingBooking.travel_date) bookingUpdates.travel_date = options.departureDate;
+    if (assignedEmployeeId && !currentBooking.employee_id) bookingUpdates.employee_id = assignedEmployeeId;
+    if (totalAmount > 0 && Number(currentBooking.total_amount || 0) === 0) bookingUpdates.total_amount = totalAmount;
+    if (options.departureDate && !currentBooking.travel_date) bookingUpdates.travel_date = options.departureDate;
 
     if (Object.keys(bookingUpdates).length > 0) {
       const { error: bookingUpdateError } = await supabase

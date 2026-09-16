@@ -241,7 +241,7 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
     (custRes.data as Array<{ id: string; name: string; client_code: string | null; phone: string }> || []).forEach((c) => {
       results.push({ id: c.id, label: c.name, sub: c.client_code || c.phone, type: 'customer' });
     });
-    (invRes.data as Array<{ id: string; invoice_number: string; customer: { name: string } | null }> || []).forEach((inv) => {
+    (invRes.data as unknown as Array<{ id: string; invoice_number: string; customer: { name: string } | null }> || []).forEach((inv) => {
       results.push({ id: inv.id, label: inv.invoice_number, sub: inv.customer?.name || 'فاتورة', type: 'invoice' });
     });
     (opRes.data as unknown as Array<{ id: string; op_number: string; customer: { name: string; client_code: string | null } | null }> || []).forEach((op) => {

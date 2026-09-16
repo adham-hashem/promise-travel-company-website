@@ -39,7 +39,7 @@ export default function Dashboard() {
       ]);
 
       const customers = (custRes.data as Array<{ status: string; created_at: string; source: string | null; service_type: string | null }>) || [];
-      const bookings = (bookRes.data as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; num_travelers?: number; package: { name: string; cost_price: number | null } | null }>) || [];
+      const bookings = (bookRes.data as unknown as Array<{ status: string; total_amount: number | null; booking_date: string; package_id: string | null; payment_status: string; num_travelers?: number; package: { name: string; cost_price: number | null } | null }>) || [];
       const expenses = (expRes.data as Array<{ amount: number; expense_date: string; category: string }>) || [];
       const payments = (payRes.data as Array<{ amount: number; status: string; approval_status?: string; payment_date: string }>) || [];
 

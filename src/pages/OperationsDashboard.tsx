@@ -23,6 +23,7 @@ interface OpDoc {
 
 interface OpFile {
   id: string;
+  customer_id?: string | null;
   op_number: string | null;
   file_status: string;
   travel_date: string | null;
@@ -36,6 +37,7 @@ interface OpFile {
   priority?: string;
   pax_count?: number;
   special_requests?: string | null;
+  is_archived?: boolean;
   created_at: string;
   customer: { id: string; name: string; client_code: string | null; phone: string; email: string | null; documents_status: string | null; service_type?: string | null; packages?: any | null } | null;
   booking: { id: string; status: string; payment_status: string; total_amount: number | null; paid_amount: number | null; package_name: string | null; source: string | null; destination: string | null; pax_count: number | null } | null;
@@ -535,7 +537,7 @@ export default function OperationsDashboard({ onNavigate }: Props) {
     setOpDocs(opDocs.filter((d) => d.id !== doc.id));
   };
 
-  const activeStages = selected ? getWorkflowStages(selected.customer?.service_type) : workflowStages;
+  const activeStages = selected ? getWorkflowStages(selected.customer?.service_type || undefined) : workflowStages;
   const currentStageIndex = selected ? activeStages.findIndex((s) => s.key === (selected.workflow_stage || 'new')) : 0;
 
   return (

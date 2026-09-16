@@ -55,7 +55,7 @@ export default function InternalGroups({}: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<TravelGroup | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
-  const [groupType, setGroupType] = useState<'internal'>('internal');
+  const [groupType, setGroupType] = useState<'internal' | 'package'>('internal');
   const [saving, setSaving] = useState(false);
 
   // ── group detail panel ──

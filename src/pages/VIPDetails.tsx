@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import JSZip from 'jszip';
 import { 
   ArrowLeft, Star, Users, DollarSign, Briefcase, Clock, 
-  Plane, Calendar, Plus, Upload, CheckCircle2, AlertCircle, FileText, Save, Trash2
+  Plane, Calendar, Plus, Upload, CheckCircle2, AlertCircle, FileText, Save, Trash2, Download
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { compressImage } from '../lib/imageCompressor';
 import { ensureVipAccountingArtifacts } from '../lib/vipAccounting';
-import type { VIPTrip, Customer, VIPTripLog } from '../types';
+import type { VIPTrip, Customer, VIPTripLog, Page } from '../types';
 
 interface VIPDetailsProps {
   tripId: string;
-  onNavigate: (page: string, params?: any) => void;
+  onNavigate: (page: Page, params?: any) => void;
 }
 
 interface VipBookingRow {
@@ -46,6 +47,7 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'info'|'customers'|'financial'|'execution'|'logs'>('info');
   const [uploadingItemFile, setUploadingItemFile] = useState<string | null>(null);
+  const [bundlingFiles, setBundlingFiles] = useState(false);
 
   // Customer Add Form State
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -525,6 +527,265 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
   const getCustomerPaid = (customerId: string) => vipPayments
     .filter((payment) => payment.customer_id === customerId && payment.status !== 'غير مدفوع')
     .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const getFileExtension = (fileName?: string, filePath?: string) => {
+    const source = fileName || filePath || '';
+    const cleanSource = source.split('?')[0];
+    const ext = cleanSource.includes('.') ? cleanSource.split('.').pop() : '';
+    return (ext || 'bin').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'bin';
+  };
+
+  const sanitizeZipName = (value: string) => value
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim() || 'بدون اسم';
+
+  const classifyDocument = (docType?: string) => {
+    const type = docType || 'مستند';
+    if (type.includes('تأش')) return { folder: 'التأشيرات', label: 'تأشيرة' };
+    if (type.includes('طيران') || type.includes('تذكرة')) return { folder: 'الطيران', label: 'تذكرة طيران' };
+    if (type.includes('فندق')) return { folder: 'الفنادق', label: 'حجز فندق' };
+    if (type.includes('قطار')) return { folder: 'القطار', label: 'تذكرة قطار' };
+    if (type.includes('نقل')) return { folder: 'النقل', label: 'حجز النقل' };
+    return { folder: 'مستندات أخرى', label: type };
+  };
+
+  const getExecutionDocumentInfo = (itemId: string, itemTitle: string) => {
+    if (itemId === 'flight') return { folder: 'الطيران', label: 'تذكرة طيران' };
+    if (itemId === 'hotel_makkah' || itemId === 'hotel_madinah') return { folder: 'الفنادق', label: `حجز ${itemTitle}` };
+    if (itemId === 'train') return { folder: 'القطار', label: 'تذكرة قطار' };
+    if (itemId === 'transport') return { folder: 'النقل', label: 'حجز النقل' };
+    if (itemId === 'visa') return { folder: 'التأشيرات', label: 'تأشيرة' };
+    return { folder: 'مستندات أخرى', label: itemTitle };
+  };
+
+  const buildStorageUrl = (filePath?: string, fileUrl?: string) => {
+    if (fileUrl) return fileUrl;
+    if (!filePath) return '';
+    return supabase.storage.from('documents').getPublicUrl(filePath).data.publicUrl;
+  };
+
+  const addUniqueFileName = (usedNames: Map<string, number>, folder: string, baseName: string, ext: string) => {
+    const cleanBase = sanitizeZipName(baseName);
+    const key = `${folder}/${cleanBase}.${ext}`.toLowerCase();
+    const count = usedNames.get(key) || 0;
+    usedNames.set(key, count + 1);
+    return count === 0 ? `${cleanBase}.${ext}` : `${cleanBase} (${count + 1}).${ext}`;
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBundleTripFiles = async () => {
+    if (!trip) return;
+    if (customers.length === 0) {
+      alert('لا يوجد عملاء داخل هذه الرحلة لتجميع ملفاتهم.');
+      return;
+    }
+
+    setBundlingFiles(true);
+    try {
+      const customerIds = customers.map((customer) => customer.id);
+      const customerNames = new Map(customers.map((customer) => [customer.id, customer.name]));
+
+      const [documentsRes, visasRes, ticketsRes, operationFilesRes] = await Promise.all([
+        supabase
+          .from('documents')
+          .select('id, customer_id, doc_type, file_path, file_url, file_name')
+          .in('customer_id', customerIds),
+        supabase
+          .from('visa_management')
+          .select('id, customer_id, visa_file_path, visa_file_name')
+          .in('customer_id', customerIds)
+          .not('visa_file_path', 'is', null),
+        supabase
+          .from('flight_tickets')
+          .select('id, customer_id, ticket_file_path, ticket_file_name')
+          .in('customer_id', customerIds)
+          .not('ticket_file_path', 'is', null),
+        supabase
+          .from('operation_files')
+          .select('id, customer_id')
+          .in('customer_id', customerIds),
+      ]);
+
+      if (documentsRes.error) throw documentsRes.error;
+      if (visasRes.error) throw visasRes.error;
+      if (ticketsRes.error) throw ticketsRes.error;
+      if (operationFilesRes.error) throw operationFilesRes.error;
+
+      const visaIds = ((visasRes.data || []) as any[]).map((visa) => visa.id);
+      const operationFiles = ((operationFilesRes.data || []) as any[]);
+      const operationFileIds = operationFiles.map((file) => file.id);
+      const operationFileCustomers = new Map(operationFiles.map((file) => [file.id, file.customer_id]));
+
+      const [visaDocumentsRes, operationDocumentsRes] = await Promise.all([
+        visaIds.length > 0
+          ? supabase
+            .from('visa_documents')
+            .select('id, visa_id, doc_type, file_path, file_name')
+            .in('visa_id', visaIds)
+          : Promise.resolve({ data: [], error: null }),
+        operationFileIds.length > 0
+          ? supabase
+            .from('operation_file_documents')
+            .select('id, operation_file_id, doc_type, file_path, file_name')
+            .in('operation_file_id', operationFileIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (visaDocumentsRes.error) throw visaDocumentsRes.error;
+      if (operationDocumentsRes.error) throw operationDocumentsRes.error;
+
+      const files: Array<{
+        folder: string;
+        label: string;
+        ownerName: string;
+        filePath?: string;
+        fileUrl?: string;
+        originalName?: string;
+      }> = [];
+
+      ((documentsRes.data || []) as any[]).forEach((doc) => {
+        if (!doc.file_path && !doc.file_url) return;
+        const customerName = customerNames.get(doc.customer_id);
+        if (!customerName) return;
+        const info = classifyDocument(doc.doc_type);
+        files.push({
+          ...info,
+          ownerName: customerName,
+          filePath: doc.file_path,
+          fileUrl: doc.file_url,
+          originalName: doc.file_name,
+        });
+      });
+
+      const visaCustomers = new Map(((visasRes.data || []) as any[]).map((visa) => [visa.id, visa.customer_id]));
+      ((visaDocumentsRes.data || []) as any[]).forEach((doc) => {
+        if (!doc.file_path) return;
+        const customerId = visaCustomers.get(doc.visa_id);
+        const customerName = customerId ? customerNames.get(customerId) : null;
+        if (!customerName) return;
+        const info = classifyDocument(doc.doc_type);
+        files.push({
+          ...info,
+          ownerName: customerName,
+          filePath: doc.file_path,
+          originalName: doc.file_name,
+        });
+      });
+
+      ((operationDocumentsRes.data || []) as any[]).forEach((doc) => {
+        if (!doc.file_path) return;
+        const customerId = operationFileCustomers.get(doc.operation_file_id);
+        const customerName = customerId ? customerNames.get(customerId) : null;
+        if (!customerName) return;
+        const info = classifyDocument(doc.doc_type);
+        files.push({
+          ...info,
+          ownerName: customerName,
+          filePath: doc.file_path,
+          originalName: doc.file_name,
+        });
+      });
+
+      ((visasRes.data || []) as any[]).forEach((visa) => {
+        const customerName = customerNames.get(visa.customer_id);
+        if (!customerName || !visa.visa_file_path) return;
+        files.push({
+          folder: 'التأشيرات',
+          label: 'تأشيرة',
+          ownerName: customerName,
+          filePath: visa.visa_file_path,
+          originalName: visa.visa_file_name,
+        });
+      });
+
+      ((ticketsRes.data || []) as any[]).forEach((ticket) => {
+        const customerName = customerNames.get(ticket.customer_id);
+        if (!customerName || !ticket.ticket_file_path) return;
+        files.push({
+          folder: 'الطيران',
+          label: 'تذكرة طيران',
+          ownerName: customerName,
+          filePath: ticket.ticket_file_path,
+          originalName: ticket.ticket_file_name,
+        });
+      });
+
+      executionItems.forEach((item) => {
+        const itemData = trip.execution_details?.[item.id];
+        const fileUrl = itemData?.file_url as string | undefined;
+        if (!fileUrl) return;
+        const info = getExecutionDocumentInfo(item.id, item.title);
+        files.push({
+          ...info,
+          ownerName: trip.name || `VIP-${trip.trip_number}`,
+          fileUrl,
+          originalName: itemData?.file_name,
+        });
+      });
+
+      if (files.length === 0) {
+        alert('لا توجد ملفات مرفوعة فعليًا داخل هذه الرحلة حتى الآن.');
+        return;
+      }
+
+      const zip = new JSZip();
+      const usedNames = new Map<string, number>();
+      let addedFiles = 0;
+
+      for (const file of files) {
+        const url = buildStorageUrl(file.filePath, file.fileUrl);
+        if (!url) continue;
+
+        const response = await fetch(url);
+        if (!response.ok) continue;
+
+        const blob = await response.blob();
+        const ext = getFileExtension(file.originalName, file.filePath || file.fileUrl);
+        const folder = sanitizeZipName(file.folder);
+        const fileName = addUniqueFileName(
+          usedNames,
+          folder,
+          `${file.label} - ${file.ownerName}`,
+          ext
+        );
+
+        zip.folder(folder)?.file(fileName, blob);
+        addedFiles += 1;
+      }
+
+      if (addedFiles === 0) {
+        alert('تعذر تحميل الملفات المرفوعة. تأكد من صلاحيات الوصول للملفات ثم حاول مرة أخرى.');
+        return;
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const tripLabel = trip.name || `VIP-${trip.trip_number}`;
+      downloadBlob(zipBlob, `رحلة VIP - ${sanitizeZipName(tripLabel)}.zip`);
+
+      await supabase.from('vip_trip_logs').insert({
+        trip_id: tripId,
+        user_id: profile?.id,
+        action: 'تجميع ملفات الرحلة',
+        details: `تم إنشاء ملف ZIP يحتوي على ${addedFiles} ملف مرفوع فعليًا`,
+      });
+      loadTripDetails();
+    } catch (err: any) {
+      alert('فشل تجميع ملفات الرحلة: ' + (err?.message || 'حدث خطأ غير متوقع'));
+    } finally {
+      setBundlingFiles(false);
+    }
+  };
+
   const detailedTotal = customers.reduce((sum, customer) => sum + Number(pricingDrafts[customer.id] || getCustomerBooking(customer.id)?.total_amount || 0), 0);
   const paidTotal = customers.reduce((sum, customer) => sum + getCustomerPaid(customer.id), 0);
   const remainingTotal = Math.max(0, detailedTotal - paidTotal);
@@ -847,11 +1108,15 @@ export default function VIPDetails({ tripId, onNavigate }: VIPDetailsProps) {
                 >
                   <CheckCircle2 size={16} /> {operating ? 'جارٍ التشغيل...' : 'تشغيل الملف'}
                 </button>
-                {trip.progress_percentage === 100 && (
-                  <button className="btn-gold flex items-center gap-2 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 border-emerald-700 text-white">
-                    <Upload size={16} /> تجميع ملفات الرحلة (ZIP)
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleBundleTripFiles}
+                  disabled={bundlingFiles}
+                  className="btn-gold flex items-center gap-2 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 border-emerald-700 text-white disabled:opacity-60"
+                >
+                  {bundlingFiles ? <Clock size={16} className="animate-spin" /> : <Download size={16} />}
+                  {bundlingFiles ? 'جارٍ تجميع الملفات...' : 'تجميع ملفات الرحلة'}
+                </button>
               </div>
             </div>
 
