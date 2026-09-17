@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Filter, Eye, Phone, Hash, Globe, ArrowRightLeft, Trash2, Undo2, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Customer, CustomerStatus, Page } from '../types';
 
@@ -29,6 +30,7 @@ interface CustomerWithOpFile extends Customer {
 export default function Customers({ onNavigate, searchValue }: Props) {
   const [customers, setCustomers] = useState<CustomerWithOpFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const { profile } = useAuth();
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'الكل'>('الكل');
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
@@ -44,12 +46,22 @@ export default function Customers({ onNavigate, searchValue }: Props) {
         
       if (data) {
         data = data.filter(c => !c.source || !c.source.startsWith('مسودة:'));
+        
+        // Privacy filter
+        if (profile?.role === 'مندوب مبيعات') {
+          data = data.filter(c => c.assigned_employee_id === profile.id);
+        } else if (profile?.role === 'قائد فريق المبيعات') {
+          // get team members
+          const { data: teamRelations } = await supabase.from('sales_teams').select('member_id').eq('leader_id', profile.id);
+          const memberIds = teamRelations ? teamRelations.map(r => r.member_id) : [];
+          data = data.filter(c => c.assigned_employee_id === profile.id || memberIds.includes(c.assigned_employee_id) || c.is_transferred_to_admin);
+        }
       }
       setCustomers((data as CustomerWithOpFile[]) || []);
       setLoading(false);
     }
-    load();
-  }, []);
+    if (profile) load();
+  }, [profile]);
   const handleExportExcel = () => {
     const data = filtered.map(c => ({
       'الكود': c.client_code || '—',
@@ -86,6 +98,48 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     const matchStatus = statusFilter === 'الكل' || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const handleTransferToAdmin = async (customerId) => {
+    if (!confirm('هل أنت متأكد من تحويل هذا العميل إلى CRM العام؟ لن تفقد بياناته ولكن سيصبح متاحاً للإدارة المركزية.')) return;
+    
+    try {
+      await supabase.from('customers').update({
+        is_transferred_to_admin: true,
+        transferred_to_admin_by: profile?.id,
+        transferred_to_admin_at: new Date().toISOString()
+      }).eq('id', customerId);
+      
+      // Audit log
+      await supabase.from('audit_logs').insert({
+        actor_id: profile?.id,
+        action: 'تحويل عميل لـ CRM العام',
+        entity_type: 'customer',
+        entity_id: customerId,
+        new_data: { is_transferred_to_admin: true }
+      });
+      
+      alert('تم تحويل العميل بنجاح');
+      
+      // refresh
+      const { data } = await supabase
+        .from('customers')
+        .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
+        .eq('is_vip', false)
+        .order('created_at', { ascending: false });
+      
+      let filteredData = data ? data.filter(c => !c.source || !c.source.startsWith('مسودة:')) : [];
+      if (profile?.role === 'قائد فريق المبيعات') {
+        const { data: teamRelations } = await supabase.from('sales_teams').select('member_id').eq('leader_id', profile.id);
+        const memberIds = teamRelations ? teamRelations.map(r => r.member_id) : [];
+        filteredData = filteredData.filter(c => c.assigned_employee_id === profile.id || memberIds.includes(c.assigned_employee_id) || c.is_transferred_to_admin);
+      }
+      setCustomers(filteredData as any);
+      
+    } catch (e) {
+      console.error(e);
+      alert('حدث خطأ أثناء التحويل');
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;

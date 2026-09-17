@@ -250,6 +250,7 @@ export default function AddCustomer({ onNavigate }: Props) {
           is_vip: isVip,
           client_type: form.client_type,
           age_group: form.age_group,
+          travel_interest_month: form.travel_interest_month || null,
         })
         .select('id, client_code')
         .single();

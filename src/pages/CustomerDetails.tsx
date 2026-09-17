@@ -7,6 +7,7 @@ import {
   Eye, Download, Layers, Edit2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Customer, CommunicationLog, CustomerStatus, CommType, Page, Booking, Invoice, Payment, DocumentRecord, OperationFile, TimelineEvent, TravelChecklist as ChecklistType, WorkflowTimelineEvent, DocType } from '../types';
 import DocumentsSection from '../components/DocumentsSection';
 import { getPackagePriceForCustomerRecord } from '../lib/packagePricing';
@@ -46,6 +47,7 @@ interface FinSummary {
 }
 
 export default function CustomerDetails({ customerId, onNavigate }: Props) {
+  const { profile } = useAuth();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [logs, setLogs] = useState<CommunicationLog[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -87,6 +89,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
     birth_date: '',
     age_group: 'بالغ' as 'بالغ' | 'طفل' | 'رضيع',
     client_type: 'فردي' as 'فردي' | 'فوج',
+    travel_interest_month: '',
   });
 
   const handleOpenEditModal = () => {
@@ -100,6 +103,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
       birth_date: customer.birth_date || '',
       age_group: customer.age_group || 'بالغ',
       client_type: customer.client_type || 'فردي',
+      travel_interest_month: customer.travel_interest_month || '',
     });
     setShowEditCustomerModal(true);
   };
@@ -121,6 +125,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
         birth_date: editCustomerForm.birth_date || null,
         age_group: editCustomerForm.age_group,
         client_type: editCustomerForm.client_type,
+        travel_interest_month: editCustomerForm.travel_interest_month || null,
       }).eq('id', customer.id);
       if (saveErr) throw saveErr;
       

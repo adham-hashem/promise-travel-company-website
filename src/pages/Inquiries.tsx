@@ -511,7 +511,18 @@ export default function Inquiries() {
       supabase.from('inquiries').select('*, employees(id, name)').order('created_at', { ascending: false }),
       supabase.from('employees').select('id, name, role').eq('is_active', true),
     ]);
-    setInquiries((inqRes.data as Inquiry[]) || []);
+    
+    let data = (inqRes.data as Inquiry[]) || [];
+    
+    if (profile?.role === 'مندوب مبيعات') {
+      data = data.filter(c => c.assigned_employee_id === profile.id);
+    } else if (profile?.role === 'قائد فريق المبيعات') {
+      const { data: teamRelations } = await supabase.from('sales_teams').select('member_id').eq('leader_id', profile.id);
+      const memberIds = teamRelations ? teamRelations.map(r => r.member_id) : [];
+      data = data.filter(c => c.assigned_employee_id === profile.id || memberIds.includes(c.assigned_employee_id));
+    }
+    
+    setInquiries(data);
     setEmployees((empRes.data as unknown as Employee[]) ?? []);
     setLoading(false);
   };

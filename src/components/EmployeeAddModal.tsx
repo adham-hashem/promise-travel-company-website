@@ -54,6 +54,16 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
   const [error, setError] = useState('');
   const [showPerms, setShowPerms] = useState(false);
   const [showPages, setShowPages] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [allSalesReps, setAllSalesReps] = useState<{id: string, name: string}[]>([]);
+
+  useEffect(() => {
+    if (form.role === 'قائد فريق المبيعات') {
+      supabase.from('employees').select('id, name').in('role', ['مندوب مبيعات', 'قائد فريق المبيعات']).eq('is_active', true)
+        .then(({ data }) => { if (data) setAllSalesReps(data); });
+    }
+  }, [form.role]);
+
 
   useEffect(() => {
     if (!open) return;
@@ -81,7 +91,13 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
           if (data) {
             const hasCustomPerms = data.permissions && Object.keys(data.permissions).length > 0;
             const hasCustomPages = data.page_permissions && Object.keys(data.page_permissions).length > 0;
-            setForm(prev => ({
+            if (role === 'قائد فريق المبيعات') {
+            supabase.from('sales_teams').select('member_id').eq('leader_id', editEmployee.id)
+              .then(({ data: teamData }) => {
+                if (teamData) setTeamMembers(teamData.map(t => t.member_id));
+              });
+          }
+          setForm(prev => ({
               ...prev,
               permissions: hasCustomPerms ? data.permissions : prev.permissions,
               page_permissions: hasCustomPages ? data.page_permissions : prev.page_permissions,

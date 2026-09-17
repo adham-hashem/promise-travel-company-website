@@ -87,6 +87,7 @@ const NAV_SECTIONS: NavSection[] = [
     icon: Package,
     anyPermission: ['bookings_view', 'packages_view', 'offers_view', 'hotels_view'],
     items: [
+      { id: 'sales-team', label: 'فريق المبيعات', icon: Users },
       { id: 'bookings', label: 'الحجوزات', icon: CalendarCheck, permissionKey: 'bookings_view' },
       { id: 'visa', label: 'إدارة التأشيرات', icon: Plane, permissionKey: 'bookings_view' },
       { id: 'packages', label: 'الباقات', icon: Package, permissionKey: 'packages_view' },

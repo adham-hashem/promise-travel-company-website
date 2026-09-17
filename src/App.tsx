@@ -35,6 +35,7 @@ import FlightTickets from './pages/FlightTickets';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import ApprovalRequests from './pages/ApprovalRequests';
 import SalesAgentPortal from './pages/SalesAgentPortal';
+import SalesTeamCRM from './pages/SalesTeamCRM';
 import TravelGroups from './pages/TravelGroups';
 import InternalGroups from './pages/InternalGroups';
 import VIPTrips from './pages/VIPTrips';
@@ -253,6 +254,7 @@ function AppInner() {
       {currentPage === 'visa' && canAccessPage('visa') && <VisaManagement onNavigate={navigate} />}
       {currentPage === 'flight-tickets' && canAccessPage('flight-tickets') && <FlightTickets onNavigate={navigate} />}
       {currentPage === 'sales-portal' && canAccessPage('sales-portal') && <SalesAgentPortal />}
+      {currentPage === 'sales-team' && canAccessPage('sales-team') && <SalesTeamCRM />}
       {currentPage === 'travel-groups' && canAccessPage('travel-groups') && <TravelGroups onNavigate={navigate} />}
       {currentPage === 'internal-groups' && canAccessPage('internal-groups') && <InternalGroups onNavigate={navigate} />}
       {currentPage === 'vip-trips' && canAccessPage('vip-trips') && <VIPTrips onNavigate={navigate} />}

@@ -102,7 +102,8 @@ export type PageKey =
   | 'vip-dashboard'
   | 'vip-details'
   | 'internal-groups'
-  | 'quotation-form';
+  | 'quotation-form'
+  | 'sales-team';
 
 export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'dashboard', label: 'لوحة التحكم', group: 'الرئيسية' },
@@ -136,6 +137,7 @@ export const ALL_PAGES: { key: PageKey; label: string; group: string }[] = [
   { key: 'vip-dashboard', label: 'لوحة عملاء VIP', group: 'إدارة المبيعات والأعمال' },
   { key: 'vip-details', label: 'تفاصيل عميل VIP', group: 'إدارة المبيعات والأعمال' },
   { key: 'quotation-form', label: 'طلب عرض سعر', group: 'أوامر الطباعة' },
+  { key: 'sales-team', label: 'فريق المبيعات', group: 'إدارة المبيعات والأعمال' },
 ];
 
 export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
@@ -274,6 +276,21 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
     inquiries_view: false, inquiries_add: false, inquiries_edit: false, inquiries_delete: false,
     vip_management_access: false,
   },
+  'قائد فريق المبيعات': {
+    customers_view: true, customers_add: true, customers_edit: true, customers_delete: false,
+    bookings_view: true, bookings_add: true, bookings_edit: true, bookings_delete: false,
+    packages_view: true, packages_add: true, packages_edit: true, packages_delete: false,
+    offers_view: true, offers_add: true, offers_edit: true, offers_delete: false,
+    employees_view: true, employees_add: true, employees_edit: true, employees_delete: false,
+    reports_view: true, reports_export_pdf: true, reports_export_excel: true,
+    settings_access: false, settings_edit: false,
+    accounting_revenue: true, accounting_payments: false, accounting_installments: true, accounting_expenses: false, accounting_commissions: true,
+    documents_upload: true, documents_review: false, documents_view: true, operations_access: true, operations_edit: false, operations_delete: false,
+    hotels_view: true, hotels_add: true, hotels_edit: true, hotels_delete: false,
+    invoices_view: true, invoices_add: true, invoices_edit: true, invoices_delete: false,
+    inquiries_view: true, inquiries_add: true, inquiries_edit: true, inquiries_delete: true,
+    vip_management_access: false,
+  },
 };
 
 export function getDefaultPermissions(role: string): Permissions {
@@ -324,7 +341,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['packages'] = true;
     pages['offers'] = true;
     pages['hotels'] = true;
-  } else if (role === 'مدير المبيعات') {
+  } else if (role === 'مدير المبيعات' || role === 'قائد فريق المبيعات') {
     pages['inquiries'] = true;
     pages['customers'] = true;
     pages['quotation-form'] = true;
@@ -332,6 +349,9 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['packages'] = true;
     pages['offers'] = true;
     pages['employees'] = true;
+    if (role === 'قائد فريق المبيعات') {
+      pages['sales-team'] = true;
+    }
   } else {
     pages['inquiries'] = true;
     pages['customers'] = true;

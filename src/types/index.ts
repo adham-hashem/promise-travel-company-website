@@ -214,8 +214,16 @@ export interface Customer {
   employees?: Employee;
   is_vip?: boolean;
   client_type?: 'فردي' | 'فوج';
+  travel_interest_month?: string | null;
+  is_transferred_to_admin?: boolean;
+  transferred_to_admin_by?: string | null;
+  transferred_to_admin_at?: string | null;
   parent_customer_id?: string;
   age_group?: 'بالغ' | 'طفل' | 'رضيع';
+  travel_interest_month?: string;
+  is_transferred_to_admin?: boolean;
+  transferred_to_admin_by?: string;
+  transferred_to_admin_at?: string;
 }
 
 export interface VipRequest {
@@ -424,7 +432,8 @@ export type Page =
   | 'vip-details'
   | 'internal-groups'
   | 'website'
-  | 'quotation-form';
+  | 'quotation-form'
+  | 'sales-team';
 
 // ===== Accounting types =====
 export type PaymentMethod = 'كاش' | 'تحويل بنكي' | 'فودافون كاش' | 'أقساط';
@@ -800,3 +809,25 @@ export interface VIPTripLog {
   created_at: string;
   user?: Employee;
 }
+
+export interface SalesTeam {
+  id: string;
+  leader_id: string;
+  member_id: string;
+  created_at: string;
+  member?: Employee;
+  leader?: Employee;
+}
+
+export interface AuditLog {
+  id: string;
+  actor_id?: string;
+  action: string;
+  entity_type: string;
+  entity_id?: string;
+  old_data?: any;
+  new_data?: any;
+  created_at: string;
+  actor?: Employee;
+}
+
