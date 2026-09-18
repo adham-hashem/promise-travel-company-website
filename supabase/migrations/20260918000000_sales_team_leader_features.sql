@@ -14,7 +14,7 @@ CREATE POLICY "Enable all for authenticated users" ON public.sales_teams FOR ALL
 
 -- 2. Add columns to customers table
 ALTER TABLE public.customers 
-ADD COLUMN IF NOT EXISTS travel_interest_month VARCHAR(255),
+ADD COLUMN IF NOT EXISTS travel_interest_month VARCHAR(7),
 ADD COLUMN IF NOT EXISTS is_transferred_to_admin BOOLEAN DEFAULT false,
 ADD COLUMN IF NOT EXISTS transferred_to_admin_by UUID REFERENCES public.employees(id) ON DELETE SET NULL,
 ADD COLUMN IF NOT EXISTS transferred_to_admin_at TIMESTAMPTZ;
@@ -35,3 +35,15 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable read for authenticated users" ON public.audit_logs FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Enable insert for authenticated users" ON public.audit_logs FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- Keep employee roles compatible with the independent team-leader role.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'employees_role_check') THEN
+    ALTER TABLE public.employees DROP CONSTRAINT employees_role_check;
+  END IF;
+  ALTER TABLE public.employees ADD CONSTRAINT employees_role_check CHECK (
+    role IN ('super_admin','مالك النظام','مدير النظام','إضافة عملاء','مدير المبيعات','قائد فريق المبيعات','مندوب مبيعات','محاسب','موظف التشغيل','مسؤول طيران')
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

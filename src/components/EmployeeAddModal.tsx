@@ -15,7 +15,7 @@ import type { Employee } from '../types';
 
 type Role = UserRole | 'مدير النظام';
 
-const allRoles: Role[] = ['super_admin', 'مالك النظام', 'مدير النظام', 'إضافة عملاء', 'مدير المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
+const allRoles: Role[] = ['super_admin', 'مالك النظام', 'مدير النظام', 'إضافة عملاء', 'مدير المبيعات', 'قائد فريق المبيعات', 'مندوب مبيعات', 'محاسب', 'موظف التشغيل', 'مسؤول طيران'];
 
 interface Props {
   open: boolean;
@@ -106,6 +106,7 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         });
     } else {
       setIsEdit(false);
+      setTeamMembers([]);
       setForm(emptyForm());
     }
   }, [open, editEmployee]);
@@ -176,6 +177,17 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
 
       if (e2) console.warn('Profile update skipped:', e2.message);
 
+      if (form.role === 'قائد فريق المبيعات') {
+        const { error: teamDeleteError } = await supabase.from('sales_teams').delete().eq('leader_id', editEmployee.id);
+        if (teamDeleteError) { setError(teamDeleteError.message); setSaving(false); return; }
+        if (teamMembers.length) {
+          const { error: teamInsertError } = await supabase.from('sales_teams').insert(teamMembers.map(member_id => ({ leader_id: editEmployee.id, member_id })));
+          if (teamInsertError) { setError(teamInsertError.message); setSaving(false); return; }
+        }
+      } else {
+        await supabase.from('sales_teams').delete().eq('leader_id', editEmployee.id);
+      }
+
       // If password field is filled, update password via RPC
       if (form.password) {
         const { error: pwdErr } = await supabase.rpc('change_user_password', {
@@ -226,6 +238,11 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
         setError(e3.message);
         setSaving(false);
         return;
+      }
+
+      if (form.role === 'قائد فريق المبيعات' && teamMembers.length) {
+        const { error: teamInsertError } = await supabase.from('sales_teams').insert(teamMembers.map(member_id => ({ leader_id: newId, member_id })));
+        if (teamInsertError) { setError(teamInsertError.message); setSaving(false); return; }
       }
 
       setSaving(false);
@@ -340,6 +357,16 @@ export default function EmployeeAddModal({ open, onClose, onSaved, editEmployee 
                   <option value="غير نشط">غير نشط</option>
                 </select>
               </div>
+
+              {form.role === 'قائد فريق المبيعات' && (
+                <div className="col-span-2 rounded-xl border border-gold-200 bg-gold-50 p-4">
+                  <label className="form-label">أعضاء فريق المبيعات</label>
+                  <p className="text-xs text-gray-500 mb-2">اختر موظفي المبيعات التابعين لهذا القائد</p>
+                  <select multiple value={teamMembers} onChange={e => setTeamMembers(Array.from(e.target.selectedOptions, option => option.value))} className="form-input min-h-32">
+                    {allSalesReps.map(rep => <option key={rep.id} value={rep.id}>{rep.name}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Custom Page Access Selection */}
               <div className="col-span-2">

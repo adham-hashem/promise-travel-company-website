@@ -687,6 +687,10 @@ export default function AddCustomer({ onNavigate }: Props) {
                 {sources.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            <div>
+              <label className="form-label">شهر الاهتمام بالسفر</label>
+              <input type="month" value={form.travel_interest_month || ''} onChange={(e) => update('travel_interest_month', e.target.value)} className="form-input" dir="ltr" />
+            </div>
           </div>
 
           <div>

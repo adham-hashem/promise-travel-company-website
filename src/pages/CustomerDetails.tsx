@@ -1402,6 +1402,11 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
                 </div>
               </div>
 
+              <div>
+                <label className="form-label font-bold text-navy-900 text-xs">شهر الاهتمام بالسفر:</label>
+                <input type="month" value={editCustomerForm.travel_interest_month || ''} onChange={(e) => setEditCustomerForm({ ...editCustomerForm, travel_interest_month: e.target.value })} className="form-input text-xs" dir="ltr" />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="form-label font-bold text-navy-900 text-xs">تاريخ الميلاد:</label>
