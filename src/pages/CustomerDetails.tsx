@@ -131,7 +131,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
       
       alert('✔ تم حفظ التعديلات بنجاح.');
       setShowEditCustomerModal(false);
-      const { data } = await supabase.from('customers').select('*, packages(*), employees(*)').eq('id', customer.id).maybeSingle();
+      const { data } = await supabase.from('customers').select('*, packages(*), employees!customers_assigned_employee_id_fkey(*)').eq('id', customer.id).maybeSingle();
       if (data) setCustomer(data as Customer);
     } catch (err: any) {
       alert('❌ فشل حفظ التعديلات: ' + err.message);
@@ -225,7 +225,7 @@ export default function CustomerDetails({ customerId, onNavigate }: Props) {
     async function load() {
       if (!customerId) { setLoading(false); return; }
       const [custRes, logsRes] = await Promise.all([
-        supabase.from('customers').select('*, packages(*), employees(*)').eq('id', customerId).maybeSingle(),
+        supabase.from('customers').select('*, packages(*), employees!customers_assigned_employee_id_fkey(*)').eq('id', customerId).maybeSingle(),
         supabase.from('communication_logs').select('*, employees(*)').eq('customer_id', customerId).order('created_at', { ascending: false }),
       ]);
       const custData = custRes.data as Customer;

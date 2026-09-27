@@ -42,7 +42,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     async function load() {
       let { data } = await supabase
         .from('customers')
-        .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
+        .select('*, packages(*), employees!customers_assigned_employee_id_fkey(*), operation_files(id, workflow_stage)')
         .eq('is_vip', false)
         .order('created_at', { ascending: false });
         
@@ -125,7 +125,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
       // refresh
       const { data } = await supabase
         .from('customers')
-        .select('*, packages(*), employees(*), operation_files(id, workflow_stage)')
+        .select('*, packages(*), employees!customers_assigned_employee_id_fkey(*), operation_files(id, workflow_stage)')
         .eq('is_vip', false)
         .order('created_at', { ascending: false });
       

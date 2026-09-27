@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, FileText, AlertTriangle, User, Wallet, CalendarClock } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, AlertTriangle, User, Wallet, CalendarClock, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { ApprovalRequest } from '../types';
+import type { ApprovalRequest, DocumentRecord } from '../types';
 
 interface Props {
   showEmptyState?: boolean;
@@ -32,6 +32,7 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
   const { profile } = useAuth();
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [documentsByInquiry, setDocumentsByInquiry] = useState<Record<string, DocumentRecord[]>>({});
 
   // Only managers or admins can view and act on approvals
   const isAdmin = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
@@ -63,8 +64,25 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
     
     if (data) {
       setRequests(data as ApprovalRequest[]);
+      if (crmOnly && data.length > 0) {
+        const inquiryIds = data.map(request => request.record_id);
+        const { data: documents } = await supabase.from('documents').select('*').in('inquiry_id', inquiryIds).order('created_at', { ascending: false });
+        const grouped = ((documents as DocumentRecord[]) || []).reduce<Record<string, DocumentRecord[]>>((result, document) => {
+          if (!document.inquiry_id) return result;
+          (result[document.inquiry_id] ||= []).push(document);
+          return result;
+        }, {});
+        setDocumentsByInquiry(grouped);
+      } else {
+        setDocumentsByInquiry({});
+      }
     }
     setLoading(false);
+  };
+
+  const openDocument = (document: DocumentRecord) => {
+    const { data } = supabase.storage.from('documents').getPublicUrl(document.file_path);
+    if (data.publicUrl) window.open(data.publicUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleApprove = async (req: ApprovalRequest) => {
@@ -212,6 +230,10 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
         <div className="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
           {requests.map(req => {
             const amount = getAmount(req);
+            const requestDocuments = documentsByInquiry[req.record_id] || [];
+            const hasPassport = requestDocuments.some(document => document.doc_type === 'جواز سفر');
+            const hasPhoto = requestDocuments.some(document => document.doc_type === 'صورة شخصية');
+            const hasProgramData = Boolean(req.record_details?.program_group || req.record_details?.program_name || req.record_details?.package_name);
             return (
             <div key={req.id} className="p-4 hover:bg-gray-50 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
               <div className="min-w-0">
@@ -252,6 +274,25 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
                   <p className="mt-2 text-xs bg-gray-100 p-2 rounded-lg text-gray-600 leading-relaxed">
                     {req.record_details.package_name || req.record_details.packages?.name || req.record_details.notes || 'تفاصيل العملية محفوظة مع الطلب.'}
                   </p>
+                )}
+                {crmOnly && (
+                  <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3">
+                    <p className="mb-2 text-xs font-bold text-navy-900">اكتمال ملف العميل قبل الانتقال للمراحل التالية</p>
+                    <div className="grid gap-2 text-xs sm:grid-cols-3">
+                      <span className={hasPassport ? 'text-emerald-700' : 'text-red-600'}>{hasPassport ? '✓' : '✕'} جواز السفر</span>
+                      <span className={hasPhoto ? 'text-emerald-700' : 'text-red-600'}>{hasPhoto ? '✓' : '✕'} الصورة الشخصية</span>
+                      <span className={hasProgramData ? 'text-emerald-700' : 'text-red-600'}>{hasProgramData ? '✓' : '✕'} بيانات البرنامج / الفوج</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {requestDocuments.length === 0 ? (
+                        <span className="text-xs text-gray-500">لم يتم رفع مستندات حتى الآن.</span>
+                      ) : requestDocuments.map(document => (
+                        <button key={document.id} type="button" onClick={() => openDocument(document)} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-semibold text-navy-700 hover:border-gold-300">
+                          <Eye size={12} /> {document.doc_type}{document.file_name ? ` — ${document.file_name}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
