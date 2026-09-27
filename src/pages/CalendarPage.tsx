@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Calendar as CalendarIcon, ChevronRight, ChevronLeft, Plane, Clock,
-  CreditCard, CheckCircle2, Hash, Loader2,
+  CreditCard, CheckCircle2, Hash, Loader2, Heart,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -9,7 +9,7 @@ interface CalEvent {
   id: string;
   title: string;
   date: string;
-  type: 'travel' | 'return' | 'follow_up' | 'installment' | 'task';
+  type: 'travel' | 'return' | 'follow_up' | 'installment' | 'task' | 'interest';
   meta?: string;
 }
 
@@ -19,6 +19,7 @@ const typeConfig = {
   follow_up: { label: 'متابعة', color: 'bg-amber-500', text: 'text-amber-700', bg: 'bg-amber-50', icon: Clock },
   installment: { label: 'قسط', color: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50', icon: CreditCard },
   task: { label: 'مهمة', color: 'bg-purple-500', text: 'text-purple-700', bg: 'bg-purple-50', icon: CheckCircle2 },
+  interest: { label: 'اهتمام / برنامج', color: 'bg-pink-500', text: 'text-pink-700', bg: 'bg-pink-50', icon: Heart },
 };
 
 const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -34,11 +35,12 @@ export default function CalendarPage() {
 
   const load = async () => {
     setLoading(true);
-    const [opsRes, tasksRes, installmentsRes, customersRes] = await Promise.all([
+    const [opsRes, tasksRes, installmentsRes, customersRes, interestsRes] = await Promise.all([
       supabase.from('operation_files').select('id, op_number, travel_date, return_date, customer:customers(name, client_code)').or('travel_date.not.is.null,return_date.not.is.null'),
       supabase.from('tasks').select('id, title, due_date, client_code').neq('status', 'مكتملة'),
       supabase.from('installments').select('id, next_due_date, booking:bookings(customer:customers(name, client_code))').not('next_due_date', 'is', null),
       supabase.from('customers').select('id, name, client_code, next_follow_up').not('next_follow_up', 'is', null),
+      supabase.from('interests').select('id, name, program_start_date, status').eq('status', 'active'),
     ]);
 
     const evts: CalEvent[] = [];
@@ -61,6 +63,7 @@ export default function CalendarPage() {
     (customersRes.data as Array<{ id: string; name: string; client_code: string | null; next_follow_up: string }> || []).forEach((c) => {
       evts.push({ id: c.id, title: c.name, date: c.next_follow_up, type: 'follow_up', meta: c.client_code || '' });
     });
+    (interestsRes.data as Array<{id:string;name:string;program_start_date:string}> || []).forEach(i=>evts.push({id:`interest-${i.id}`,title:i.name,date:i.program_start_date,type:'interest'}));
 
     setEvents(evts);
     setLoading(false);
@@ -85,6 +88,7 @@ export default function CalendarPage() {
     follow_up: events.filter((e) => e.type === 'follow_up').length,
     installment: events.filter((e) => e.type === 'installment').length,
     task: events.filter((e) => e.type === 'task').length,
+    interest: events.filter((e) => e.type === 'interest').length,
   };
 
   return (
@@ -95,7 +99,7 @@ export default function CalendarPage() {
       </div>
 
       {/* Legend / stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {(Object.keys(typeConfig) as Array<keyof typeof typeConfig>).map((key) => {
           const cfg = typeConfig[key];
           const Icon = cfg.icon;

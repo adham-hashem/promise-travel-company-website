@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Filter, Calendar, TrendingUp, Search, Loader2, Download, FileSpreadsheet } from 'lucide-react';
+import { Users, Filter, Calendar, TrendingUp, Loader2, Download, FileSpreadsheet, PhoneCall, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Customer, Employee } from '../types';
 
@@ -11,6 +11,9 @@ export default function SalesTeamCRM() {
   const [teamMembers, setTeamMembers] = useState<Employee[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [logs, setLogs] = useState<Array<{customer_id:string;employee_id?:string;created_at:string}>>([]);
+  const [range, setRange] = useState('7');
+  const [customFrom,setCustomFrom]=useState(''); const [customTo,setCustomTo]=useState('');
   
   useEffect(() => {
     loadTeamData();
@@ -20,14 +23,11 @@ export default function SalesTeamCRM() {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      // Fetch team members
-      const { data: teamRelations } = await supabase
-        .from('sales_teams')
-        .select('member_id')
-        .eq('leader_id', profile.id);
-        
-      if (teamRelations && teamRelations.length > 0) {
-        const memberIds = teamRelations.map(r => r.member_id);
+      const isAdmin=['super_admin','مالك النظام','مدير النظام','مدير المبيعات'].includes(profile.role);
+      const { data: teamRelations } = isAdmin ? {data:null} : await supabase.from('sales_teams').select('member_id').eq('leader_id', profile.id);
+      let memberIds:string[]=[];
+      if(isAdmin){const {data}=await supabase.from('employees').select('id').in('role',['مندوب مبيعات','قائد فريق المبيعات']).eq('is_active',true);memberIds=(data||[]).map(x=>x.id)}else memberIds=(teamRelations||[]).map(r=>r.member_id);
+      if (memberIds.length > 0) {
         const { data: members } = await supabase
           .from('employees')
           .select('*')
@@ -43,6 +43,8 @@ export default function SalesTeamCRM() {
           .eq('is_vip', false);
           
         if (custs) setCustomers(custs);
+        const {data:followups}=await supabase.from('communication_logs').select('customer_id,employee_id,created_at').in('employee_id',memberIds);
+        setLogs(followups||[]);
       }
     } catch (err) {
       console.error('Error loading team data:', err);
@@ -53,6 +55,11 @@ export default function SalesTeamCRM() {
   const filteredCustomers = selectedMemberId === 'all' 
     ? customers 
     : customers.filter(c => c.assigned_employee_id === selectedMemberId);
+
+  const bounds=()=>{const now=new Date();let from=new Date(now);let to=new Date(now);to.setHours(23,59,59,999);if(range==='today')from.setHours(0,0,0,0);else if(range==='yesterday'){from.setDate(from.getDate()-1);from.setHours(0,0,0,0);to=new Date(from);to.setHours(23,59,59,999)}else if(range==='month')from=new Date(now.getFullYear(),now.getMonth(),1);else if(range==='prevmonth'){from=new Date(now.getFullYear(),now.getMonth()-1,1);to=new Date(now.getFullYear(),now.getMonth(),0,23,59,59)}else if(range==='custom'){from=new Date(customFrom||0);to=new Date(customTo||Date.now());to.setHours(23,59,59,999)}else {from.setDate(from.getDate()-6);from.setHours(0,0,0,0)}return {from,to}};
+  const {from,to}=bounds(); const periodLogs=logs.filter(l=>{const d=new Date(l.created_at);return d>=from&&d<=to});
+  const metrics=teamMembers.map(m=>{const owned=customers.filter(c=>c.assigned_employee_id===m.id);const ml=periodLogs.filter(l=>l.employee_id===m.id);const contacted=new Set(ml.map(l=>l.customer_id));const repeated=new Set(ml.filter((l,_,a)=>a.filter(x=>x.customer_id===l.customer_id).length>1).map(l=>l.customer_id));const won=owned.filter(c=>['مكتمل','تم الحجز','حجز'].includes(c.status)).length;return {m,total:owned.length,contacted:contacted.size,uncontacted:owned.filter(c=>!contacted.has(c.id)).length,followups:ml.length,repeated:repeated.size,overdue:owned.filter(c=>c.next_follow_up&&new Date(c.next_follow_up)<new Date()).length,won,rate:owned.length?Math.round(won/owned.length*100):0,last:ml.sort((a,b)=>b.created_at.localeCompare(a.created_at))[0]?.created_at}});
+  const reassign=async(customerId:string,employeeId:string)=>{await supabase.from('customers').update({assigned_employee_id:employeeId||null}).eq('id',customerId);await supabase.from('audit_logs').insert({actor_id:profile?.id,action:'reassign_customer',entity_type:'customer',entity_id:customerId,new_data:{assigned_employee_id:employeeId}});loadTeamData()};
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -94,6 +101,10 @@ export default function SalesTeamCRM() {
           ))}
         </select>
       </div>
+
+      <div className="bg-white p-4 rounded-xl border border-gray-100 flex flex-wrap gap-2 items-center"><b className="text-sm ml-2">الفترة:</b>{[['today','اليوم'],['yesterday','أمس'],['7','آخر 7 أيام'],['month','الشهر الحالي'],['prevmonth','الشهر السابق'],['custom','مخصصة']].map(([v,l])=><button key={v} onClick={()=>setRange(v)} className={`px-3 py-2 rounded-lg text-xs ${range===v?'bg-navy-900 text-white':'bg-gray-100'}`}>{l}</button>)}{range==='custom'&&<><input type="date" className="form-input w-auto" value={customFrom} onChange={e=>setCustomFrom(e.target.value)}/><input type="date" className="form-input w-auto" value={customTo} onChange={e=>setCustomTo(e.target.value)}/></>}</div>
+
+      {!loading&&<div className="grid lg:grid-cols-2 gap-4">{metrics.map(x=><div key={x.m.id} className="bg-white rounded-2xl border border-gray-100 p-5"><h3 className="font-bold text-navy-900 mb-4">{x.m.name}</h3><div className="grid grid-cols-3 gap-2 text-center">{[[Users,'المسندون',x.total],[PhoneCall,'تم التواصل',x.contacted],[AlertTriangle,'لم يتم',x.uncontacted],[TrendingUp,'المتابعات',x.followups],[CheckCircle2,'مغلق بنجاح',x.won],[TrendingUp,'التحويل',`${x.rate}%`],[Users,'أكثر من متابعة',x.repeated],[AlertTriangle,'متأخرون',x.overdue],[Calendar,'آخر متابعة',x.last?new Date(x.last).toLocaleDateString('ar-EG'):'—']].map(([Icon,l,v],i)=>{const C=Icon as React.ElementType;return <div key={i} className="rounded-xl bg-gray-50 p-2"><C size={15} className="mx-auto text-gold-600"/><p className="font-black mt-1">{v as React.ReactNode}</p><p className="text-[10px] text-gray-500">{l as string}</p></div>})}</div></div>)}</div>}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -156,11 +167,7 @@ export default function SalesTeamCRM() {
                     <tr key={c.id}>
                       <td className="font-bold">{c.name}</td>
                       <td dir="ltr" className="text-right">{c.phone}</td>
-                      <td>
-                        <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded-md">
-                          {c.employees?.name || 'غير محدد'}
-                        </span>
-                      </td>
+                      <td><select value={c.assigned_employee_id||''} onChange={e=>reassign(c.id,e.target.value)} className="form-input text-xs py-1"><option value="">غير محدد</option>{teamMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
                       <td>{c.service_type || '—'}</td>
                       <td>{c.travel_interest_month || '—'}</td>
                       <td>

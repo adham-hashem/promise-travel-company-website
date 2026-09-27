@@ -220,10 +220,6 @@ export interface Customer {
   transferred_to_admin_at?: string | null;
   parent_customer_id?: string;
   age_group?: 'بالغ' | 'طفل' | 'رضيع';
-  travel_interest_month?: string;
-  is_transferred_to_admin?: boolean;
-  transferred_to_admin_by?: string;
-  transferred_to_admin_at?: string;
 }
 
 export interface VipRequest {
@@ -433,7 +429,8 @@ export type Page =
   | 'internal-groups'
   | 'website'
   | 'quotation-form'
-  | 'sales-team';
+  | 'sales-team'
+  | 'interests';
 
 // ===== Accounting types =====
 export type PaymentMethod = 'كاش' | 'تحويل بنكي' | 'فودافون كاش' | 'أقساط';

@@ -99,7 +99,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
     return matchSearch && matchStatus;
   });
 
-  const handleTransferToAdmin = async (customerId) => {
+  const handleTransferToAdmin = async (customerId: string) => {
     if (!confirm('هل أنت متأكد من تحويل هذا العميل إلى CRM العام؟ لن تفقد بياناته ولكن سيصبح متاحاً للإدارة المركزية.')) return;
     
     try {

@@ -14,6 +14,7 @@ const requestTypeLabels: Record<string, string> = {
   cancel_installment: 'إلغاء قسط',
   cancel_customer_trip: 'إلغاء رحلة عميل',
   cancel_booking: 'إلغاء حجز',
+  crm_conversion: 'تحويل استعلام إلى CRM',
 };
 
 const getCustomerName = (req: ApprovalRequest) => (
@@ -91,6 +92,24 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
           const { error: custErr } = await supabase.from('customers').update({ status: 'ملغي' }).eq('id', customerId);
           if (custErr) throw custErr;
         }
+      } else if (req.type === 'crm_conversion' && req.record_type === 'inquiries') {
+        const details = req.record_details || {};
+        const { data: inquiry, error: inquiryErr } = await supabase.from('inquiries').select('*').eq('id', req.record_id).single();
+        if (inquiryErr) throw inquiryErr;
+        if (inquiry.converted_customer_id) throw new Error('تم تحويل هذا الاستعلام مسبقًا.');
+        const { data: customer, error: customerErr } = await supabase.from('customers').insert({
+          name: inquiry.customer_name, phone: inquiry.phone,
+          service_type: inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة' ? inquiry.service_type : null,
+          source: inquiry.source, status: 'جديد', crm_stage: 'documents_pending',
+          notes: details.transfer_notes ? `${inquiry.notes || ''}\nملاحظات التحويل: ${details.transfer_notes}`.trim() : inquiry.notes,
+          assigned_employee_id: details.assigned_employee_id || inquiry.assigned_employee_id || null,
+          visa_requirement: inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة' ? 'Requires Visa' : 'No Visa Required',
+        }).select().single();
+        if (customerErr) throw customerErr;
+        await supabase.from('documents').update({ customer_id: customer.id, client_code: customer.client_code || null }).eq('inquiry_id', inquiry.id);
+        await supabase.from('inquiries').update({ status:'تم التحويل', converted_customer_id:customer.id, crm_conversion_status:'approved', crm_conversion_reviewed_by:profile?.id, crm_conversion_reviewed_at:new Date().toISOString() }).eq('id',inquiry.id);
+        await supabase.from('workflow_timeline').insert({ customer_id:customer.id, stage:'crm', stage_label:'New CRM Customer', department:'المبيعات', employee_id:profile?.id, status:'مكتمل', notes:'تم إنشاء العميل بعد موافقة الأدمن' });
+        await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'approve_crm_conversion', entity_type:'customer', entity_id:customer.id, new_data:{inquiry_id:inquiry.id} });
       }
 
       // Mark request as approved
@@ -133,6 +152,10 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
         .eq('id', req.id);
         
       if (error) throw error;
+      if (req.type === 'crm_conversion') {
+        await supabase.from('inquiries').update({ crm_conversion_status:'rejected', crm_conversion_reviewed_by:profile?.id, crm_conversion_reviewed_at:new Date().toISOString(), crm_conversion_rejection_reason:reason }).eq('id',req.record_id);
+        await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'reject_crm_conversion', entity_type:'inquiry', entity_id:req.record_id, new_data:{reason} });
+      }
       await supabase
         .from('notifications')
         .update({ requires_action: false, resolved_at: new Date().toISOString(), is_read: true })

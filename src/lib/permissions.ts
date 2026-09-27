@@ -335,6 +335,7 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['flight-tickets'] = true;
   } else if (role === 'مندوب مبيعات') {
     pages['inquiries'] = true;
+    pages['interests'] = true;
     pages['sales-portal'] = true;
     pages['quotation-form'] = true;
     pages['bookings'] = true;
@@ -349,9 +350,8 @@ export function getDefaultPagePermissions(role: string): Record<string, boolean>
     pages['packages'] = true;
     pages['offers'] = true;
     pages['employees'] = true;
-    if (role === 'قائد فريق المبيعات') {
-      pages['sales-team'] = true;
-    }
+    pages['sales-team'] = true;
+    pages['interests'] = true;
   } else {
     pages['inquiries'] = true;
     pages['customers'] = true;

@@ -158,6 +158,7 @@ interface ConvertModalProps {
 }
 
 function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModalProps) {
+  const { profile } = useAuth();
   const [converting, setConverting] = useState(false);
   const [transferTarget, setTransferTarget] = useState<'crm' | 'accounts'>('accounts');
   const [targetEmployeeId, setTargetEmployeeId] = useState('');
@@ -167,80 +168,16 @@ function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModal
 
   const handleConvert = async () => {
     setConverting(true);
-    // Create a new customer from inquiry
-    const { data: newCustomer } = await supabase.from('customers').insert([{
-      name: inquiry.customer_name,
-      phone: inquiry.phone,
-      service_type: inquiry.service_type === 'حج' ? 'حج' : inquiry.service_type === 'عمرة' ? 'عمرة' : undefined,
-      source: inquiry.source,
-      status: 'جديد',
-      notes: transferNotes ? `${inquiry.notes ? inquiry.notes + ' | ' : ''}ملاحظات التحويل: ${transferNotes}` : inquiry.notes,
-      assigned_employee_id: targetEmployeeId || undefined,
-      visa_requirement: inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة' ? 'Requires Visa' : 'No Visa Required',
-    }]).select().maybeSingle();
-
-    if (newCustomer) {
-      await supabase
-        .from('documents')
-        .update({ customer_id: newCustomer.id, client_code: newCustomer.client_code || null })
-        .eq('inquiry_id', inquiry.id);
-
-      // Link inquiry to the new customer
-      await supabase.from('inquiries').update({
-        status: 'تم التحويل',
-        converted_customer_id: newCustomer.id,
-        updated_at: new Date().toISOString(),
-      }).eq('id', inquiry.id);
-
-      // If transferring to Accounts, create an operation file record with stage 'accounts'
-      if (transferTarget === 'accounts') {
-        await supabase.from('operation_files').insert({
-          customer_id: newCustomer.id,
-          file_status: 'جديد',
-          workflow_stage: 'accounts',
-          notes: transferNotes || 'تم التحويل من قسم إضافة العملاء والاستعلامات إلى قسم الحسابات',
-          assigned_to: targetEmployeeId || null,
-          financially_approved: false,
-        });
-
-        // Notify selected employee or accounts team
-        if (targetEmployeeId) {
-          await supabase.from('notifications').insert({
-            employee_id: targetEmployeeId,
-            type: 'new_customer',
-            title: 'عميل جديد محول إلى قسم الحسابات',
-            body: `تم تحويل العميل ${newCustomer.name} إليك من قسم إضافة العملاء: ${transferNotes}`,
-          });
-        }
-      }
-
-      // Auto-create a visa file if the service requires a visa
-      if (inquiry.service_type === 'حج' || inquiry.service_type === 'عمرة') {
-        await supabase.from('visa_management').insert({
-          client_code: newCustomer.client_code || null,
-          customer_id: newCustomer.id,
-          full_name: newCustomer.name,
-          service_type: inquiry.service_type,
-          visa_type: inquiry.service_type === 'حج' ? 'حج' : 'عمرة',
-          country: 'السعودية',
-          visa_status: 'لم يبدأ',
-          visa_fee: 0,
-        });
-        // Auto-create travel checklist
-        await supabase.from('travel_checklist').upsert({ customer_id: newCustomer.id }, { onConflict: 'customer_id' });
-      }
-
-      // Log workflow timeline
-      await supabase.from('workflow_timeline').insert({
-        customer_id: newCustomer.id,
-        stage: transferTarget === 'accounts' ? 'accounts' : 'crm',
-        stage_label: transferTarget === 'accounts' ? 'قسم الحسابات' : 'العملاء CRM',
-        department: transferTarget === 'accounts' ? 'الحسابات' : 'المبيعات',
-        employee_id: targetEmployeeId || null,
-        status: 'مكتمل',
-        notes: transferNotes || 'تم تحويل العميل من مسار الاستعلامات وإضافة العملاء',
-      });
-    }
+    const requestedAt = new Date().toISOString();
+    const { error } = await supabase.from('approval_requests').insert({
+      type: 'crm_conversion', record_id: inquiry.id, record_type: 'inquiries', requested_by: profile?.id,
+      customer_id: null, reason: transferNotes || 'طلب تحويل الاستعلام إلى CRM',
+      record_details: { customer_name: inquiry.customer_name, phone: inquiry.phone, source: inquiry.source, service_type: inquiry.service_type, notes: inquiry.notes, transfer_notes: transferNotes, assigned_employee_id: targetEmployeeId || inquiry.assigned_employee_id, requested_by_name: profile?.name }
+    });
+    if (error) { alert('تعذر إرسال الطلب: ' + error.message); setConverting(false); return; }
+    await supabase.from('inquiries').update({ crm_conversion_status:'pending', crm_conversion_requested_by:profile?.id, crm_conversion_requested_at:requestedAt }).eq('id',inquiry.id);
+    await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'request_crm_conversion', entity_type:'inquiry', entity_id:inquiry.id, new_data:{status:'pending'} });
+    alert('تم إرسال طلب التحويل إلى الأدمن للموافقة. لن يتم إنشاء العميل في CRM قبل الاعتماد.');
     setConverting(false);
     onConverted();
   };
@@ -318,7 +255,7 @@ function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModal
 
           <div className="flex gap-3 pt-2">
             <button onClick={handleConvert} disabled={converting} className="btn-gold flex-1 justify-center text-xs py-2.5">
-              {converting ? 'جارٍ التحويل...' : 'تأكيد وإرسال التحويل'}
+              {converting ? 'جارٍ الإرسال...' : 'Request CRM Conversion'}
             </button>
             <button onClick={onClose} className="btn-outline flex-1 justify-center text-xs py-2.5">إلغاء</button>
           </div>

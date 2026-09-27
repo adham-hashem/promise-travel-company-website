@@ -103,6 +103,7 @@ export default function AddCustomer({ onNavigate }: Props) {
     room_type_makkah: '', room_type_madinah: '',
     client_type: 'فردي' as 'فردي' | 'فوج',
     age_group: 'بالغ' as 'بالغ' | 'طفل' | 'رضيع',
+    travel_interest_month: '',
   });
 
   const [docUploads, setDocUploads] = useState<Record<string, DocUpload>>(
