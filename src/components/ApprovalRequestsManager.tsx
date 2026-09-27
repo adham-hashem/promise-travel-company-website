@@ -166,11 +166,10 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
   };
 
   const handleReject = async (req: ApprovalRequest) => {
-    const reason = prompt('يرجى إدخال سبب الرفض:');
+    const reason = prompt('يرجى إدخال سبب الرفض:')?.trim();
     if (!reason) return;
 
     try {
-      const employeeId = await getEmployeeId();
       const { error } = await supabase
         .from('approval_requests')
         .update({
@@ -182,10 +181,7 @@ export default function ApprovalRequestsManager({ showEmptyState = false, crmOnl
         .eq('id', req.id);
         
       if (error) throw error;
-      if (req.type === 'crm_conversion') {
-        await supabase.from('inquiries').update({ crm_conversion_status:'rejected', crm_conversion_reviewed_by:employeeId, crm_conversion_reviewed_at:new Date().toISOString(), crm_conversion_rejection_reason:reason }).eq('id',req.record_id);
-        await supabase.from('audit_logs').insert({ actor_id:employeeId, action:'reject_crm_conversion', entity_type:'inquiry', entity_id:req.record_id, new_data:{reason} });
-      }
+      // The database trigger updates the inquiry, records the event and notifies the requester atomically.
       await supabase
         .from('notifications')
         .update({ requires_action: false, resolved_at: new Date().toISOString(), is_read: true })

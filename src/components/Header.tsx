@@ -41,6 +41,7 @@ const notifIcons: Record<string, React.ElementType> = {
   travel_soon: Plane,
   website_booking: Globe,
   approval_request: AlertCircle,
+  crm_conversion_rejected: AlertCircle,
   installment_overdue: CreditCard,
   installment_due_soon: Clock,
   installment_due_today: CreditCard,
@@ -68,6 +69,7 @@ const notifColors: Record<string, string> = {
   travel_soon: 'bg-emerald-100 text-emerald-700',
   website_booking: 'bg-gold-100 text-gold-700',
   approval_request: 'bg-red-100 text-red-700',
+  crm_conversion_rejected: 'bg-red-100 text-red-700',
   installment_overdue: 'bg-red-100 text-red-700',
   installment_due_soon: 'bg-amber-100 text-amber-700',
   installment_due_today: 'bg-orange-100 text-orange-700',
@@ -282,7 +284,10 @@ export default function Header({ currentPage, searchValue, onSearchChange, onNav
 
   const openNotification = async (notification: AppNotification) => {
     if (!employee) return;
-    if (!notification.is_read) {
+    if (notification.type === 'crm_conversion_rejected') {
+      await supabase.from('notifications').update({ is_read: true, requires_action: false, resolved_at: new Date().toISOString() }).eq('id', notification.id);
+      setNotifications((items) => items.filter((n) => n.id !== notification.id));
+    } else if (!notification.is_read) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
       setNotifications((items) => items.map((n) => n.id === notification.id ? { ...n, is_read: true } : n));
     }

@@ -111,7 +111,7 @@ export type NotificationType =
   | 'new_customer' | 'new_booking' | 'new_payment' | 'new_invoice'
   | 'missing_document' | 'document_required' | 'travel_soon' | 'urgent_travel_issue'
   | 'website_booking' | 'installment_overdue' | 'installment_due_soon'
-  | 'installment_due_today' | 'booking_pending' | 'approval_request'
+  | 'installment_due_today' | 'booking_pending' | 'approval_request' | 'crm_conversion_rejected'
   | 'new_visa' | 'visa_review' | 'visa_approved' | 'visa_rejected' | 'visa_expired'
   | 'visa_incomplete' | 'accounts_approved' | 'operations_ready' | 'flight_ready'
   | 'ticket_issued';

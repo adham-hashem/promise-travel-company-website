@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare, Plus, Search, Eye, Pencil, Trash2, X,
   Phone, Globe, MessageCircle, PhoneCall, MapPin,
@@ -289,6 +289,7 @@ interface DetailModalProps {
 }
 
 type InquiryInterestLink = { id: string; interest_id: string; status: string; interests: { id: string; name: string; color: string; program_start_date: string } | null };
+type ConversionRequestEvent = { id: string; status: 'pending' | 'approved' | 'rejected'; notes: string | null; created_at: string; reviewed_at: string | null };
 
 function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: DetailModalProps) {
   const StatusIcon = STATUS_ICONS[inquiry.status];
@@ -300,6 +301,8 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: 
   const [selectedInterestId, setSelectedInterestId] = useState('');
   const [savingInterest, setSavingInterest] = useState(false);
   const [interestError, setInterestError] = useState('');
+  const [conversionEvents, setConversionEvents] = useState<ConversionRequestEvent[]>([]);
+  const [conversionEventsError, setConversionEventsError] = useState('');
   const formattedNotes = (inquiry.notes || '')
     .split(/\s*[—|]\s*/g)
     .map((part) => part.trim())
@@ -344,6 +347,22 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: 
   };
 
   useEffect(() => { loadInterests(); }, [inquiry.id]);
+
+  useEffect(() => {
+    let active = true;
+    setConversionEventsError('');
+    supabase.from('approval_requests')
+      .select('id,status,notes,created_at,reviewed_at')
+      .eq('type', 'crm_conversion')
+      .eq('record_id', inquiry.id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) setConversionEventsError('تعذر تحميل سجل طلبات التحويل: ' + error.message);
+        else setConversionEvents((data as ConversionRequestEvent[]) || []);
+      });
+    return () => { active = false; };
+  }, [inquiry.id]);
 
   const addInterest = async () => {
     if (!selectedInterestId) return;
@@ -440,6 +459,25 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: 
           )}
 
           <div className="rounded-xl bg-gray-50 p-3">
+            <p className="mb-3 text-xs font-bold text-navy-900">سجل أحداث تحويل العميل إلى CRM</p>
+            {conversionEventsError && <p className="text-xs text-red-600">{conversionEventsError}</p>}
+            {!conversionEventsError && conversionEvents.length === 0 && <p className="text-xs text-gray-500">لا توجد طلبات تحويل سابقة.</p>}
+            <div className="space-y-2">
+              {conversionEvents.map(event => (
+                <div key={event.id} className="rounded-lg border border-gray-100 bg-white px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs font-bold ${event.status === 'rejected' ? 'text-red-700' : event.status === 'approved' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {event.status === 'rejected' ? 'تم رفض تحويل العميل' : event.status === 'approved' ? 'تمت الموافقة على التحويل' : 'طلب تحويل بانتظار الموافقة'}
+                    </span>
+                    <span className="text-[11px] text-gray-500">{new Date(event.reviewed_at || event.created_at).toLocaleString('ar-EG')}</span>
+                  </div>
+                  {event.status === 'rejected' && <p className="mt-1 text-xs text-gray-700 whitespace-pre-wrap">سبب الرفض: {event.notes || 'لم يُسجل سبب الرفض'}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-gray-50 p-3">
             <p className="mb-3 text-xs font-bold text-navy-900">اهتمامات العميل</p>
             <div className="flex gap-2">
               <select className="form-input flex-1 text-xs" value={selectedInterestId} onChange={event=>setSelectedInterestId(event.target.value)}>
@@ -497,7 +535,7 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: 
   );
 }
 
-export default function Inquiries() {
+export default function Inquiries({ selectedInquiryId }: { selectedInquiryId?: string }) {
   const { can, profile } = useAuth();
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -510,6 +548,7 @@ export default function Inquiries() {
   const [detailInquiry, setDetailInquiry] = useState<Inquiry | null>(null);
   const [convertInquiry, setConvertInquiry] = useState<Inquiry | null>(null);
   const [loadError, setLoadError] = useState('');
+  const openedFromNotification = useRef<string | undefined>();
 
   const load = async () => {
     setLoading(true);
@@ -540,6 +579,15 @@ export default function Inquiries() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!selectedInquiryId || openedFromNotification.current === selectedInquiryId) return;
+    const inquiry = inquiries.find(item => item.id === selectedInquiryId);
+    if (inquiry) {
+      openedFromNotification.current = selectedInquiryId;
+      setDetailInquiry(inquiry);
+    }
+  }, [selectedInquiryId, inquiries]);
 
   const handleDelete = async (inq: Inquiry) => {
     if (inq.converted_customer_id) {

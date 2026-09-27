@@ -97,6 +97,7 @@ function AppInner() {
   });
   
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
+  const [selectedInquiryId, setSelectedInquiryId] = useState<string | undefined>();
   const [search, setSearch] = useState('');
   
   const [adminRoute, setAdminRoute] = useState(() => {
@@ -158,7 +159,8 @@ function AppInner() {
       return;
     }
     setCurrentPage(page);
-    if (id) setSelectedCustomerId(id);
+    if (page === 'inquiries') setSelectedInquiryId(id);
+    else if (id) setSelectedCustomerId(id);
     setSearch('');
   };
 
@@ -246,7 +248,7 @@ function AppInner() {
       {currentPage === 'operations' && canAccessPage('operations') && <OperationsDashboard />}
       {currentPage === 'hotels' && canAccessPage('hotels') && <Hotels />}
       {currentPage === 'invoices' && canAccessPage('invoices') && <Invoices />}
-      {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries />}
+      {currentPage === 'inquiries' && canAccessPage('inquiries') && <Inquiries selectedInquiryId={selectedInquiryId} />}
       {currentPage === 'client-search' && canAccessPage('client-search') && <ClientSearch onNavigate={navigate} customerId={selectedCustomerId} />}
       {currentPage === 'tasks' && canAccessPage('tasks') && <Tasks onNavigate={navigate} selectedTaskId={selectedCustomerId} />}
       {currentPage === 'calendar' && canAccessPage('calendar') && <CalendarPage />}
