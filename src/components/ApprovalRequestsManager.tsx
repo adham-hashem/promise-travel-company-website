@@ -6,6 +6,7 @@ import type { ApprovalRequest } from '../types';
 
 interface Props {
   showEmptyState?: boolean;
+  crmOnly?: boolean;
 }
 
 const requestTypeLabels: Record<string, string> = {
@@ -27,13 +28,20 @@ const getCustomerName = (req: ApprovalRequest) => (
 
 const getAmount = (req: ApprovalRequest) => Number(req.amount || req.record_details?.amount || req.record_details?.total_amount || 0);
 
-export default function ApprovalRequestsManager({ showEmptyState = false }: Props) {
+export default function ApprovalRequestsManager({ showEmptyState = false, crmOnly = false }: Props) {
   const { profile } = useAuth();
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Only managers or admins can view and act on approvals
-  const isManager = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام' || profile?.role === 'مدير المبيعات';
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
+  const isManager = crmOnly ? isAdmin : isAdmin || profile?.role === 'مدير المبيعات';
+
+  const getEmployeeId = async () => {
+    if (!profile?.email) return null;
+    const { data } = await supabase.from('employees').select('id').eq('email', profile.email).maybeSingle();
+    return data?.id || null;
+  };
 
   useEffect(() => {
     if (isManager) {
@@ -45,11 +53,13 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
 
   const loadRequests = async () => {
     setLoading(true);
-    const { data } = await supabase
+    let query = supabase
       .from('approval_requests')
       .select('*, requester:user_profiles!approval_requests_requested_by_fkey(*), reviewer:user_profiles!approval_requests_reviewed_by_fkey(*)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
+    query = crmOnly ? query.eq('type', 'crm_conversion') : query.neq('type', 'crm_conversion');
+    const { data } = await query;
     
     if (data) {
       setRequests(data as ApprovalRequest[]);
@@ -61,6 +71,7 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
     if (!confirm('هل أنت متأكد من الموافقة على هذا الطلب وإتمام العملية؟')) return;
 
     try {
+      const employeeId = await getEmployeeId();
       // Execute the requested action based on type
       if (req.type === 'delete_payment' && req.record_type === 'payments') {
         const { error: delErr } = await supabase.from('payments').delete().eq('id', req.record_id);
@@ -107,9 +118,9 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
         }).select().single();
         if (customerErr) throw customerErr;
         await supabase.from('documents').update({ customer_id: customer.id, client_code: customer.client_code || null }).eq('inquiry_id', inquiry.id);
-        await supabase.from('inquiries').update({ status:'تم التحويل', converted_customer_id:customer.id, crm_conversion_status:'approved', crm_conversion_reviewed_by:profile?.id, crm_conversion_reviewed_at:new Date().toISOString() }).eq('id',inquiry.id);
+        await supabase.from('inquiries').update({ status:'تم التحويل', converted_customer_id:customer.id, crm_conversion_status:'approved', crm_conversion_reviewed_by:employeeId, crm_conversion_reviewed_at:new Date().toISOString() }).eq('id',inquiry.id);
         await supabase.from('workflow_timeline').insert({ customer_id:customer.id, stage:'crm', stage_label:'New CRM Customer', department:'المبيعات', employee_id:profile?.id, status:'مكتمل', notes:'تم إنشاء العميل بعد موافقة الأدمن' });
-        await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'approve_crm_conversion', entity_type:'customer', entity_id:customer.id, new_data:{inquiry_id:inquiry.id} });
+        await supabase.from('audit_logs').insert({ actor_id:employeeId, action:'approve_crm_conversion', entity_type:'customer', entity_id:customer.id, new_data:{inquiry_id:inquiry.id} });
       }
 
       // Mark request as approved
@@ -141,6 +152,7 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
     if (!reason) return;
 
     try {
+      const employeeId = await getEmployeeId();
       const { error } = await supabase
         .from('approval_requests')
         .update({
@@ -153,8 +165,8 @@ export default function ApprovalRequestsManager({ showEmptyState = false }: Prop
         
       if (error) throw error;
       if (req.type === 'crm_conversion') {
-        await supabase.from('inquiries').update({ crm_conversion_status:'rejected', crm_conversion_reviewed_by:profile?.id, crm_conversion_reviewed_at:new Date().toISOString(), crm_conversion_rejection_reason:reason }).eq('id',req.record_id);
-        await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'reject_crm_conversion', entity_type:'inquiry', entity_id:req.record_id, new_data:{reason} });
+        await supabase.from('inquiries').update({ crm_conversion_status:'rejected', crm_conversion_reviewed_by:employeeId, crm_conversion_reviewed_at:new Date().toISOString(), crm_conversion_rejection_reason:reason }).eq('id',req.record_id);
+        await supabase.from('audit_logs').insert({ actor_id:employeeId, action:'reject_crm_conversion', entity_type:'inquiry', entity_id:req.record_id, new_data:{reason} });
       }
       await supabase
         .from('notifications')

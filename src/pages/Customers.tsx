@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToExcel, exportToPDF } from '../lib/exportUtils';
 import type { Customer, CustomerStatus, Page } from '../types';
+import ApprovalRequestsManager from '../components/ApprovalRequestsManager';
 
 const statusColors: Record<CustomerStatus, string> = {
   جديد: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
@@ -35,6 +36,7 @@ export default function Customers({ onNavigate, searchValue }: Props) {
   const [transferCustomer, setTransferCustomer] = useState<Customer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'مالك النظام' || profile?.role === 'مدير النظام';
 
   useEffect(() => {
     async function load() {
@@ -197,6 +199,15 @@ export default function Customers({ onNavigate, searchValue }: Props) {
 
   return (
     <div className="space-y-5">
+      {isAdmin && (
+        <section>
+          <div className="mb-3">
+            <h2 className="text-lg font-bold text-navy-900">طلبات تحويل العملاء إلى CRM</h2>
+            <p className="text-sm text-gray-500">تظهر هنا للأدمن فقط، ولا يتم إنشاء العميل قبل الموافقة.</p>
+          </div>
+          <ApprovalRequestsManager crmOnly showEmptyState />
+        </section>
+      )}
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">

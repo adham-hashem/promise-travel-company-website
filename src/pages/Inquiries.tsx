@@ -175,14 +175,23 @@ function ConvertModal({ inquiry, employees, onClose, onConverted }: ConvertModal
   const handleConvert = async () => {
     setConverting(true);
     const requestedAt = new Date().toISOString();
-    const { error } = await supabase.from('approval_requests').insert({
-      type: 'crm_conversion', record_id: inquiry.id, record_type: 'inquiries', requested_by: profile?.id,
-      customer_id: null, reason: transferNotes || 'طلب تحويل الاستعلام إلى CRM',
-      record_details: { customer_name: inquiry.customer_name, phone: inquiry.phone, source: inquiry.source, service_type: inquiry.service_type, notes: inquiry.notes, transfer_notes: transferNotes, assigned_employee_id: targetEmployeeId || inquiry.assigned_employee_id, requested_by_name: profile?.name }
-    });
-    if (error) { alert('تعذر إرسال الطلب: ' + error.message); setConverting(false); return; }
-    await supabase.from('inquiries').update({ crm_conversion_status:'pending', crm_conversion_requested_by:profile?.id, crm_conversion_requested_at:requestedAt }).eq('id',inquiry.id);
-    await supabase.from('audit_logs').insert({ actor_id:profile?.id, action:'request_crm_conversion', entity_type:'inquiry', entity_id:inquiry.id, new_data:{status:'pending'} });
+    const { data: employee } = profile?.email
+      ? await supabase.from('employees').select('id').eq('email', profile.email).maybeSingle()
+      : { data: null };
+    const actorEmployeeId = employee?.id || inquiry.assigned_employee_id || null;
+    const { data: pendingRequest } = await supabase.from('approval_requests').select('id').eq('type', 'crm_conversion').eq('record_id', inquiry.id).eq('status', 'pending').maybeSingle();
+    if (!pendingRequest) {
+      const { error } = await supabase.from('approval_requests').insert({
+        type: 'crm_conversion', record_id: inquiry.id, record_type: 'inquiries', requested_by: profile?.id,
+        customer_id: null, reason: transferNotes || 'طلب تحويل الاستعلام إلى CRM',
+        record_details: { customer_name: inquiry.customer_name, phone: inquiry.phone, source: inquiry.source, service_type: inquiry.service_type, notes: inquiry.notes, transfer_notes: transferNotes, assigned_employee_id: targetEmployeeId || inquiry.assigned_employee_id, requested_by_name: profile?.name }
+      });
+      if (error) { alert('تعذر إرسال الطلب: ' + error.message); setConverting(false); return; }
+    }
+    const { error: updateError } = await supabase.from('inquiries').update({ crm_conversion_status:'pending', crm_conversion_requested_by:actorEmployeeId, crm_conversion_requested_at:requestedAt }).eq('id',inquiry.id);
+    if (updateError) { alert('تم إنشاء طلب الموافقة، لكن تعذر تحديث حالة الاستعلام: ' + updateError.message); setConverting(false); return; }
+    const { error: auditError } = await supabase.from('audit_logs').insert({ actor_id:actorEmployeeId, action:'request_crm_conversion', entity_type:'inquiry', entity_id:inquiry.id, new_data:{status:'pending'} });
+    if (auditError) console.error('Failed to write CRM conversion audit log:', auditError);
     alert('تم إرسال طلب التحويل إلى الأدمن للموافقة. لن يتم إنشاء العميل في CRM قبل الاعتماد.');
     setConverting(false);
     onConverted();
