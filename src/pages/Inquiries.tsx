@@ -69,21 +69,26 @@ function InquiryModal({ inquiry, employees, onClose, onSave }: InquiryModalProps
     notes: inquiry?.notes ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSaveError('');
     const payload = {
       ...form,
       assigned_employee_id: form.assigned_employee_id || null,
       updated_at: new Date().toISOString(),
     };
-    if (inquiry) {
-      await supabase.from('inquiries').update(payload).eq('id', inquiry.id);
-    } else {
-      await supabase.from('inquiries').insert([payload]);
-    }
+    const { error } = inquiry
+      ? await supabase.from('inquiries').update(payload).eq('id', inquiry.id)
+      : await supabase.from('inquiries').insert(payload);
     setSaving(false);
+    if (error) {
+      console.error('Failed to save inquiry:', error);
+      setSaveError(error.code === '23505' ? 'رقم الاستعلام مستخدم بالفعل. أغلق النافذة وحاول مرة أخرى.' : `تعذر حفظ الاستعلام: ${error.message}`);
+      return;
+    }
     onSave();
   };
 
@@ -138,6 +143,7 @@ function InquiryModal({ inquiry, employees, onClose, onSave }: InquiryModalProps
               <textarea className="input-field resize-none" rows={3} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="تفاصيل الاستعلام وملاحظات المتابعة" />
             </div>
           </div>
+          {saveError && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>}
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={saving} className="btn-gold flex-1 justify-center">
               {saving ? 'جارٍ الحفظ...' : inquiry ? 'حفظ التعديلات' : 'إضافة الاستعلام'}
@@ -441,13 +447,20 @@ export default function Inquiries() {
   const [editInquiry, setEditInquiry] = useState<Inquiry | null>(null);
   const [detailInquiry, setDetailInquiry] = useState<Inquiry | null>(null);
   const [convertInquiry, setConvertInquiry] = useState<Inquiry | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   const load = async () => {
     setLoading(true);
+    setLoadError('');
     const [inqRes, empRes] = await Promise.all([
-      supabase.from('inquiries').select('*, employees(id, name)').order('created_at', { ascending: false }),
+      supabase.from('inquiries').select('*, employees!inquiries_assigned_employee_id_fkey(id, name)').order('created_at', { ascending: false }),
       supabase.from('employees').select('id, name, role').eq('is_active', true),
     ]);
+    if (inqRes.error) {
+      console.error('Failed to load inquiries:', inqRes.error);
+      setLoadError(`تعذر تحميل الاستعلامات: ${inqRes.error.message}`);
+    }
+    if (empRes.error) console.error('Failed to load employees:', empRes.error);
     
     let data = (inqRes.data as Inquiry[]) || [];
     
@@ -570,6 +583,13 @@ export default function Inquiries() {
           )}
         </div>
       </div>
+
+      {loadError && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span>{loadError}</span>
+          <button onClick={load} className="font-bold underline">إعادة المحاولة</button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

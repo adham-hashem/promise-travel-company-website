@@ -11,7 +11,7 @@ export default function Interests() {
   const isAdmin = ['super_admin','مالك النظام','مدير النظام'].includes(profile?.role || '');
   const [items,setItems] = useState<Interest[]>([]); const [editing,setEditing] = useState<Interest|null>(null);
   const [form,setForm] = useState(empty); const [open,setOpen] = useState(false); const [loading,setLoading] = useState(true);
-  const load = async()=>{ setLoading(true); const {data}=await supabase.from('interests').select('*, inquiry_interests(id,last_follow_up_at,status,inquiries(customer_name,phone,employees(name)))').order('program_start_date'); setItems((data as Interest[])||[]); setLoading(false); };
+  const load = async()=>{ setLoading(true); const {data}=await supabase.from('interests').select('*, inquiry_interests(id,last_follow_up_at,status,inquiries!inquiry_interests_inquiry_id_fkey(customer_name,phone,employees!inquiries_assigned_employee_id_fkey(name)))').order('program_start_date'); setItems((data as Interest[])||[]); setLoading(false); };
   useEffect(()=>{load();},[]);
   const save=async(e:React.FormEvent)=>{e.preventDefault(); const payload={...form,interest_end_date:form.interest_end_date||null,created_by:profile?.id}; if(editing) await supabase.from('interests').update(payload).eq('id',editing.id); else await supabase.from('interests').insert(payload); setOpen(false);setEditing(null);setForm(empty);load();};
   const edit=(i:Interest)=>{setEditing(i);setForm({name:i.name,description:i.description||'',interest_start_date:i.interest_start_date,interest_end_date:i.interest_end_date||'',program_start_date:i.program_start_date,status:i.status,color:i.color});setOpen(true)};
