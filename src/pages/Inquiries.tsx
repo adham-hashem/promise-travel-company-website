@@ -285,13 +285,21 @@ interface DetailModalProps {
   onClose: () => void;
   onEdit: () => void;
   onConvert: () => void;
+  onChanged: () => void;
 }
 
-function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModalProps) {
+type InquiryInterestLink = { id: string; interest_id: string; status: string; interests: { id: string; name: string; color: string; program_start_date: string } | null };
+
+function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert, onChanged }: DetailModalProps) {
   const StatusIcon = STATUS_ICONS[inquiry.status];
   const SourceIcon = SOURCE_ICONS[inquiry.source];
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
+  const [availableInterests, setAvailableInterests] = useState<Array<{id:string;name:string;color:string;program_start_date:string}>>([]);
+  const [interestLinks, setInterestLinks] = useState<InquiryInterestLink[]>([]);
+  const [selectedInterestId, setSelectedInterestId] = useState('');
+  const [savingInterest, setSavingInterest] = useState(false);
+  const [interestError, setInterestError] = useState('');
   const formattedNotes = (inquiry.notes || '')
     .split(/\s*[—|]\s*/g)
     .map((part) => part.trim())
@@ -321,6 +329,36 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModal
       });
     return () => { active = false; };
   }, [inquiry.id]);
+
+  const loadInterests = async () => {
+    const [interestsResult, linksResult] = await Promise.all([
+      supabase.from('interests').select('id,name,color,program_start_date').eq('status','active').order('program_start_date'),
+      supabase.from('inquiry_interests').select('id,interest_id,status,interests(id,name,color,program_start_date)').eq('inquiry_id',inquiry.id).order('created_at'),
+    ]);
+    if (interestsResult.error || linksResult.error) {
+      setInterestError(interestsResult.error?.message || linksResult.error?.message || 'تعذر تحميل الاهتمامات');
+      return;
+    }
+    setAvailableInterests(interestsResult.data || []);
+    setInterestLinks((linksResult.data as unknown as InquiryInterestLink[]) || []);
+  };
+
+  useEffect(() => { loadInterests(); }, [inquiry.id]);
+
+  const addInterest = async () => {
+    if (!selectedInterestId) return;
+    setSavingInterest(true); setInterestError('');
+    const { error } = await supabase.from('inquiry_interests').insert({ inquiry_id: inquiry.id, interest_id: selectedInterestId, assigned_employee_id: inquiry.assigned_employee_id || null });
+    setSavingInterest(false);
+    if (error) { setInterestError(error.code === '23505' ? 'هذا العميل مرتبط بالفعل بهذا الاهتمام.' : error.message); return; }
+    setSelectedInterestId(''); await loadInterests(); onChanged();
+  };
+
+  const removeInterest = async (linkId: string) => {
+    const { error } = await supabase.from('inquiry_interests').delete().eq('id',linkId);
+    if (error) { setInterestError(error.message); return; }
+    await loadInterests(); onChanged();
+  };
 
   const openDocument = (doc: DocumentRecord) => {
     const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_path);
@@ -401,6 +439,21 @@ function InquiryDetailModal({ inquiry, onClose, onEdit, onConvert }: DetailModal
             </div>
           )}
 
+          <div className="rounded-xl bg-gray-50 p-3">
+            <p className="mb-3 text-xs font-bold text-navy-900">اهتمامات العميل</p>
+            <div className="flex gap-2">
+              <select className="form-input flex-1 text-xs" value={selectedInterestId} onChange={event=>setSelectedInterestId(event.target.value)}>
+                <option value="">اختر اهتمامًا...</option>
+                {availableInterests.filter(item=>!interestLinks.some(link=>link.interest_id===item.id)).map(item=><option key={item.id} value={item.id}>{item.name} — {new Date(item.program_start_date).toLocaleDateString('ar-EG')}</option>)}
+              </select>
+              <button type="button" disabled={!selectedInterestId||savingInterest} onClick={addInterest} className="btn-gold px-3 text-xs"><Plus size={14}/>{savingInterest?'جارٍ...':'إضافة'}</button>
+            </div>
+            {interestError&&<p className="mt-2 text-xs text-red-600">{interestError}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {interestLinks.length===0?<span className="text-xs text-gray-500">لم تتم إضافة اهتمامات لهذا العميل.</span>:interestLinks.map(link=><span key={link.id} className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold" style={{borderColor:link.interests?.color||'#d1d5db',color:link.interests?.color||'#374151'}}>{link.interests?.name||'اهتمام'}<button type="button" onClick={()=>removeInterest(link.id)} className="text-gray-400 hover:text-red-600" title="إزالة الاهتمام"><X size={12}/></button></span>)}
+            </div>
+          </div>
+
           <div className="bg-gray-50 rounded-xl p-3">
             <div className="flex items-center justify-between gap-3 mb-3">
               <p className="text-xs font-bold text-navy-900 flex items-center gap-1.5">
@@ -462,7 +515,7 @@ export default function Inquiries() {
     setLoading(true);
     setLoadError('');
     const [inqRes, empRes] = await Promise.all([
-      supabase.from('inquiries').select('*, employees!inquiries_assigned_employee_id_fkey(id, name)').order('created_at', { ascending: false }),
+      supabase.from('inquiries').select('*, employees!inquiries_assigned_employee_id_fkey(id, name)').order('updated_at', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('employees').select('id, name, role').eq('is_active', true),
     ]);
     if (inqRes.error) {
@@ -749,6 +802,7 @@ export default function Inquiries() {
           onClose={() => setDetailInquiry(null)}
           onEdit={() => { setEditInquiry(detailInquiry); setDetailInquiry(null); setShowModal(true); }}
           onConvert={() => { setConvertInquiry(detailInquiry); setDetailInquiry(null); }}
+          onChanged={load}
         />
       )}
       {convertInquiry && (
