@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Hotel, Users, Loader2, Plane, Calendar, ArrowLeft } from 'lucide-react';
+import { MapPin, Hotel, Users, Calendar, Plane } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { InternalTrip } from '../../types';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
 import ShareButton from '../../components/public/ShareButton';
+import { Empty, Loading, PageHero, SectionHead } from '../../components/public/site/sections';
+import { formatEGP, waLink } from '../../components/public/site/siteData';
+import { WhatsAppIcon } from '../../components/public/site/icons';
 
 interface Props {
   onNavigate: (p: PublicPage, preset?: { packageId?: string; type?: string }) => void;
@@ -23,49 +26,58 @@ export default function InternalPage({ onNavigate }: Props) {
 
   return (
     <div>
-      <section className="relative min-h-[400px] overflow-hidden">
-        <img src="https://images.pexels.com/photos/1287460/pexels-photo-1287460.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="الرحلات السياحية" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 public-hero-overlay" />
-        <div className="relative max-w-7xl mx-auto px-4 py-28 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-4"><Plane size={12} /> سياحة</span>
-          <h1 className="text-3xl md:text-5xl font-black mb-3">الرحلات السياحية</h1>
-          <p className="text-white/80 text-lg max-w-2xl">اكتشف أجمل الوجهات — شرم الشيخ، الغردقة، إسطنبول، دبي وغيرها برامج سياحية متكاملة.</p>
+      <PageHero
+        eyebrow="شرم الشيخ · الغردقة · الأقصر وأسوان"
+        title={<>السياحة <em>الداخلية</em></>}
+        lead="رحلات عائلية ورحلات شركات داخل مصر، بفنادق مختارة وبرنامج واضح من أول يوم لآخر يوم."
+        crumbs={[{ label: 'الرئيسية', page: 'home' }, { label: 'السياحة الداخلية' }]}
+        onNavigate={onNavigate}
+      >
+        <div className="pm-cta-row">
+          <a className="pm-btn pm-btn-gold" href={waLink('السلام عليكم، أريد برنامج رحلة داخلية من برومس للسياحة')} target="_blank" rel="noopener noreferrer"><WhatsAppIcon /> اطلب برنامج رحلة</a>
         </div>
-      </section>
+      </PageHero>
 
-      <section className="py-16 bg-[#fbfaf7]">
-        <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl font-black text-emerald-950 mb-8">الرحلات المتاحة</h2>
+      <section className="pm-section">
+        <div className="pm-wrap">
+          <SectionHead kicker="رحلات قادمة" title="الرحلات المتاحة" text="المقاعد محدودة في كل رحلة، والأسعار للفرد." />
           {loading ? (
-            <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-gold-600" /></div>
+            <Loading />
           ) : trips.length === 0 ? (
-            <div className="text-center py-16 text-gray-400"><Plane size={48} className="mx-auto mb-3 opacity-30" /><p className="font-medium">لا توجد رحلات متاحة حالياً</p></div>
+            <Empty icon={<Plane size={44} />} title="لا توجد رحلات متاحة حالياً" text="راسلنا ونرتب لك برنامجاً خاصاً لعائلتك أو شركتك." />
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="pm-grid-3">
               {trips.map((t) => {
                 const seatPct = t.total_seats > 0 ? Math.round((t.available_seats / t.total_seats) * 100) : 0;
                 return (
-                  <div key={t.id} className="public-card overflow-hidden">
-                    <div className="relative h-52 overflow-hidden bg-gradient-emerald flex items-center justify-center">
-                      <MapPin size={56} className="text-gold-400/40" />
-                      <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur text-emerald-950 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1"><MapPin size={11} /> {t.destination}</div>
-                      <div className="absolute top-3 left-3" onClick={(e) => e.stopPropagation()}><ShareButton title={t.name} compact /></div>
+                  <article key={t.id} className="pm-card flex flex-col">
+                    <div className="pm-card-media pm-pattern h-40">
+                      <div className="pm-media-fallback"><MapPin size={46} /></div>
+                      <span className="pm-pill glass absolute bottom-3 right-3"><MapPin size={12} /> {t.destination}</span>
+                      <div className="absolute top-3 left-3"><ShareButton title={t.name} compact /></div>
                     </div>
-                    <div className="p-5">
-                      <h3 className="font-black text-emerald-950 text-lg mb-1">{t.name}</h3>
-                      {t.duration && <p className="text-gray-400 text-xs mb-3">{t.duration}</p>}
-                      <div className="space-y-2 text-xs text-gray-600 mb-4">
-                        {t.hotel && <div className="flex items-center gap-2"><Hotel size={13} className="text-gold-600" /> {t.hotel}</div>}
-                        <div className="flex items-center gap-2"><Calendar size={13} className="text-gold-600" /> {new Date(t.start_date).toLocaleDateString('ar-EG')} ← {new Date(t.end_date).toLocaleDateString('ar-EG')}</div>
-                        <div className="flex items-center gap-2"><Users size={13} className="text-gold-600" /> مقاعد متاحة: {t.available_seats} / {t.total_seats}</div>
+                    <div className="p-5 flex-1 flex flex-col gap-3">
+                      <div>
+                        <h3 className="text-xl">{t.name}</h3>
+                        {t.duration && <p className="text-sm text-pm-muted">{t.duration}</p>}
                       </div>
-                      <div className="mb-3"><div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${seatPct > 50 ? 'bg-emerald-500' : seatPct > 20 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${seatPct}%` }} /></div></div>
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <div><p className="text-xs text-gray-400">السعر للفرد</p><p className="font-black text-emerald-950 text-lg">{Number(t.price).toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p></div>
-                        <button onClick={() => onNavigate('booking', { type: 'داخلي' })} className="bg-gradient-gold text-emerald-950 font-bold text-xs px-4 py-2 rounded-xl hover:shadow-lg transition-all flex items-center gap-1">استكشف الرحلة <ArrowLeft size={12} /></button>
+                      <div className="pm-meta">
+                        {t.hotel && <div><Hotel size={14} /> {t.hotel}</div>}
+                        <div><Calendar size={14} /> {new Date(t.start_date).toLocaleDateString('ar-EG')} ← {new Date(t.end_date).toLocaleDateString('ar-EG')}</div>
+                        <div><Users size={14} /> مقاعد متاحة: {t.available_seats} / {t.total_seats}</div>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-pm-line overflow-hidden" aria-hidden="true">
+                        <div className={`h-full rounded-full ${seatPct > 20 ? 'bg-pm-teal-3' : 'bg-pm-gold-deep'}`} style={{ width: `${seatPct}%` }} />
+                      </div>
+                      <div className="mt-auto pt-3 pm-divider flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-[12px] text-pm-muted">السعر للفرد</p>
+                          <p className="pm-price">{formatEGP(t.price)}</p>
+                        </div>
+                        <button type="button" onClick={() => onNavigate('booking', { type: 'داخلي' })} className="pm-btn pm-btn-gold pm-btn-sm">احجز مقعدك</button>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>

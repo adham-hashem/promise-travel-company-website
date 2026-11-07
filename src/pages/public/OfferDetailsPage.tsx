@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, Tag } from 'lucide-react';
+import { CalendarDays, Clock3, MapPin, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { Offer, Package } from '../../types';
+import { offerShareUrl } from '../../lib/share-urls';
 import type { PublicPage } from '../../components/public/WebsiteRouter';
 import ShareButton from '../../components/public/ShareButton';
+import { Empty, Loading, PageHero } from '../../components/public/site/sections';
+import { formatEGP, offerPricing, waLink, type OfferWithPackage } from '../../components/public/site/siteData';
+import { WhatsAppIcon } from '../../components/public/site/icons';
 
 interface Props {
   offerId: string;
@@ -11,36 +14,98 @@ interface Props {
 }
 
 export default function OfferDetailsPage({ offerId, onNavigate }: Props) {
-  const [offer, setOffer] = useState<(Offer & { packages?: Package }) | null>(null);
+  const [offer, setOffer] = useState<OfferWithPackage | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     supabase.from('offers').select('*, packages(*)').eq('id', offerId).maybeSingle().then(({ data }) => {
-      setOffer(data as (Offer & { packages?: Package }) | null);
+      setOffer(data as OfferWithPackage | null);
       setLoading(false);
     });
   }, [offerId]);
 
-  if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 size={30} className="animate-spin text-gold-600" /></div>;
-  if (!offer) return <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-gray-500"><Tag size={48} className="text-gray-300" /><p className="font-bold">العرض غير متاح حالياً</p><button onClick={() => onNavigate('offers')} className="text-gold-600 font-bold">العودة إلى العروض</button></div>;
+  if (loading) return <Loading />;
+  if (!offer) {
+    return (
+      <div className="pm-wrap pm-section">
+        <Empty icon={<Tag size={48} />} title="العرض غير متاح حالياً" />
+        <div className="text-center mt-5"><button type="button" className="pm-btn pm-btn-teal" onClick={() => onNavigate('offers')}>العودة إلى العروض</button></div>
+      </div>
+    );
+  }
 
   const pkg = offer.packages;
-  const original = offer.original_price ?? pkg?.price;
-  const discounted = offer.discounted_price ?? (pkg ? Math.round(Number(pkg.price) * (1 - offer.discount_percentage / 100)) : null);
-  const image = offer.image_url || pkg?.image_url || 'https://images.pexels.com/photos/35299546/pexels-photo-35299546.jpeg?auto=compress&cs=tinysrgb&w=1600';
+  const { original, discounted } = offerPricing(offer);
+  const image = offer.image_url || pkg?.image_url;
   const type = offer.type || pkg?.type || 'رحلة سياحية';
+  const url = offerShareUrl(offer.id);
 
   return (
-    <div className="bg-[#fbfaf7] pb-20">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-2 text-sm text-gray-500"><button onClick={() => onNavigate('home')} className="hover:text-gold-600">الرئيسية</button><ArrowRight size={14} /><button onClick={() => onNavigate('offers')} className="hover:text-gold-600">العروض</button><ArrowRight size={14} /><span className="text-emerald-950 font-bold">{offer.name}</span></div>
-      <section className="max-w-7xl mx-auto px-4 pt-3"><div className="relative h-[360px] md:h-[510px] rounded-[2rem] overflow-hidden"><img src={image} alt={offer.name} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-emerald-950/30 to-transparent" /><div className="absolute top-6 right-6 bg-red-600 text-white font-black rounded-xl px-4 py-2">خصم {offer.discount_percentage}%</div><div className="absolute top-6 left-6"><ShareButton title={offer.name} compact shareUrl={`${window.location.origin}/#offer/${offer.id}`} /></div><div className="absolute bottom-8 right-6 left-6 text-white"><span className="inline-flex items-center gap-2 text-gold-300 text-sm font-bold mb-3"><Tag size={15} /> {type}</span><h1 className="text-3xl md:text-5xl font-black">{offer.name}</h1><p className="text-white/75 mt-3 max-w-2xl">{offer.description || 'استمتع بتجربة سفر متكاملة مع PROMISE وخدمة تهتم بكل التفاصيل.'}</p></div></div></section>
-      <section className="max-w-7xl mx-auto px-4 mt-8 grid lg:grid-cols-[1fr_360px] gap-8">
-        <div className="space-y-7">
-          <div className="grid sm:grid-cols-3 gap-3"><div className="public-card p-5"><Clock3 size={20} className="text-gold-600 mb-3" /><p className="text-xs text-gray-400">المدة</p><p className="font-black text-emerald-950 mt-1">{pkg?.duration_days || 'حسب البرنامج'} {pkg?.duration_days ? 'أيام' : ''}</p></div><div className="public-card p-5"><MapPin size={20} className="text-gold-600 mb-3" /><p className="text-xs text-gray-400">الوجهة</p><p className="font-black text-emerald-950 mt-1">{type === 'حج' || type === 'عمرة' ? 'مكة والمدينة' : 'وجهة مميزة'}</p></div><div className="public-card p-5"><CalendarDays size={20} className="text-gold-600 mb-3" /><p className="text-xs text-gray-400">صلاحية العرض</p><p className="font-black text-emerald-950 mt-1 text-sm">حتى {new Date(offer.end_date).toLocaleDateString('ar-EG')}</p></div></div>
-          <div className="public-card p-7"><h2 className="text-2xl font-black text-emerald-950 mb-5">تفاصيل البرنامج</h2><p className="text-gray-600 leading-relaxed">{offer.description || 'برنامج متكامل تم اختياره بعناية ليمنحك رحلة مريحة ومنظمة. تواصل مع فريقنا لمعرفة الجدول اليومي والتفاصيل المناسبة لاحتياجاتك.'}</p><div className="grid sm:grid-cols-2 gap-3 mt-7">{['إقامة مريحة', 'متابعة من فريق متخصص', 'تنظيم واضح للرحلة', 'خيارات نقل مرنة', 'خدمة عملاء مستمرة', 'أسعار خاصة لفترة محدودة'].map((item) => <div key={item} className="flex items-center gap-2 text-sm text-gray-600"><CheckCircle2 size={17} className="text-emerald-600" />{item}</div>)}</div></div>
-          <div className="public-card p-7"><h2 className="text-2xl font-black text-emerald-950 mb-5">شروط الحجز</h2><ul className="space-y-3 text-sm text-gray-600 leading-relaxed list-disc pr-5"><li>يتم تأكيد الحجز بعد مراجعة البيانات والتواصل مع فريق Promise.</li><li>الأسعار قابلة للتحديث حسب التوافر ومواعيد السفر.</li><li>تطبق الشروط الخاصة بالبرنامج عند إتمام الحجز.</li></ul></div>
+    <div>
+      <PageHero
+        eyebrow={type}
+        title={offer.name}
+        lead={offer.description || undefined}
+        crumbs={[{ label: 'الرئيسية', page: 'home' }, { label: 'العروض', page: 'offers' }, { label: offer.name }]}
+        onNavigate={onNavigate}
+      >
+        <div className="mt-4"><span className="pm-pill gold" style={{ fontSize: 15, padding: '4px 14px' }}><Tag size={14} /> خصم {offer.discount_percentage}%</span></div>
+      </PageHero>
+
+      <section className="pm-wrap py-10 grid lg:grid-cols-[1fr_360px] gap-8 items-start">
+        <div className="space-y-6 min-w-0">
+          {image && (
+            <div className="pm-card-media h-[260px] md:h-[420px] rounded-[14px]">
+              <img src={image} alt={offer.name} />
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { icon: Clock3, label: 'المدة', value: pkg?.duration_days ? `${pkg.duration_days} أيام` : 'حسب البرنامج' },
+              { icon: MapPin, label: 'الوجهة', value: type === 'حج' || type === 'عمرة' ? 'مكة والمدينة' : 'حسب البرنامج' },
+              { icon: CalendarDays, label: 'صلاحية العرض', value: `حتى ${new Date(offer.end_date).toLocaleDateString('ar-EG')}` },
+            ].map(({ icon: Icon, label, value }) => (
+              <div key={label} className="pm-panel" style={{ padding: 20 }}>
+                <Icon size={20} className="text-pm-gold-deep mb-2" />
+                <p className="text-xs text-pm-muted">{label}</p>
+                <p className="font-semibold text-pm-teal mt-0.5">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="pm-panel">
+            <h3 className="mb-3">تفاصيل البرنامج</h3>
+            <p className="text-pm-muted">{offer.description || 'تواصل مع فريقنا لمعرفة الجدول اليومي والتفاصيل المناسبة لاحتياجاتك، ونرسل لك عرض سعر مكتوباً برقم مرجعي.'}</p>
+            {pkg && (
+              <button type="button" className="pm-link mt-4" onClick={() => onNavigate('package-details', undefined, pkg.id)}>عرض تفاصيل الباقة المرتبطة ←</button>
+            )}
+          </div>
+
+          <div className="pm-panel">
+            <h3 className="mb-3">شروط الحجز</h3>
+            <ul className="pm-bullets text-pm-muted" style={{ fontSize: 15 }}>
+              <li>يتم تأكيد الحجز بعد مراجعة البيانات والتواصل مع فريق برومس.</li>
+              <li>الأسعار قابلة للتحديث حسب التوافر ومواعيد السفر.</li>
+              <li>تطبق الشروط الخاصة بالبرنامج كما هي موضحة في عرض السعر.</li>
+            </ul>
+          </div>
         </div>
-        <aside className="lg:sticky lg:top-28 h-fit"><div className="bg-emerald-950 rounded-[2rem] p-7 text-white shadow-xl"><p className="text-white/60 text-sm">السعر الخاص يبدأ من</p>{original != null && <p className="text-white/45 line-through text-sm mt-2">{Number(original).toLocaleString('ar-EG')} ج.م</p>}{discounted != null ? <p className="text-4xl font-black text-gold-300 mt-1">{Number(discounted).toLocaleString('ar-EG')} <span className="text-sm font-medium">ج.م</span></p> : <p className="text-2xl font-black text-gold-300 mt-2">تواصل معنا</p>}<div className="border-t border-white/10 my-6" /><button onClick={() => onNavigate('booking', { packageId: pkg?.id, type: offer.type || pkg?.type })} className="w-full bg-gradient-gold text-emerald-950 font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] transition-all">احجز الآن</button><button onClick={() => onNavigate('contact')} className="w-full mt-3 border border-white/20 text-white font-bold py-3.5 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2"><MessageCircle size={17} /> تواصل معنا</button><div className="border-t border-white/10 mt-5 pt-4"><p className="text-white/60 text-xs mb-3">شارك هذا العرض</p><ShareButton title={offer.name} label="مشاركة" shareUrl={`${window.location.origin}/#offer/${offer.id}`} /></div></div></aside>
+
+        <aside className="pm-sticky">
+          <div className="pm-side">
+            <p className="muted text-sm">السعر الخاص يبدأ من</p>
+            {original != null && discounted != null && <p className="pm-price-old mt-1">{formatEGP(original)}</p>}
+            {discounted != null ? <p className="pm-price mt-1">{formatEGP(discounted)}</p> : <p className="pm-price mt-1" style={{ fontSize: 26 }}>تواصل معنا</p>}
+            <hr />
+            <button type="button" onClick={() => onNavigate('booking', { packageId: pkg?.id, type: offer.type || pkg?.type })} className="pm-btn pm-btn-gold pm-btn-block">احجز الآن</button>
+            <a className="pm-btn pm-btn-line pm-btn-block mt-3" href={waLink(`السلام عليكم، أريد الاستفسار عن عرض: ${offer.name}`)} target="_blank" rel="noopener noreferrer"><WhatsAppIcon /> اسأل عبر واتساب</a>
+            <hr />
+            <p className="muted text-xs mb-3">شارك هذا العرض</p>
+            <ShareButton title={offer.name} label="مشاركة" shareUrl={url} />
+          </div>
+        </aside>
       </section>
     </div>
   );

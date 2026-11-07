@@ -1,24 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Loader2, CheckCircle2, Moon, Plane, MapPin, Hotel as HotelIcon,
-  User, Users, Phone, Mail, FileText, Send, Upload,
-  Eye, Trash2, Globe, Hash, BedDouble,
+  Loader2, CheckCircle2, Send, Upload, Eye, Trash2, Hash,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageCompressor';
 import { adultRoomOptions, getPackagePriceForCustomer, type AgeGroup, type AdultRoomType } from '../../lib/packagePricing';
 import type { Package, Hotel, InternalTrip } from '../../types';
+import type { PublicPage } from '../../components/public/WebsiteRouter';
+import { PageHero } from '../../components/public/site/sections';
+import { ProgramIcon, WhatsAppIcon } from '../../components/public/site/icons';
+import { waLink, type ProgramIconKey } from '../../components/public/site/siteData';
 
 interface Props {
   preset?: { packageId?: string; type?: string };
   onDone: () => void;
+  onNavigate?: (p: PublicPage) => void;
 }
 
-const serviceTypes = [
-  { value: 'حج', label: 'حج', icon: Moon },
-  { value: 'عمرة', label: 'عمرة', icon: Plane },
-  { value: 'داخلي', label: 'سياحة داخلية', icon: MapPin },
-  { value: 'فندق', label: 'حجز فندق', icon: HotelIcon },
+const serviceTypes: { value: string; label: string; icon: ProgramIconKey }[] = [
+  { value: 'حج', label: 'حج', icon: 'hajj' },
+  { value: 'عمرة', label: 'عمرة', icon: 'umrah' },
+  { value: 'داخلي', label: 'سياحة داخلية', icon: 'internal' },
+  { value: 'فندق', label: 'حجز فندق', icon: 'hotels' },
 ];
 
 const optionalDocs = [
@@ -39,7 +42,7 @@ interface TravelerLine {
   room_type: AdultRoomType | '';
 }
 
-export default function BookingPage({ preset, onDone }: Props) {
+export default function BookingPage({ preset, onDone, onNavigate }: Props) {
   const [packages, setPackages] = useState<Package[] | null>(null);
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [trips, setTrips] = useState<InternalTrip[]>([]);
@@ -262,28 +265,29 @@ export default function BookingPage({ preset, onDone }: Props) {
     }
   };
 
+  const isPackageService = form.service_type === 'حج' || form.service_type === 'عمرة';
+  const req = <span style={{ color: '#B3412E' }}>*</span>;
+
   if (done) {
     return (
-      <div className="min-h-[70vh] flex items-start justify-center px-4 pt-10 pb-20">
-        <div className="max-w-md text-center bg-white rounded-3xl border border-emerald-100 shadow-xl p-8 animate-fadeIn">
-          <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 animate-fadeIn">
-            <CheckCircle2 size={48} className="text-emerald-600" />
-          </div>
-          <h2 className="text-2xl font-black text-emerald-950 mb-3">تم استلام طلبك بنجاح!</h2>
-          <p className="text-gray-500 mb-2">شكراً لك. سيتواصل معك فريق المبيعات لدينا في أقرب وقت لتأكيد الحجز.</p>
-          {createdCode && (
-            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 mt-3 mb-4">
-              <Hash size={16} className="text-gold-600" />
-              <span className="font-mono font-black text-emerald-800">رقم الطلب: {createdCode}</span>
+      <div className="pm-section">
+        <div className="pm-wrap" style={{ maxWidth: 560 }}>
+          <div className="pm-panel text-center animate-fadeIn">
+            <span className="pm-ico mx-auto mb-4" style={{ width: 72, height: 72, borderRadius: '50%' }}><CheckCircle2 size={36} /></span>
+            <h2 className="text-3xl font-bold text-pm-teal mb-2">تم استلام طلبك</h2>
+            <p className="text-pm-muted">شكراً لك. سيتواصل معك فريق المبيعات في أقرب وقت خلال مواعيد العمل لتأكيد التفاصيل وإرسال عرض السعر.</p>
+            {createdCode && (
+              <div className="inline-flex items-center gap-2 rounded-[10px] border border-dashed border-pm-gold-deep px-4 py-2 mt-5">
+                <Hash size={16} className="text-pm-gold-deep" />
+                <span className="text-pm-teal font-semibold">رقم الطلب: <span className="pm-num pm-latin" style={{ letterSpacing: '.06em' }}>{createdCode}</span></span>
+              </div>
+            )}
+            <p className="text-sm text-pm-muted mt-3">احتفظ بهذا الرقم لمتابعة طلبك معنا.</p>
+            <div className="flex flex-wrap gap-3 justify-center mt-6">
+              <button type="button" onClick={onDone} className="pm-btn pm-btn-gold">العودة للرئيسية</button>
+              <a className="pm-btn pm-btn-teal" href={waLink(`السلام عليكم، أرسلت طلب حجز من الموقع${createdCode ? ` برقم ${createdCode}` : ''}`)} target="_blank" rel="noopener noreferrer"><WhatsAppIcon /> تابع عبر واتساب</a>
             </div>
-          )}
-          <button
-            type="button"
-            onClick={onDone}
-            className="mt-4 w-full bg-gradient-gold text-emerald-950 font-black py-3 rounded-xl shadow-lg hover:scale-[1.02] transition-all"
-          >
-            الذهاب إلى الصفحة الرئيسية
-          </button>
+          </div>
         </div>
       </div>
     );
@@ -291,67 +295,50 @@ export default function BookingPage({ preset, onDone }: Props) {
 
   return (
     <div>
-      {/* Hero */}
-      <section className="relative h-[35vh] min-h-[280px] overflow-hidden">
-        <img src="https://images.pexels.com/photos/1620168/pexels-photo-1620168.jpeg?auto=compress&cs=tinysrgb&w=1920" alt="احجز الآن" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-emerald-950 via-emerald-900/70 to-emerald-900/30" />
-        <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col justify-end pb-12 text-white">
-          <span className="inline-flex w-fit items-center gap-2 bg-gold-500/20 backdrop-blur border border-gold-400/30 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold mb-3">
-            <Globe size={12} /> حجز من الموقع
-          </span>
-          <h1 className="text-3xl md:text-5xl font-black mb-2">احجز رحلتك</h1>
-          <p className="text-white/80 text-lg">ابدأ رحلتك المباركة الآن — املأ النموذج وسنتواصل معك فوراً</p>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="نموذج الحجز"
+        title={<>اطلب عرض <em>سعر</em></>}
+        lead="املأ البيانات وسيتواصل معك فريق المبيعات بعرض سعر مكتوب برقم مرجعي. يمكنك رفع المستندات الآن أو لاحقاً."
+        crumbs={onNavigate ? [{ label: 'الرئيسية', page: 'home' }, { label: 'نموذج الحجز' }] : undefined}
+        onNavigate={(p) => onNavigate?.(p)}
+      />
 
-      {/* Form */}
-      <section className="py-16">
-        <div className="max-w-2xl mx-auto px-4">
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-emerald p-6">
-              <h2 className="text-white font-black text-lg">نموذج الحجز</h2>
-              <p className="text-white/60 text-sm mt-1">الحقول المطلوبة مشار إليها بعلامة <span className="text-red-400">*</span> — المستندات اختيارية</p>
-            </div>
+      <section className="pm-section tight tint">
+        <div className="pm-wrap" style={{ maxWidth: 820 }}>
+          <div className="pm-panel">
+            <h3>بيانات الحجز</h3>
+            <p className="pm-panel-lead">الحقول المطلوبة عليها علامة {req}، والمستندات اختيارية.</p>
 
-            <div className="p-6 space-y-5">
+            <div className="space-y-6">
               {/* Service type */}
               <div>
-                <label className="form-label">نوع الخدمة <span className="text-red-500">*</span></label>
+                <p className="pm-label mb-2">نوع الخدمة {req}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {serviceTypes.map((s) => {
-                    const Icon = s.icon;
-                    const active = form.service_type === s.value;
-                    return (
-                      <button
-                        key={s.value}
-                        type="button"
-                        onClick={() => setService(s.value)}
-                        className={`p-3 sm:p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-1.5 ${
-                          active ? 'border-gold-500 bg-gold-50 text-emerald-900' : 'border-gray-100 text-gray-500 hover:border-emerald-200'
-                        }`}
-                      >
-                        <Icon size={20} />
-                        <span className="text-xs font-bold">{s.label}</span>
-                      </button>
-                    );
-                  })}
+                  {serviceTypes.map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => setService(s.value)}
+                      aria-pressed={form.service_type === s.value}
+                      className="pm-choice flex flex-col items-center gap-1.5"
+                    >
+                      <ProgramIcon name={s.icon} size={22} />
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Package / Hotel / Trip selection */}
-              {form.service_type === 'حج' || form.service_type === 'عمرة' ? (
-                <div>
-                  <label className="form-label">الباقة</label>
+              {/* Package selection */}
+              {isPackageService && (
+                <div className="pm-field">
+                  <label htmlFor="bk-package">الباقة</label>
                   {packages === null ? (
-                    <div className="flex items-center gap-2 text-gray-400 text-sm py-3"><Loader2 size={16} className="animate-spin" /> جارٍ تحميل الباقات...</div>
+                    <div className="flex items-center gap-2 text-pm-muted text-sm py-3"><Loader2 size={16} className="animate-spin" /> جارٍ تحميل الباقات...</div>
                   ) : packages.length === 0 ? (
-                    <p className="text-gray-400 text-sm py-3">لا توجد باقات متاحة حالياً</p>
+                    <p className="text-pm-muted text-sm py-3">لا توجد باقات متاحة حالياً، ويمكنك إرسال الطلب وسنرسل لك أقرب البرامج.</p>
                   ) : (
-                    <select
-                      value={form.package_id}
-                      onChange={(e) => setPackage(e.target.value)}
-                      className="form-input"
-                    >
+                    <select id="bk-package" value={form.package_id} onChange={(e) => setPackage(e.target.value)}>
                       <option value="">— اختر باقة —</option>
                       {packages.map((p) => (
                         <option key={p.id} value={p.id}>{p.name} — {Number(p.price).toLocaleString('ar-EG')} ج.م</option>
@@ -359,48 +346,46 @@ export default function BookingPage({ preset, onDone }: Props) {
                     </select>
                   )}
                 </div>
-              ) : null}
+              )}
 
-              {(form.service_type === 'حج' || form.service_type === 'عمرة') && selectedPackage && (
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 space-y-4">
+              {isPackageService && selectedPackage && (
+                <div className="rounded-[14px] border border-pm-line bg-pm-paper p-4 space-y-4">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <h3 className="font-black text-emerald-950 text-sm">تفاصيل الغرفة والمسافرين</h3>
-                      <p className="text-xs text-gray-500 mt-1">يتم حساب السعر من بيانات الباقة المحفوظة في النظام.</p>
+                      <h4 className="text-lg font-semibold text-pm-teal">الغرف والمسافرين</h4>
+                      <p className="text-xs text-pm-muted mt-1">السعر محسوب من بيانات الباقة المسجلة لدينا.</p>
                     </div>
                     {packageTotal > 0 && (
                       <div className="text-left">
-                        <p className="text-xs text-gray-500">إجمالي تقديري</p>
-                        <p className="font-black text-emerald-950 text-lg">{packageTotal.toLocaleString('ar-EG')} <span className="text-xs font-medium">ج.م</span></p>
+                        <p className="text-xs text-pm-muted">إجمالي تقديري</p>
+                        <p className="pm-price">{packageTotal.toLocaleString('ar-EG')} <small>ج.م</small></p>
                       </div>
                     )}
                   </div>
 
-                  <div>
-                    <label className="form-label">عدد الأشخاص</label>
-                    <input type="number" min="1" value={form.travelers} onChange={(e) => setTravelerCount(e.target.value)} className="form-input bg-white text-left" dir="ltr" />
+                  <div className="pm-field" style={{ maxWidth: 200 }}>
+                    <label htmlFor="bk-travelers">عدد الأشخاص</label>
+                    <input id="bk-travelers" type="number" min="1" value={form.travelers} onChange={(e) => setTravelerCount(e.target.value)} dir="ltr" style={{ background: '#fff' }} />
                   </div>
 
                   <div className="space-y-3">
                     {travelerLines.map((traveler, index) => {
                       const travelerPrice = getPackagePriceForCustomer(selectedPackage, traveler.age_group, traveler.room_type);
                       return (
-                        <div key={traveler.id} className="rounded-2xl border border-emerald-100 bg-white p-3 space-y-3">
+                        <div key={traveler.id} className="rounded-[12px] border border-pm-line bg-white p-3 space-y-3">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-black text-emerald-950">مسافر {index + 1}</p>
-                            <p className="text-sm font-black text-emerald-800">{travelerPrice.toLocaleString('ar-EG')} ج.م</p>
+                            <p className="font-semibold text-pm-teal">مسافر {index + 1}</p>
+                            <p className="font-semibold text-pm-teal">{travelerPrice.toLocaleString('ar-EG')} ج.م</p>
                           </div>
-                          <div className="grid sm:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             {(['بالغ', 'طفل', 'رضيع'] as AgeGroup[]).map((ageGroup) => (
                               <button
                                 key={ageGroup}
                                 type="button"
                                 onClick={() => updateTraveler(traveler.id, { age_group: ageGroup })}
-                                className={`rounded-xl border-2 px-3 py-2 text-xs font-bold transition-all ${
-                                  traveler.age_group === ageGroup
-                                    ? 'border-gold-500 bg-gold-50 text-emerald-950'
-                                    : 'border-gray-100 text-gray-500 hover:border-emerald-200'
-                                }`}
+                                aria-pressed={traveler.age_group === ageGroup}
+                                className="pm-choice"
+                                style={{ padding: '8px 10px' }}
                               >
                                 {ageGroup}
                               </button>
@@ -413,23 +398,18 @@ export default function BookingPage({ preset, onDone }: Props) {
                                   key={option.value}
                                   type="button"
                                   onClick={() => updateTraveler(traveler.id, { room_type: option.value })}
-                                  className={`rounded-xl border-2 p-3 text-right transition-all ${
-                                    traveler.room_type === option.value
-                                      ? 'border-gold-500 bg-emerald-50 text-emerald-950 shadow-sm'
-                                      : 'border-emerald-100 bg-white text-gray-600 hover:border-gold-300'
-                                  }`}
+                                  aria-pressed={traveler.room_type === option.value}
+                                  className="pm-choice"
+                                  style={{ padding: '9px 12px', textAlign: 'right' }}
                                 >
-                                  <div className="flex items-center gap-2 text-xs font-bold">
-                                    <BedDouble size={14} className="text-gold-600" />
-                                    {option.label}
-                                  </div>
-                                  <p className="mt-1 text-sm font-black">{Number(option.price).toLocaleString('ar-EG')} ج.م</p>
+                                  <span className="block text-xs">{option.label}</span>
+                                  <span className="block text-sm">{Number(option.price).toLocaleString('ar-EG')} ج.م</span>
                                 </button>
                               ))}
                             </div>
                           )}
                           {traveler.age_group !== 'بالغ' && (
-                            <p className="text-[11px] text-gray-500">لا يوجد نوع تسكين مستقل للطفل أو الرضيع، ويُحسب بسعره المستقل داخل الباقة.</p>
+                            <p className="text-xs text-pm-muted">لا يوجد نوع تسكين مستقل للطفل أو الرضيع، ويُحسب بسعره داخل الباقة.</p>
                           )}
                         </div>
                       );
@@ -439,9 +419,9 @@ export default function BookingPage({ preset, onDone }: Props) {
               )}
 
               {form.service_type === 'فندق' && (
-                <div>
-                  <label className="form-label">الفندق</label>
-                  <select value={form.hotel_id} onChange={(e) => setForm({ ...form, hotel_id: e.target.value })} className="form-input">
+                <div className="pm-field">
+                  <label htmlFor="bk-hotel">الفندق</label>
+                  <select id="bk-hotel" value={form.hotel_id} onChange={(e) => setForm({ ...form, hotel_id: e.target.value })}>
                     <option value="">— اختر فندق —</option>
                     {hotels.map((h) => (
                       <option key={h.id} value={h.id}>{h.name} — {h.city} — {Number(h.price_per_night).toLocaleString('ar-EG')} ج.م/ليلة</option>
@@ -452,110 +432,82 @@ export default function BookingPage({ preset, onDone }: Props) {
 
               {form.service_type === 'داخلي' && trips.length > 0 && (
                 <div>
-                  <label className="form-label">الرحلة المتاحة</label>
+                  <p className="pm-label mb-2">الرحلات المتاحة</p>
                   <div className="space-y-2">
                     {trips.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <div>
-                          <p className="text-sm font-bold text-emerald-900">{t.name}</p>
-                          <p className="text-xs text-gray-500">{t.destination} — {new Date(t.start_date).toLocaleDateString('ar-EG')}</p>
+                      <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-[10px] border border-pm-line bg-pm-paper">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-pm-teal">{t.name}</p>
+                          <p className="text-xs text-pm-muted">{t.destination} — {new Date(t.start_date).toLocaleDateString('ar-EG')}</p>
                         </div>
-                        <span className="text-sm font-bold text-emerald-700">{Number(t.price).toLocaleString('ar-EG')} ج.م</span>
+                        <span className="text-sm font-semibold text-pm-teal flex-none">{Number(t.price).toLocaleString('ar-EG')} ج.م</span>
                       </div>
                     ))}
                   </div>
+                  <p className="text-xs text-pm-muted mt-2">اذكر اسم الرحلة في الملاحظات.</p>
                 </div>
               )}
 
-              {/* Name + Phone */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">الاسم بالكامل <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <User size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
-                    <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="form-input pl-12 pr-4 text-right" placeholder="الاسم بالكامل" dir="rtl" />
-                  </div>
+              <div className="pm-fields">
+                <div className="pm-field">
+                  <label htmlFor="bk-name">الاسم بالكامل {req}</label>
+                  <input id="bk-name" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: محمد أحمد" />
                 </div>
-                <div>
-                  <label className="form-label">رقم الهاتف <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                    <input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="01xxxxxxxxx" />
-                  </div>
+                <div className="pm-field">
+                  <label htmlFor="bk-phone">رقم الهاتف {req}</label>
+                  <input id="bk-phone" inputMode="tel" autoComplete="tel" dir="ltr" style={{ textAlign: 'right' }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01xxxxxxxxx" />
                 </div>
-              </div>
-
-              {/* WhatsApp + Email */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">رقم واتساب</label>
-                  <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                    <input dir="ltr" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="01xxxxxxxxx" />
-                  </div>
+                <div className="pm-field">
+                  <label htmlFor="bk-wa">رقم واتساب</label>
+                  <input id="bk-wa" inputMode="tel" dir="ltr" style={{ textAlign: 'right' }} value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="01xxxxxxxxx" />
                 </div>
-                <div>
-                  <label className="form-label">البريد الإلكتروني</label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-gray-400 pointer-events-none" />
-                    <input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="form-input pr-12 pl-4 text-left" placeholder="example@email.com" />
-                  </div>
+                <div className="pm-field">
+                  <label htmlFor="bk-email">البريد الإلكتروني</label>
+                  <input id="bk-email" type="email" autoComplete="email" dir="ltr" style={{ textAlign: 'right' }} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="example@email.com" />
                 </div>
-              </div>
-
-              {/* Travelers + Travel date */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                {!(form.service_type === 'حج' || form.service_type === 'عمرة') ? (
-                  <div>
-                    <label className="form-label">عدد الأفراد</label>
-                    <div className="relative">
-                      <Users size={16} className="absolute top-1/2 -translate-y-1/2 left-3 text-gray-400 pointer-events-none" />
-                      <input type="number" min="1" value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} className="form-input pl-12 pr-4 text-left" placeholder="1" dir="ltr" />
-                    </div>
+                {!isPackageService && (
+                  <div className="pm-field">
+                    <label htmlFor="bk-count">عدد الأفراد</label>
+                    <input id="bk-count" type="number" min="1" dir="ltr" style={{ textAlign: 'right' }} value={form.travelers} onChange={(e) => setForm({ ...form, travelers: e.target.value })} />
                   </div>
-                ) : null}
-                <div className={form.service_type === 'حج' || form.service_type === 'عمرة' ? 'sm:col-span-2' : ''}>
-                  <label className="form-label">تاريخ السفر المفضل</label>
-                  <input type="date" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} className="form-input px-4 text-left" dir="ltr" />
+                )}
+                <div className={`pm-field ${isPackageService ? 'full' : ''}`}>
+                  <label htmlFor="bk-date">تاريخ السفر المفضل</label>
+                  <input id="bk-date" type="date" dir="ltr" value={form.travel_date} onChange={(e) => setForm({ ...form, travel_date: e.target.value })} />
                 </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="form-label">ملاحظات إضافية</label>
-                <div className="relative">
-                  <FileText size={16} className="absolute top-4 left-3 text-gray-400 pointer-events-none" />
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="form-input pl-12 pr-4 min-h-[90px] resize-none text-right" placeholder="أي تفاصيل إضافية تود إخبارنا بها" dir="rtl" />
+                <div className="pm-field full">
+                  <label htmlFor="bk-notes">ملاحظات</label>
+                  <textarea id="bk-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="مستوى الفندق، غرفة ثنائية أو ثلاثية، أي طلب خاص" />
                 </div>
               </div>
 
               {/* Optional documents */}
               <div>
-                <label className="form-label">المستندات <span className="text-gray-400 font-normal text-xs">(اختياري — يمكن رفعها لاحقاً)</span></label>
+                <p className="pm-label mb-2">المستندات <span className="opt">(اختياري — يمكن رفعها لاحقاً)</span></p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {optionalDocs.map((d) => {
                     const file = docFiles[d.id];
                     return (
-                      <div key={d.id} className={`rounded-2xl border-2 p-3 transition-all ${file ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-100'}`}>
+                      <div key={d.id} className={`rounded-[12px] border p-3 transition-colors ${file ? 'border-pm-gold-deep bg-pm-gold-soft/40' : 'border-pm-line bg-white'}`}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-emerald-900">{d.label}</span>
-                          {file && <CheckCircle2 size={14} className="text-emerald-500" />}
+                          <span className="text-sm font-semibold text-pm-teal">{d.label}</span>
+                          {file && <CheckCircle2 size={15} className="text-pm-gold-deep" />}
                         </div>
                         {!file ? (
                           <button
                             type="button"
                             onClick={() => fileRefs.current[d.id]?.click()}
-                            className="w-full border-2 border-dashed border-gray-200 rounded-xl py-4 flex flex-col items-center gap-1 text-gray-400 hover:border-gold-400 hover:text-gold-600 transition-all"
+                            className="w-full border border-dashed border-pm-line rounded-[10px] py-4 flex flex-col items-center gap-1 text-pm-muted hover:border-pm-gold-deep hover:text-pm-gold-deep transition-colors"
                           >
                             <Upload size={16} />
-                            <span className="text-[10px] font-semibold">رفع</span>
+                            <span className="text-xs font-semibold">رفع ملف</span>
                           </button>
                         ) : (
                           <div className="space-y-1.5">
-                            <p className="text-[10px] text-gray-600 truncate bg-white rounded px-1.5 py-1">{file.name}</p>
+                            <p className="text-xs text-pm-ink truncate bg-white rounded px-2 py-1">{file.name}</p>
                             <div className="flex items-center gap-1">
-                              <button type="button" onClick={() => previewFile(d.id)} className="p-1 rounded hover:bg-emerald-50 text-emerald-600"><Eye size={12} /></button>
-                              <button type="button" onClick={() => setDocFiles({ ...docFiles, [d.id]: null })} className="p-1 rounded hover:bg-red-50 text-red-500"><Trash2 size={12} /></button>
+                              <button type="button" aria-label="معاينة" onClick={() => previewFile(d.id)} className="p-1.5 rounded text-pm-teal hover:bg-white"><Eye size={14} /></button>
+                              <button type="button" aria-label="حذف" onClick={() => setDocFiles({ ...docFiles, [d.id]: null })} className="p-1.5 rounded text-[#8A2E1F] hover:bg-white"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         )}
@@ -572,21 +524,14 @@ export default function BookingPage({ preset, onDone }: Props) {
                 </div>
               </div>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">{error}</div>
-              )}
+              {error && <div className="pm-error" role="alert">{error}</div>}
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="w-full bg-gradient-gold text-emerald-950 font-black py-4 rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <><Loader2 size={18} className="animate-spin" /> جارٍ إرسال الطلب...</>
-                ) : (
-                  <><Send size={18} /> تأكيد الحجز</>
-                )}
-              </button>
+              <div className="pm-form-foot" style={{ marginTop: 0 }}>
+                <button type="button" onClick={handleSubmit} disabled={submitting} className="pm-btn pm-btn-gold">
+                  {submitting ? <><Loader2 size={18} className="animate-spin" /> جارٍ إرسال الطلب...</> : <><Send size={17} /> إرسال الطلب</>}
+                </button>
+                <small>أو راسلنا مباشرة على <a href={waLink()} target="_blank" rel="noopener noreferrer" className="pm-link" style={{ fontSize: 13 }}>واتساب</a></small>
+              </div>
             </div>
           </div>
         </div>
@@ -594,3 +539,4 @@ export default function BookingPage({ preset, onDone }: Props) {
     </div>
   );
 }
+

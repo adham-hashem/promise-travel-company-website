@@ -7,6 +7,22 @@ export default {
         cairo: ['Cairo', 'sans-serif'],
       },
       colors: {
+        // Visitor-site palette (see src/styles/public-site.css)
+        pm: {
+          teal: '#053D43',
+          'teal-2': '#0A4A50',
+          'teal-3': '#13595F',
+          gold: '#DDBB6B',
+          'gold-deep': '#A9832F',
+          'gold-soft': '#F3E6C4',
+          paper: '#F4F7F6',
+          tint: '#E9EFED',
+          ink: '#11292A',
+          muted: '#566B6B',
+          line: '#DCE5E3',
+          'on-teal': '#F4F1EB',
+          'on-teal-muted': '#B4C8C5',
+        },
         navy: {
           50: '#eef2f9',
           100: '#d5def0',

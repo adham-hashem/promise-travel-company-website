@@ -15,6 +15,8 @@ import BookingPage from '../../pages/public/BookingPage';
 import ContactPage from '../../pages/public/ContactPage';
 import BrandInfoPage from '../../pages/public/BrandInfoPage';
 import FloatingSocial from './FloatingSocial';
+import { FAQS, SITE } from './site/siteData';
+import '../../styles/public-site.css';
 
 export type PublicPage =
   | 'home' | 'about' | 'services' | 'hajj' | 'umrah' | 'internal'
@@ -105,40 +107,11 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
   home: {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: [
-      {
-        '@type': 'Question',
-        name: 'كيف يمكنني الحجز مع بروميس للسياحة؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'يمكنك الحجز مباشرة من خلال صفحة الحجز على موقعنا، أو التواصل معنا هاتفياً وسيقوم فريقنا بمساعدتك في إتمام الحجز.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل تشمل باقات الحج والعمرة تذاكر الطيران؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، جميع باقات الحج والعمرة تشمل تذاكر الطيران ذهاباً وعودة، كما تشمل الإقامة والنقل والتأشيرات.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل يمكنني الدفع على دفعات؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، نوفر نظام دفع مرن يتيح لك دفع جزء من المبلغ عند الحجز والباقي قبل موعد السفر بفترة كافية.',
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'هل توفرون مرشدين سياحيين؟',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'نعم، نوفر مرشدين متخصصين يتحدثون العربية والإنجليزية طوال فترة الرحلة لضمان تجربة مريحة وممتعة.',
-        },
-      },
-    ],
+    mainEntity: FAQS.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
   },
   hajj: {
     '@context': 'https://schema.org',
@@ -166,21 +139,18 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
   },
   contact: {
     '@context': 'https://schema.org',
-    '@type': 'LocalBusiness',
-    name: 'Promise Travel | بروميس للسياحة والسفر',
-    telephone: '+201012484971',
-    email: 'info@promisetravel.com',
+    '@type': 'TravelAgency',
+    name: `${SITE.name} | Promise Travel`,
+    telephone: SITE.phones.map((p) => `+2${p}`),
+    email: SITE.email,
     url: 'https://promisetravelgroup.com/contact',
+    sameAs: [SITE.facebook],
     address: {
       '@type': 'PostalAddress',
-      addressLocality: 'القاهرة',
+      streetAddress: 'المركزية خلف بي تك',
+      addressLocality: 'دمياط الجديدة',
+      addressRegion: 'دمياط',
       addressCountry: 'EG',
-    },
-    openingHoursSpecification: {
-      '@type': 'OpeningHoursSpecification',
-      dayOfWeek: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-      opens: '09:00',
-      closes: '22:00',
     },
   },
 };
@@ -253,7 +223,7 @@ export default function WebsiteRouter() {
   const currentSEO = SEO_META[page] || SEO_META.home;
 
   return (
-    <div className="public-shell min-h-screen bg-white flex flex-col" dir="rtl">
+    <div className="public-shell min-h-screen flex flex-col" dir="rtl">
       <SEOHead
         title={currentSEO.title}
         description={currentSEO.description}
@@ -263,7 +233,7 @@ export default function WebsiteRouter() {
 
       <WebsiteHeader currentPage={page} onNavigate={go} />
 
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1">
         {page === 'home' && <Home onNavigate={go} />}
         {page === 'about' && <BrandInfoPage mode="about" onNavigate={go} />}
         {page === 'services' && <BrandInfoPage mode="services" onNavigate={go} />}
@@ -275,8 +245,8 @@ export default function WebsiteRouter() {
         {page === 'offers' && <OffersPage onNavigate={go} />}
         {page === 'offer-details' && offerId && <OfferDetailsPage offerId={offerId} onNavigate={go} />}
         {page === 'package-details' && packageId && <PackageDetailsPage packageId={packageId} onNavigate={go} />}
-        {page === 'booking' && <BookingPage preset={bookingPreset} onDone={() => go('home')} />}
-        {page === 'contact' && <ContactPage />}
+        {page === 'booking' && <BookingPage preset={bookingPreset} onDone={() => go('home')} onNavigate={go} />}
+        {page === 'contact' && <ContactPage preset={bookingPreset} onNavigate={go} />}
       </main>
 
       <WebsiteFooter onNavigate={go} />

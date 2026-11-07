@@ -51,18 +51,19 @@ export default function ShareButton({ title, label = 'مشاركة', compact = f
     { id: 'telegram', label: 'تيليجرام', icon: Send, color: 'bg-sky-500 text-white', show: true },
     { id: 'messenger', label: 'ماسنجر', icon: MessageCircle, color: 'bg-violet-600 text-white', show: true },
     { id: 'email', label: 'بريد إلكتروني', icon: Mail, color: 'bg-amber-600 text-white', show: true },
-    { id: 'copy', label: copied ? 'تم نسخ الرابط' : 'نسخ الرابط', icon: copied ? Check : Link2, color: 'bg-emerald-950 text-gold-400', show: true },
+    { id: 'copy', label: copied ? 'تم نسخ الرابط' : 'نسخ الرابط', icon: copied ? Check : Link2, color: 'bg-pm-teal text-pm-gold', show: true },
   ];
 
   return (
     <div className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className={`flex items-center gap-1.5 rounded-xl font-bold transition-all ${
+        className={`flex items-center gap-1.5 font-semibold transition-all ${
           compact
-            ? 'w-9 h-9 justify-center bg-white/90 backdrop-blur text-emerald-950 hover:bg-white shadow-sm'
-            : 'px-3 py-2 text-xs bg-emerald-50 text-emerald-950 hover:bg-emerald-100'
+            ? 'w-9 h-9 justify-center rounded-full bg-white/90 backdrop-blur text-pm-teal hover:bg-white shadow-sm'
+            : 'px-4 py-2 text-sm rounded-full bg-pm-gold-soft text-pm-teal hover:bg-[#EEDCAE]'
         }`}
+        type="button"
         aria-label={label}
       >
         <Share2 size={compact ? 16 : 14} />
@@ -72,7 +73,7 @@ export default function ShareButton({ title, label = 'مشاركة', compact = f
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 min-w-[210px] animate-fadeIn">
+          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-2xl shadow-xl border border-pm-line p-3 min-w-[210px] animate-fadeIn text-pm-ink">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-bold text-gray-500">شارك على</span>
               <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
