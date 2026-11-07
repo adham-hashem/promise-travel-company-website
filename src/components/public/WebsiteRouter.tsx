@@ -144,7 +144,7 @@ const PAGE_JSONLD: Partial<Record<PublicPage, object>> = {
     telephone: SITE.phones.map((p) => `+2${p}`),
     email: SITE.email,
     url: 'https://promisetravelgroup.com/contact',
-    sameAs: [SITE.facebook],
+    sameAs: [SITE.facebook, SITE.instagram],
     address: {
       '@type': 'PostalAddress',
       streetAddress: 'المركزية خلف بي تك',

@@ -12,6 +12,8 @@ export const SITE = {
   email: 'Promisetravelcompany@gmail.com',
   facebook: 'https://www.facebook.com/share/1KMnsgykQi/',
   facebookLabel: 'برومس للسياحة-Promise',
+  instagram: 'https://www.instagram.com/promise_travel',
+  instagramLabel: '@promise_travel',
   address: 'المركزية خلف بي تك – دمياط الجديدة – دمياط',
   logoMark: '/brand/logo-mark.webp',
   logoFull: '/brand/logo-full.webp',

@@ -35,7 +35,9 @@ export default function WebsiteFooter({ onNavigate }: Props) {
         </ul>
       </div>
       <div className="pm-legal">
-        <a href={SITE.facebook} target="_blank" rel="noopener noreferrer">تابعنا على فيسبوك</a>
+        <a href={SITE.facebook} target="_blank" rel="noopener noreferrer">فيسبوك</a>
+        {' · '}
+        <a href={SITE.instagram} target="_blank" rel="noopener noreferrer">إنستجرام</a>
         {' · © '}<span className="pm-num">{new Date().getFullYear()}</span> {SITE.name} · ترخيص وزارة السياحة رقم <span className="pm-num">{SITE.license}</span>
       </div>
     </footer>

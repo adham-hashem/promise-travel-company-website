@@ -46,6 +46,7 @@ export function ContactInfoPanel({ onCopied }: { onCopied: (m: string) => void }
         <div><dt>أرقام الحجز والاستفسار</dt><dd><PhoneList onCopied={onCopied} /></dd></div>
         <div><dt>البريد الإلكتروني</dt><dd><a className="pm-num" href={`mailto:${SITE.email}`} style={{ textDecoration: 'none' }}>{SITE.email}</a></dd></div>
         <div><dt>فيسبوك</dt><dd><a href={SITE.facebook} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', textUnderlineOffset: 4 }}>{SITE.facebookLabel}</a></dd></div>
+        <div><dt>إنستجرام</dt><dd><a className="pm-num" href={SITE.instagram} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', textUnderlineOffset: 4 }}>{SITE.instagramLabel}</a></dd></div>
       </dl>
     </aside>
   );
